@@ -42,7 +42,7 @@
 #include "mdp4.h"
 
 #define MDP4_VIDEO_ENHANCE_TUNING
-#define VIDEO_ENHANCE_DEBUG
+//#define VIDEO_ENHANCE_DEBUG
 
 #ifdef VIDEO_ENHANCE_DEBUG
 #define DPRINT(x...)	printk(KERN_ERR "mdnie " x)
@@ -52,7 +52,7 @@
 
 #define MAX_LUT_SIZE	256
 
-unsigned int mDNIe_data[MAX_LUT_SIZE * 3];
+u8 mDNIe_data[MAX_LUT_SIZE * 3];
 
 int play_speed_1_5;
 #if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OLED_VIDEO_HD_PT) || \
@@ -274,7 +274,7 @@ void free_cmap(struct fb_cmap *cmap)
 }
 
 
-void lut_tune(int num, unsigned int *pLutTable)
+void lut_tune(int num, u8 *pLutTable)
 {
 	__u16 *r, *g, *b, i;
 	int j;
@@ -393,7 +393,7 @@ int s3c_mdnie_off()
 
 void mDNIe_Set_Mode(enum Lcd_mDNIe_UI mode)
 {
-	unsigned int *pLut;
+	u8 *pLut;
 	int sharpvalue = 0;
 	static int isSetDMBMode;
 
@@ -508,7 +508,7 @@ void mDNIe_Set_Mode(enum Lcd_mDNIe_UI mode)
 
 void mDNIe_set_negative(enum Lcd_mDNIe_Negative negative)
 {
-	unsigned int *pLut;
+	u8 *pLut;
 	int sharpvalue = 0;
 
 	if (negative == 0) {
