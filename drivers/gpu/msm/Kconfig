@@ -8,6 +8,56 @@ config MSM_KGSL
 	  3D graphics driver. Required to use hardware accelerated
 	  OpenGL ES 2.0 and 1.1.
 
+choice
+	prompt "Adreno GPU Model"
+	default ADR_RUNTIME
+	depends on MSM_KGSL
+	help
+	  If set to "Runtime detection", the full Adreno driver suite will be
+	  compiled, and the resulting code will run across all Adreno models.
+	  If a specific model is selected, only code and data required for that
+	  specific model will be compiled.
+
+	config ADR_RUNTIME
+		bool "Runtime detection"
+
+	config ADR_200
+		bool "Adreno 200"
+
+	config ADR_203
+		bool "Adreno 203"
+
+	config ADR_205
+		bool "Adreno 205"
+
+	config ADR_220
+		bool "Adreno 220"
+
+	config ADR_225
+		bool "Adreno 225"
+
+	config ADR_305
+		bool "Adreno 305"
+
+	config ADR_320
+		bool "Adreno 320"
+
+	config ADR_330
+		bool "Adreno 330"
+endchoice
+
+config AXXX_REV
+	int
+	default 0 if ADR_RUNTIME
+	default 200 if ADR_200
+	default 203 if ADR_203
+	default 205 if ADR_205
+	default 220 if ADR_220
+	default 225 if ADR_225
+	default 305 if ADR_305
+	default 320 if ADR_320
+	default 330 if ADR_330
+
 config MSM_KGSL_CFF_DUMP
 	bool "Enable KGSL Common File Format (CFF) Dump Feature [Use with caution]"
 	default n

@@ -59,6 +59,7 @@ struct adreno_ringbuffer {
 	unsigned int global_ts;
 };
 
+
 #ifdef CONFIG_MSM_KGSL_CFF_DUMP
 #define GSL_RB_WRITE(ring, gpuaddr, data) \
 	do { \

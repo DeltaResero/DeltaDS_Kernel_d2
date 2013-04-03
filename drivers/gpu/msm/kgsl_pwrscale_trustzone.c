@@ -8,7 +8,7 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * Modified by Paul Reioux (Faux123)
  * 2013-06-20: Added KGSL Simple GPU Governor
  *
@@ -211,7 +211,7 @@ static int simple_governor(struct kgsl_device *device, int idle_stat)
 
 		if (laziness <= -simple_gpu_default_laziness / 2) {
 			laziness = 0;
-			return -1; 
+			return -1;
 		}
 	} else {
 		if (laziness < simple_gpu_default_laziness)

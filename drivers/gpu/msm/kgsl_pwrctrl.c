@@ -94,6 +94,7 @@ static void update_clk_statistics(struct kgsl_device *device,
  * Given a requested power level do bounds checking on the constraints and
  * return the nearest possible level
  */
+
 extern int limited_gpu_pwrlevel;
 static inline int _adjust_pwrlevel(struct kgsl_pwrctrl *pwr, int level)
 {
@@ -172,12 +173,10 @@ void kgsl_pwrctrl_pwrlevel_change(struct kgsl_device *device,
 				pwrlevel->bus_freq);
 		else if (pwr->ebi1_clk)
 			clk_set_rate(pwr->ebi1_clk, pwrlevel->bus_freq);
-	}
-
-	trace_kgsl_pwrlevel(device, pwr->active_pwrlevel, pwrlevel->gpu_freq);
 #ifdef CONFIG_CPU_FREQ_GOV_ELEMENTALX
         graphics_boost = pwr->active_pwrlevel;
 #endif
+	}
 }
 
 EXPORT_SYMBOL(kgsl_pwrctrl_pwrlevel_change);
@@ -729,7 +728,6 @@ void kgsl_pwrctrl_clk(struct kgsl_device *device, int state,
 	if (state == KGSL_PWRFLAGS_OFF) {
 		if (test_and_clear_bit(KGSL_PWRFLAGS_CLK_ON,
 			&pwr->power_flags)) {
-			trace_kgsl_clk(device, state);
 			for (i = KGSL_MAX_CLKS - 1; i > 0; i--)
 				if (pwr->grp_clks[i])
 					clk_disable(pwr->grp_clks[i]);
@@ -757,7 +755,6 @@ void kgsl_pwrctrl_clk(struct kgsl_device *device, int state,
 	} else if (state == KGSL_PWRFLAGS_ON) {
 		if (!test_and_set_bit(KGSL_PWRFLAGS_CLK_ON,
 			&pwr->power_flags)) {
-			trace_kgsl_clk(device, state);
 			/* High latency clock maintenance. */
 			if (device->state != KGSL_STATE_NAP) {
 				for (i = KGSL_MAX_CLKS - 1; i > 0; i--)
@@ -787,7 +784,6 @@ void kgsl_pwrctrl_axi(struct kgsl_device *device, int state)
 	if (state == KGSL_PWRFLAGS_OFF) {
 		if (test_and_clear_bit(KGSL_PWRFLAGS_AXI_ON,
 			&pwr->power_flags)) {
-			trace_kgsl_bus(device, state);
 			if (pwr->ebi1_clk) {
 				clk_set_rate(pwr->ebi1_clk, 0);
 				clk_disable_unprepare(pwr->ebi1_clk);
@@ -799,7 +795,6 @@ void kgsl_pwrctrl_axi(struct kgsl_device *device, int state)
 	} else if (state == KGSL_PWRFLAGS_ON) {
 		if (!test_and_set_bit(KGSL_PWRFLAGS_AXI_ON,
 			&pwr->power_flags)) {
-			trace_kgsl_bus(device, state);
 			if (pwr->ebi1_clk) {
 				clk_prepare_enable(pwr->ebi1_clk);
 				clk_set_rate(pwr->ebi1_clk,
@@ -821,7 +816,6 @@ void kgsl_pwrctrl_pwrrail(struct kgsl_device *device, int state)
 	if (state == KGSL_PWRFLAGS_OFF) {
 		if (test_and_clear_bit(KGSL_PWRFLAGS_POWER_ON,
 			&pwr->power_flags)) {
-			trace_kgsl_rail(device, state);
 			if (pwr->gpu_cx)
 				regulator_disable(pwr->gpu_cx);
 			if (pwr->gpu_reg)
@@ -830,7 +824,6 @@ void kgsl_pwrctrl_pwrrail(struct kgsl_device *device, int state)
 	} else if (state == KGSL_PWRFLAGS_ON) {
 		if (!test_and_set_bit(KGSL_PWRFLAGS_POWER_ON,
 			&pwr->power_flags)) {
-			trace_kgsl_rail(device, state);
 			if (pwr->gpu_reg) {
 				int status = regulator_enable(pwr->gpu_reg);
 				if (status)
@@ -858,13 +851,11 @@ void kgsl_pwrctrl_irq(struct kgsl_device *device, int state)
 	if (state == KGSL_PWRFLAGS_ON) {
 		if (!test_and_set_bit(KGSL_PWRFLAGS_IRQ_ON,
 			&pwr->power_flags)) {
-			trace_kgsl_irq(device, state);
 			enable_irq(pwr->interrupt_num);
 		}
 	} else if (state == KGSL_PWRFLAGS_OFF) {
 		if (test_and_clear_bit(KGSL_PWRFLAGS_IRQ_ON,
 			&pwr->power_flags)) {
-			trace_kgsl_irq(device, state);
 			if (in_interrupt())
 				disable_irq_nosync(pwr->interrupt_num);
 			else
@@ -1247,7 +1238,6 @@ int kgsl_pwrctrl_wake(struct kgsl_device *device)
 {
 	int status = 0;
 	unsigned int context_id;
-	unsigned int state = device->state;
 	unsigned int ts_processed = 0xdeaddead;
 	struct kgsl_context *context;
 
@@ -1273,7 +1263,7 @@ int kgsl_pwrctrl_wake(struct kgsl_device *device)
 			ts_processed = kgsl_readtimestamp(device, context,
 				KGSL_TIMESTAMP_RETIRED);
 		KGSL_PWR_INFO(device, "Wake from %s state. CTXT: %d RTRD TS: %08X\n",
-			kgsl_pwrstate_to_str(state),
+			kgsl_pwrstate_to_str(device->state),
 			context ? context->id : -1, ts_processed);
 		kgsl_context_put(context);
 		/* fall through */
@@ -1326,7 +1316,6 @@ EXPORT_SYMBOL(kgsl_pwrctrl_disable);
 
 void kgsl_pwrctrl_set_state(struct kgsl_device *device, unsigned int state)
 {
-	trace_kgsl_pwr_set_state(device, state);
 	device->state = state;
 	device->requested_state = KGSL_STATE_NONE;
 }
@@ -1334,8 +1323,6 @@ EXPORT_SYMBOL(kgsl_pwrctrl_set_state);
 
 void kgsl_pwrctrl_request_state(struct kgsl_device *device, unsigned int state)
 {
-	if (state != KGSL_STATE_NONE && state != device->requested_state)
-		trace_kgsl_pwr_request_state(device, state);
 	device->requested_state = state;
 }
 EXPORT_SYMBOL(kgsl_pwrctrl_request_state);

@@ -283,6 +283,9 @@ int adreno_ringbuffer_load_pm4_ucode(struct kgsl_device *device)
 		adreno_regwrite(device, REG_CP_ME_RAM_DATA,
 			adreno_dev->pm4_fw[i]);
 
+	/* Done writing firmware, reset debug flags */
+	adreno_regwrite(device, REG_CP_DEBUG, 0);
+
 	return 0;
 }
 
@@ -454,8 +457,10 @@ int adreno_ringbuffer_start(struct adreno_ringbuffer *rb)
 
 void adreno_ringbuffer_stop(struct adreno_ringbuffer *rb)
 {
+#if !CONFIG_AXXX_REV
 	struct kgsl_device *device = rb->device;
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
+#endif
 
 	if (rb->flags & KGSL_FLAGS_STARTED) {
 		if (adreno_is_a200(adreno_dev))
@@ -528,7 +533,9 @@ adreno_ringbuffer_addcmds(struct adreno_ringbuffer *rb,
 				unsigned int flags, unsigned int *cmds,
 				int sizedwords)
 {
+#if !CONFIG_AXXX_REV
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(rb->device);
+#endif
 	unsigned int *ringcmds;
 	unsigned int total_sizedwords = sizedwords;
 	unsigned int i;
@@ -571,8 +578,8 @@ adreno_ringbuffer_addcmds(struct adreno_ringbuffer *rb,
 	if (adreno_is_a3xx(adreno_dev))
 		total_sizedwords += 7;
 
-	if (adreno_is_a2xx(adreno_dev))
-		total_sizedwords += 2; /* CP_WAIT_FOR_IDLE */
+	/*if (adreno_is_a2xx(adreno_dev))
+		total_sizedwords += 2;*/ /* CP_WAIT_FOR_IDLE */
 
 	total_sizedwords += 2; /* scratchpad ts for recovery */
 	total_sizedwords += 3; /* sop timestamp */
@@ -643,11 +650,13 @@ adreno_ringbuffer_addcmds(struct adreno_ringbuffer *rb,
 	* due to memory getting free early before
 	* GPU completes it.
 	*/
+	/*
 	if (adreno_is_a2xx(adreno_dev)) {
 		GSL_RB_WRITE(ringcmds, rcmd_gpu,
 			cp_type3_packet(CP_WAIT_FOR_IDLE, 1));
 		GSL_RB_WRITE(ringcmds, rcmd_gpu, 0x00);
 	}
+	*/
 
 	if (adreno_is_a3xx(adreno_dev)) {
 		/*
@@ -731,6 +740,7 @@ adreno_ringbuffer_addcmds(struct adreno_ringbuffer *rb,
 				CP_INT_CNTL__RB_INT_MASK);
 	}
 
+#if __adreno_is_a3xx
 	if (adreno_is_a3xx(adreno_dev)) {
 		/* Dummy set-constant to trigger context rollover */
 		GSL_RB_WRITE(ringcmds, rcmd_gpu,
@@ -739,6 +749,7 @@ adreno_ringbuffer_addcmds(struct adreno_ringbuffer *rb,
 			(0x4<<16)|(A3XX_HLSQ_CL_KERNEL_GROUP_X_REG - 0x2000));
 		GSL_RB_WRITE(ringcmds, rcmd_gpu, 0);
 	}
+#endif
 
 	if (flags & KGSL_CMD_FLAGS_EOF) {
 		GSL_RB_WRITE(ringcmds, rcmd_gpu, cp_nop_packet(1));
@@ -972,9 +983,8 @@ adreno_ringbuffer_issueibcmds(struct kgsl_device_private *dev_priv,
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
 	unsigned int *link = 0;
 	unsigned int *cmds;
-	unsigned int i;
+	unsigned int i = 0;
 	struct adreno_context *drawctxt = NULL;
-	unsigned int start_index = 0;
 	int ret = 0;
 
 	if (device->state & KGSL_STATE_HUNG) {
@@ -1007,22 +1017,22 @@ adreno_ringbuffer_issueibcmds(struct kgsl_device_private *dev_priv,
 		numibs = 0;
 	}
 
-	cmds = link = kzalloc(sizeof(unsigned int) * (numibs * 3 + 4),
-				GFP_KERNEL);
-	if (!link) {
-		ret = -ENOMEM;
-		goto done;
-	}
-
 	/*When preamble is enabled, the preamble buffer with state restoration
 	commands are stored in the first node of the IB chain. We can skip that
 	if a context switch hasn't occured */
 
 	if (drawctxt->flags & CTXT_FLAGS_PREAMBLE &&
 		adreno_dev->drawctxt_active == drawctxt)
-		start_index = 1;
+		i = 1;
 
-	if (!start_index) {
+	cmds = link = kmalloc(sizeof(unsigned int) * (numibs * 3 + 4),
+				GFP_KERNEL);
+	if (unlikely(!link)) {
+		ret = -ENOMEM;
+		goto done;
+	}
+
+	if (!i) {
 		*cmds++ = cp_nop_packet(1);
 		*cmds++ = KGSL_START_OF_IB_IDENTIFIER;
 	} else {
@@ -1032,7 +1042,7 @@ adreno_ringbuffer_issueibcmds(struct kgsl_device_private *dev_priv,
 		*cmds++ = ibdesc[0].gpuaddr;
 		*cmds++ = ibdesc[0].sizedwords;
 	}
-	for (i = start_index; i < numibs; i++) {
+	for (; i < numibs; i++) {
 		if (unlikely(adreno_dev->ib_check_level >= 1 &&
 		    !_parse_ibs(dev_priv, ibdesc[i].gpuaddr,
 				ibdesc[i].sizedwords))) {
@@ -1103,10 +1113,6 @@ adreno_ringbuffer_issueibcmds(struct kgsl_device_private *dev_priv,
 	}
 
 done:
-	kgsl_trace_issueibcmds(device, context ? context->id : 0, ibdesc,
-		numibs, *timestamp, flags, ret,
-		drawctxt ? drawctxt->type : 0);
-
 	kfree(link);
 	return ret;
 }
