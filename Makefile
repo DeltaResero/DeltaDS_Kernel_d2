@@ -347,7 +347,8 @@ CHECK		= sparse
 
 # Use the wrapper for the compiler.  This wrapper scans for new
 # warnings and causes the build to stop upon encountering them.
-CC		= $(srctree)/scripts/gcc-wrapper.py $(REAL_CC)
+#CC		= $(srctree)/scripts/gcc-wrapper.py $(REAL_CC)
+CC		= $(REAL_CC)
 
 CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ \
 		  -Wbitwise -Wno-return-void $(CF)
@@ -357,6 +358,11 @@ LDFLAGS_MODULE  =
 CFLAGS_KERNEL	=
 AFLAGS_KERNEL	=
 CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
+CFLAGS_A15	= -marm -mtune=cortex-a15 -mfpu=neon -mfloat-abi=softfp -march=armv7-a \
+		  -funsafe-math-optimizations -funroll-loops -mvectorize-with-neon-quad
+CFLAGS_GR	= -fgraphite-identity -floop-block -ftree-loop-linear \
+		  -floop-strip-mine -ftree-loop-distribution
+CFLAGS_MOD	= -fmodulo-sched -fmodulo-sched-allow-regmoves
 
 
 # Use LINUXINCLUDE when you must reference the include/ directory.
@@ -372,7 +378,8 @@ KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -fno-strict-aliasing -fno-common \
 		   -Werror-implicit-function-declaration \
 		   -Wno-format-security \
-		   -fno-delete-null-pointer-checks
+		   -fno-delete-null-pointer-checks \
+		   $(CFLAGS_A15) $(CFLAGS_GR) $(CFLAGS_MOD)
 KBUILD_AFLAGS_KERNEL :=
 KBUILD_CFLAGS_KERNEL :=
 KBUILD_AFLAGS   := -D__ASSEMBLY__
@@ -565,7 +572,7 @@ all: vmlinux
 ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
 KBUILD_CFLAGS	+= -Os
 else
-KBUILD_CFLAGS	+= -O2
+KBUILD_CFLAGS	+= -O3
 endif
 
 include $(srctree)/arch/$(SRCARCH)/Makefile
