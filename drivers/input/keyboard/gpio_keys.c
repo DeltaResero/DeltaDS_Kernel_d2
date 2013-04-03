@@ -29,6 +29,7 @@
 #include <linux/of_platform.h>
 #include <linux/of_gpio.h>
 #include <linux/spinlock.h>
+#include <linux/cpufreq.h>
 
 struct gpio_button_data {
 	const struct gpio_keys_button *button;
@@ -338,6 +339,11 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 		input_event(input, type, button->code, !!state);
 	}
 	input_sync(input);
+	if (button->code == KEY_HOMEPAGE) {
+		cpufreq_set_interactivity(1, INTERACT_ID_HARDKEY);
+		if (!state)
+			cpufreq_set_interactivity(0, INTERACT_ID_HARDKEY);
+	}
 }
 
 static void gpio_keys_gpio_work_func(struct work_struct *work)
@@ -346,6 +352,7 @@ static void gpio_keys_gpio_work_func(struct work_struct *work)
 		container_of(work, struct gpio_button_data, work);
 
 	gpio_keys_gpio_report_event(bdata);
+	cpufreq_set_interactivity(0, INTERACT_ID_HARDKEY);
 }
 
 static void gpio_keys_gpio_timer(unsigned long _data)
@@ -353,6 +360,7 @@ static void gpio_keys_gpio_timer(unsigned long _data)
 	struct gpio_button_data *bdata = (struct gpio_button_data *)_data;
 
 	schedule_work(&bdata->work);
+	cpufreq_set_interactivity(0, INTERACT_ID_HARDKEY);
 }
 
 static irqreturn_t gpio_keys_gpio_isr(int irq, void *dev_id)

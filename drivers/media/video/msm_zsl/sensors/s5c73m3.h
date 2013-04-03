@@ -18,7 +18,7 @@
 #include <mach/board.h>
 
 /*#define DEBUG_LEVEL_HIGH */
-#define DEBUG_LEVEL_MID
+//#define DEBUG_LEVEL_MID
 
 /* #define DEBUG_CAM_I2C */
 

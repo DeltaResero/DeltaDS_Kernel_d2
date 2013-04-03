@@ -13,6 +13,58 @@
 #ifndef __ADRENO_H
 #define __ADRENO_H
 
+#if !CONFIG_AXXX_REV
+#define __adreno_is_a200 (1)
+#define __adreno_is_a203 (1)
+#define __adreno_is_a205 (1)
+#define __adreno_is_a20x (1)
+#define __adreno_is_a220 (1)
+#define __adreno_is_a225 (1)
+#define __adreno_is_a22x (1)
+#define __adreno_is_a2xx (1)
+#define __adreno_is_a3xx (1)
+#define __adreno_is_a305 (1)
+#define __adreno_is_a320 (1)
+#define __adreno_is_a330 (1)
+#else
+#define adreno_is_a200(dev) \
+	(CONFIG_AXXX_REV == 200)
+#define adreno_is_a203(dev) \
+	(CONFIG_AXXX_REV == 203)
+#define adreno_is_a205(dev) \
+	(CONFIG_AXXX_REV == 205)
+#define adreno_is_a20x(dev) \
+	(CONFIG_AXXX_REV >= 200 && CONFIG_AXXX_REV < 220)
+#define adreno_is_a220(dev) \
+	(CONFIG_AXXX_REV == 220)
+#define adreno_is_a225(dev) \
+	(CONFIG_AXXX_REV == 225)
+#define adreno_is_a22x(dev) \
+	(CONFIG_AXXX_REV >= 220 && CONFIG_AXXX_REV < 300)
+#define adreno_is_a2xx(dev) \
+	(CONFIG_AXXX_REV >= 200 && CONFIG_AXXX_REV < 300)
+#define adreno_is_a3xx(dev) \
+	(CONFIG_AXXX_REV >= 300)
+#define adreno_is_a305(dev) \
+	(CONFIG_AXXX_REV == 305)
+#define adreno_is_a320(dev) \
+	(CONFIG_AXXX_REV == 320)
+#define adreno_is_a330(dev) \
+	(CONFIG_AXXX_REV == 330)
+#define __adreno_is_a200 adreno_is_a200(0)
+#define __adreno_is_a203 adreno_is_a203(0)
+#define __adreno_is_a205 adreno_is_a205(0)
+#define __adreno_is_a20x adreno_is_a20x(0)
+#define __adreno_is_a220 adreno_is_a220(0)
+#define __adreno_is_a225 adreno_is_a225(0)
+#define __adreno_is_a22x adreno_is_a22x(0)
+#define __adreno_is_a2xx adreno_is_a2xx(0)
+#define __adreno_is_a3xx adreno_is_a3xx(0)
+#define __adreno_is_a305 adreno_is_a305(0)
+#define __adreno_is_a320 adreno_is_a320(0)
+#define __adreno_is_a330 adreno_is_a330(0)
+#endif
+
 #include "kgsl_device.h"
 #include "adreno_drawctxt.h"
 #include "adreno_ringbuffer.h"
@@ -234,6 +286,7 @@ void adreno_dump_rb(struct kgsl_device *device, const void *buf,
 unsigned int adreno_ft_detect(struct kgsl_device *device,
 						unsigned int *prev_reg_val);
 
+#if !CONFIG_AXXX_REV
 static inline int adreno_is_a200(struct adreno_device *adreno_dev)
 {
 	return (adreno_dev->gpurev == ADRENO_REV_A200);
@@ -294,6 +347,7 @@ static inline int adreno_is_a330(struct adreno_device *adreno_dev)
 {
 	return (adreno_dev->gpurev == ADRENO_REV_A330);
 }
+#endif
 
 static inline int adreno_rb_ctxtswitch(unsigned int *cmd)
 {

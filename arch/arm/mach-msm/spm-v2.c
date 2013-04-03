@@ -34,11 +34,7 @@ enum {
 	MSM_SPM_DEBUG_VCTL = 1U << 1,
 };
 
-static int msm_spm_debug_mask;
-module_param_named(
-	debug_mask, msm_spm_debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP
-);
-
+#define msm_spm_debug_mask (0)
 
 static uint32_t msm_spm_reg_offsets_v1[MSM_SPM_REG_NR] = {
 	[MSM_SPM_REG_SAW2_SECURE]		= 0x00,

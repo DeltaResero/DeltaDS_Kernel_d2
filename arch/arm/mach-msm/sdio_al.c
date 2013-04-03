@@ -153,38 +153,11 @@
 
 #define SDIO_TEST_POSTFIX "_TEST"
 
-#define DATA_DEBUG(x, y...)						\
-	do {								\
-		if (sdio_al->debug.debug_data_on)			\
-			pr_info(y);					\
-		sdio_al_log(x, y);					\
-	} while (0)
-
-#define LPM_DEBUG(x, y...)						\
-	do {								\
-		if (sdio_al->debug.debug_lpm_on)			\
-			pr_info(y);					\
-		sdio_al_log(x, y);					\
-	} while (0)
-
-#define sdio_al_loge(x, y...)						\
-	do {								\
-		pr_err(y);						\
-		sdio_al_log(x, y);					\
-	} while (0)
-
-#define sdio_al_logi(x, y...)						\
-	do {								\
-		pr_info(y);						\
-		sdio_al_log(x, y);					\
-	} while (0)
-
-#define CLOSE_DEBUG(x, y...)						\
-	do {								\
-		if (sdio_al->debug.debug_close_on)			\
-			pr_info(y);					\
-		sdio_al_log(x, y);					\
-	} while (0)
+#define DATA_DEBUG(x, y...)
+#define LPM_DEBUG(x, y...)
+#define sdio_al_loge(x, y...)
+#define sdio_al_logi(x, y...)
+#define CLOSE_DEBUG(x, y...)
 
 /* The index of the SDIO card used for the sdio_al_dloader */
 #define SDIO_BOOTLOADER_CARD_INDEX 1
@@ -195,18 +168,6 @@ enum sdio_al_device_state {
 	CARD_INSERTED,
 	CARD_REMOVED,
 	MODEM_RESTART
-};
-
-struct sdio_al_debug {
-	u8 debug_lpm_on;
-	u8 debug_data_on;
-	u8 debug_close_on;
-	struct dentry *sdio_al_debug_root;
-	struct dentry *sdio_al_debug_lpm_on;
-	struct dentry *sdio_al_debug_data_on;
-	struct dentry *sdio_al_debug_close_on;
-	struct dentry *sdio_al_debug_info;
-	struct dentry *sdio_al_debug_log_buffers[MAX_NUM_OF_SDIO_DEVICES + 1];
 };
 
 /* Polling time for the inactivity timer for devices that doesn't have
@@ -317,15 +278,8 @@ struct peer_sdioc_sw_mailbox {
 	struct peer_sdioc_channel_config ch_config[SDIO_AL_MAX_CHANNELS];
 };
 
-#define SDIO_AL_DEBUG_LOG_SIZE 3000
-struct sdio_al_local_log {
-	char buffer[SDIO_AL_DEBUG_LOG_SIZE];
-	unsigned int buf_cur_pos;
-	spinlock_t log_lock;
-};
-
-#define SDIO_AL_DEBUG_TMP_LOG_SIZE 250
-static int sdio_al_log(struct sdio_al_local_log *, const char *fmt, ...);
+static int sdio_al_log(struct sdio_al_local_log *, const char *fmt, ...)
+{ return 1; }
 
 /**
  *  SDIO Abstraction Layer driver context.
@@ -342,8 +296,6 @@ static int sdio_al_log(struct sdio_al_local_log *, const char *fmt, ...);
  *
  */
 struct sdio_al {
-	struct sdio_al_local_log gen_log;
-	struct sdio_al_local_log device_log[MAX_NUM_OF_SDIO_DEVICES];
 	struct sdio_al_platform_data *pdata;
 	struct sdio_al_debug debug;
 	struct sdio_al_device *devices[MAX_NUM_OF_SDIO_DEVICES];
@@ -404,7 +356,6 @@ struct sdio_al_work {
  *
  */
 struct sdio_al_device {
-	struct sdio_al_local_log *dev_log;
 	struct mmc_card *card;
 	struct mmc_host *host;
 	struct sdio_mailbox *mailbox;
@@ -475,20 +426,6 @@ enum peer_op_state {
 static int debug_lpm_on;
 module_param(debug_lpm_on, int, 0);
 
-/*
- * On the kernel command line specify
- * sdio_al.debug_data_on=1 to enable the DATA debug messages
- * By default the DATA debug messages are turned off
- */
-static int debug_data_on;
-module_param(debug_data_on, int, 0);
-
-/*
- * Enables / disables open close debug messages
- */
-static int debug_close_on = 1;
-module_param(debug_close_on, int, 0);
-
 /** The driver context */
 static struct sdio_al *sdio_al;
 
@@ -515,13 +452,7 @@ static int sdio_read_internal(struct sdio_channel *ch, void *data, int len);
 static int sdio_read_from_closed_ch(struct sdio_channel *ch, int len);
 static void stop_and_del_timer(struct sdio_al_device *sdio_al_dev);
 
-#define SDIO_AL_ERR(func)					\
-	do {							\
-		printk_once(KERN_ERR MODULE_NAME		\
-			":In Error state, ignore %s\n",		\
-			func);					\
-		sdio_al_print_info();				\
-	} while (0)
+#define SDIO_AL_ERR(func)
 
 #ifdef CONFIG_DEBUG_FS
 static int debug_info_open(struct inode *inode, struct file *file)
@@ -544,18 +475,6 @@ const struct file_operations debug_info_ops = {
 
 struct debugfs_blob_wrapper sdio_al_dbgfs_log[MAX_NUM_OF_SDIO_DEVICES + 1];
 
-/*
-*
-* Trigger on/off for debug messages
-* for trigger off the data messages debug level use:
-* echo 0 > /sys/kernel/debugfs/sdio_al/debug_data_on
-* for trigger on the data messages debug level use:
-* echo 1 > /sys/kernel/debugfs/sdio_al/debug_data_on
-* for trigger off the lpm messages debug level use:
-* echo 0 > /sys/kernel/debugfs/sdio_al/debug_lpm_on
-* for trigger on the lpm messages debug level use:
-* echo 1 > /sys/kernel/debugfs/sdio_al/debug_lpm_on
-*/
 static int sdio_al_debugfs_init(void)
 {
 	int i, blob_errs = 0;
@@ -657,41 +576,6 @@ static void sdio_al_debugfs_cleanup(void)
 	debugfs_remove(sdio_al->debug.sdio_al_debug_root);
 }
 #endif
-
-static int sdio_al_log(struct sdio_al_local_log *log, const char *fmt, ...)
-{
-	va_list args;
-	int r;
-	char *tp, *log_buf;
-	unsigned int *log_cur_pos;
-	struct timeval kt;
-	unsigned long flags;
-	static char sdio_al_log_tmp[SDIO_AL_DEBUG_TMP_LOG_SIZE];
-
-	spin_lock_irqsave(&log->log_lock, flags);
-
-	kt = ktime_to_timeval(ktime_get());
-	r = scnprintf(sdio_al_log_tmp, SDIO_AL_DEBUG_TMP_LOG_SIZE,
-			"[%8ld.%6ld] ", kt.tv_sec, kt.tv_usec);
-
-	va_start(args, fmt);
-	r += vscnprintf(&sdio_al_log_tmp[r], (SDIO_AL_DEBUG_TMP_LOG_SIZE - r),
-			fmt, args);
-	va_end(args);
-
-	log_buf = log->buffer;
-	log_cur_pos = &(log->buf_cur_pos);
-
-	for (tp = sdio_al_log_tmp; tp < (sdio_al_log_tmp + r); tp++) {
-		log_buf[(*log_cur_pos)++] = *tp;
-		if ((*log_cur_pos) == SDIO_AL_DEBUG_LOG_SIZE)
-			*log_cur_pos = 0;
-	}
-
-	spin_unlock_irqrestore(&log->log_lock, flags);
-
-	return r;
-}
 
 static int sdio_al_verify_func1(struct sdio_al_device *sdio_al_dev,
 				char const *func)
@@ -796,8 +680,6 @@ static void sdio_al_get_into_err_state(struct sdio_al_device *sdio_al_dev)
 		return;
 
 	sdio_al_dev->is_err = true;
-	sdio_al->debug.debug_data_on = 0;
-	sdio_al->debug.debug_lpm_on = 0;
 	sdio_al_print_info();
 }
 
@@ -4031,198 +3913,7 @@ static void sdio_print_mailbox(char *prefix_str, struct sdio_mailbox *mailbox)
 }
 
 static void sdio_al_print_info(void)
-{
-	int i = 0;
-	int j = 0;
-	int ret = 0;
-	struct sdio_mailbox *mailbox = NULL;
-	struct sdio_mailbox *hw_mailbox = NULL;
-	struct peer_sdioc_channel_config *ch_config = NULL;
-	struct sdio_func *func1 = NULL;
-	struct sdio_func *lpm_func = NULL;
-	int offset = 0;
-	int is_ok_to_sleep = 0;
-	char buf[50];
-
-	if (sdio_al->skip_print_info == 1)
-		return;
-
-	sdio_al->skip_print_info = 1;
-
-	sdio_al_loge(&sdio_al->gen_log, MODULE_NAME ": %s - SDIO DEBUG INFO\n",
-			__func__);
-
-	if (!sdio_al) {
-		sdio_al_loge(&sdio_al->gen_log, MODULE_NAME ": %s - ERROR - "
-				"sdio_al is NULL\n",  __func__);
-		return;
-	}
-
-	sdio_al_loge(&sdio_al->gen_log, MODULE_NAME ": GPIO mdm2ap_status=%d\n",
-				sdio_al->pdata->get_mdm2ap_status());
-
-	for (j = 0 ; j < MAX_NUM_OF_SDIO_DEVICES ; ++j) {
-		struct sdio_al_device *sdio_al_dev = sdio_al->devices[j];
-
-		if (sdio_al_dev == NULL) {
-			continue;
-		}
-
-		if (!sdio_al_dev->host) {
-			sdio_al_loge(sdio_al_dev->dev_log, MODULE_NAME ": Host"
-					" is NULL\n);");
-			continue;
-		}
-
-		snprintf(buf, sizeof(buf), "Card#%d: Shadow HW MB",
-		       sdio_al_dev->host->index);
-
-		/* printing Shadowing HW Mailbox*/
-		mailbox = sdio_al_dev->mailbox;
-		sdio_print_mailbox(buf, mailbox);
-
-		sdio_al_loge(sdio_al_dev->dev_log, MODULE_NAME ": Card#%d: "
-			"is_ok_to_sleep=%d\n",
-			sdio_al_dev->host->index,
-			sdio_al_dev->is_ok_to_sleep);
-
-
-		sdio_al_loge(sdio_al_dev->dev_log, MODULE_NAME ": Card#%d: "
-				   "Shadow channels SW MB:",
-		       sdio_al_dev->host->index);
-
-		/* printing Shadowing SW Mailbox per channel*/
-		for (i = 0 ; i < SDIO_AL_MAX_CHANNELS ; ++i) {
-			struct sdio_channel *ch = &sdio_al_dev->channel[i];
-
-			if (ch == NULL) {
-				continue;
-			}
-
-			if (ch->state == SDIO_CHANNEL_STATE_INVALID)
-				continue;
-
-			ch_config = &sdio_al_dev->channel[i].ch_config;
-
-			sdio_al_loge(sdio_al_dev->dev_log, MODULE_NAME
-				": Ch %s: max_rx_thres=0x%x, "
-				"max_tx_thres=0x%x, tx_buf=0x%x, "
-				"is_packet_mode=%d, "
-				"max_packet=0x%x, min_write=0x%x",
-				ch->name, ch_config->max_rx_threshold,
-				ch_config->max_tx_threshold,
-				ch_config->tx_buf_size,
-				ch_config->is_packet_mode,
-				ch_config->max_packet_size,
-				ch->min_write_avail);
-
-			sdio_al_loge(sdio_al_dev->dev_log, MODULE_NAME
-				": total_rx=0x%x, total_tx=0x%x, "
-				"read_avail=0x%x, write_avail=0x%x, "
-				"rx_pending=0x%x, num_reads=0x%x, "
-				"num_notifs=0x%x", ch->total_rx_bytes,
-				ch->total_tx_bytes, ch->read_avail,
-				ch->write_avail, ch->rx_pending_bytes,
-				ch->statistics.total_read_times,
-				ch->statistics.total_notifs);
-		} /* end loop over all channels */
-
-	} /* end loop over all devices */
-
-	/* reading from client and printing is_host_ok_to_sleep per device */
-	for (j = 0 ; j < MAX_NUM_OF_SDIO_DEVICES ; ++j) {
-		struct sdio_al_device *sdio_al_dev = sdio_al->devices[j];
-
-		if (sdio_al_verify_func1(sdio_al_dev, __func__))
-			continue;
-
-		if (!sdio_al_dev->host) {
-			sdio_al_loge(sdio_al_dev->dev_log, MODULE_NAME
-					": Host is NULL");
-			continue;
-		}
-
-		if (sdio_al_dev->lpm_chan == INVALID_SDIO_CHAN) {
-			sdio_al_loge(sdio_al_dev->dev_log, MODULE_NAME
-				": %s - for Card#%d, is lpm_chan=="
-				"INVALID_SDIO_CHAN. continuing...",
-				__func__, sdio_al_dev->host->index);
-			continue;
-		}
-
-		offset = offsetof(struct peer_sdioc_sw_mailbox, ch_config)+
-		sizeof(struct peer_sdioc_channel_config) *
-		sdio_al_dev->lpm_chan+
-		offsetof(struct peer_sdioc_channel_config, is_host_ok_to_sleep);
-
-		lpm_func = sdio_al_dev->card->sdio_func[sdio_al_dev->
-								lpm_chan+1];
-		if (!lpm_func) {
-			sdio_al_loge(sdio_al_dev->dev_log, MODULE_NAME
-					": %s - lpm_func is NULL for card#%d"
-					" continuing...\n", __func__,
-					sdio_al_dev->host->index);
-			continue;
-		}
-
-		if (sdio_al_claim_mutex_and_verify_dev(sdio_al_dev, __func__))
-			return;
-		ret  =  sdio_memcpy_fromio(lpm_func,
-					    &is_ok_to_sleep,
-					    SDIOC_SW_MAILBOX_ADDR+offset,
-					    sizeof(int));
-		sdio_al_release_mutex(sdio_al_dev, __func__);
-
-		if (ret)
-			sdio_al_loge(sdio_al_dev->dev_log, MODULE_NAME
-					": %s - fail to read "
-				"is_HOST_ok_to_sleep from mailbox for card %d",
-				__func__, sdio_al_dev->host->index);
-		else
-			sdio_al_loge(sdio_al_dev->dev_log, MODULE_NAME
-					": Card#%d: "
-				"is_HOST_ok_to_sleep=%d\n",
-				sdio_al_dev->host->index,
-				is_ok_to_sleep);
-	}
-
-	for (j = 0 ; j < MAX_NUM_OF_SDIO_DEVICES ; ++j) {
-		struct sdio_al_device *sdio_al_dev = sdio_al->devices[j];
-
-		if (!sdio_al_dev)
-			continue;
-
-		/* Reading HW Mailbox */
-		hw_mailbox = sdio_al_dev->mailbox;
-
-		if (sdio_al_claim_mutex_and_verify_dev(sdio_al_dev, __func__))
-			return;
-
-		if (!sdio_al_dev->card || !sdio_al_dev->card->sdio_func[0]) {
-			sdio_al_release_mutex(sdio_al_dev, __func__);
-			return;
-		}
-		func1 = sdio_al_dev->card->sdio_func[0];
-		ret = sdio_memcpy_fromio(func1, hw_mailbox,
-			HW_MAILBOX_ADDR, sizeof(*hw_mailbox));
-		sdio_al_release_mutex(sdio_al_dev, __func__);
-
-		if (ret) {
-			sdio_al_loge(sdio_al_dev->dev_log, MODULE_NAME
-					": fail to read "
-			       "mailbox for card#%d. "
-			       "continuing...\n",
-			       sdio_al_dev->host->index);
-			continue;
-		}
-
-		snprintf(buf, sizeof(buf), "Card#%d: Current HW MB",
-		       sdio_al_dev->host->index);
-
-		/* Printing HW Mailbox */
-		sdio_print_mailbox(buf, hw_mailbox);
-	}
-}
+{ return; }
 
 static struct sdio_device_id sdio_al_sdioid[] = {
     {.class = 0, .vendor = 0x70, .device = 0x2460},
@@ -4288,10 +3979,6 @@ static int __init sdio_al_init(void)
 		sdio_al->devices[i] = NULL;
 
 	sdio_al->unittest_mode = false;
-
-	sdio_al->debug.debug_lpm_on = debug_lpm_on;
-	sdio_al->debug.debug_data_on = debug_data_on;
-	sdio_al->debug.debug_close_on = debug_close_on;
 
 #ifdef CONFIG_DEBUG_FS
 	sdio_al_debugfs_init();

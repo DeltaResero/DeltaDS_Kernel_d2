@@ -109,6 +109,43 @@ static struct hwrng msm_rng = {
 	.read = msm_rng_read,
 };
 
+/* Implement arch_get_random_TYPE.  Precache data to avoid toggling the hwrng
+ * clock every call.
+ */
+#define RANDBUF_SIZE 512
+static void *randbuf;
+static int randbuf_bytes;
+static DEFINE_SPINLOCK(randbuf_lock);
+static int msm_get_random_bytes(void *data, size_t size) {
+	unsigned long flags;
+	spin_lock_irqsave(&randbuf_lock, flags);
+	if (randbuf_bytes < size) {
+		if (!msm_rng.priv || !randbuf) {
+			spin_unlock_irqrestore(&randbuf_lock, flags);
+			printk(KERN_WARNING "msm_rng: not initialized correctly\n");
+			return 0;
+		}
+		randbuf_bytes += msm_rng_read(&msm_rng, randbuf + randbuf_bytes,
+			RANDBUF_SIZE - randbuf_bytes, 0);
+		if (randbuf_bytes < size) {
+			spin_unlock_irqrestore(&randbuf_lock, flags);
+			return 0;
+		}
+	}
+	memcpy(data, randbuf + randbuf_bytes - size, size);
+	randbuf_bytes -= size;
+	spin_unlock_irqrestore(&randbuf_lock, flags);
+	return size;
+}
+int arch_get_random_long(unsigned long *v) {
+	return msm_get_random_bytes((void *)v, sizeof(unsigned long));
+}
+EXPORT_SYMBOL(arch_get_random_long);
+int arch_get_random_int(unsigned int *v) {
+	return msm_get_random_bytes((void *)v, sizeof(unsigned int));
+}
+EXPORT_SYMBOL(arch_get_random_int);
+
 static int __devinit msm_rng_enable_hw(struct msm_rng_device *msm_rng_dev)
 {
 	unsigned long val = 0;
@@ -249,6 +286,10 @@ static struct platform_driver rng_driver = {
 
 static int __init msm_rng_init(void)
 {
+	randbuf = kmalloc(RANDBUF_SIZE, GFP_KERNEL);
+	if (!randbuf)
+		printk(KERN_WARNING "msm_rng: can't allocate buffer\n");
+
 	return platform_driver_register(&rng_driver);
 }
 

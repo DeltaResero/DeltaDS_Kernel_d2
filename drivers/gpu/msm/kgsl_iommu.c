@@ -146,9 +146,6 @@ static int kgsl_iommu_fault_handler(struct iommu_domain *domain,
 	mmu->fault = 1;
 	iommu_dev->fault = 1;
 
-	trace_kgsl_mmu_pagefault(iommu_dev->kgsldev, addr,
-			kgsl_mmu_get_ptname_from_ptbase(mmu, ptbase), 0);
-
 	/*
 	 * We do not want the h/w to resume fetching data from an iommu unit
 	 * that has faulted, this is better for debugging as it will stall

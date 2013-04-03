@@ -41,10 +41,7 @@ enum {
 	MSM_RPMRS_DEBUG_EVENT_TIMER = BIT(2),
 };
 
-static int msm_rpmrs_debug_mask;
-module_param_named(
-	debug_mask, msm_rpmrs_debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP
-);
+#define msm_rpmrs_debug_mask (0)
 
 static struct msm_rpmrs_level *msm_rpmrs_levels;
 static int msm_rpmrs_level_count;
@@ -62,20 +59,13 @@ static bool msm_rpmrs_vdd_dig_beyond_limits(struct msm_rpmrs_limits *limits);
 static void msm_rpmrs_aggregate_vdd_dig(struct msm_rpmrs_limits *limits);
 static void msm_rpmrs_restore_vdd_dig(void);
 
-static ssize_t msm_rpmrs_resource_attr_show(
-	struct kobject *kobj, struct kobj_attribute *attr, char *buf);
-static ssize_t msm_rpmrs_resource_attr_store(struct kobject *kobj,
-	struct kobj_attribute *attr, const char *buf, size_t count);
-
 static int vdd_dig_vlevels[MSM_RPMRS_VDD_DIG_LAST];
 static int vdd_mem_vlevels[MSM_RPMRS_VDD_MEM_LAST];
 static int vdd_mask;
 
 #define MSM_RPMRS_MAX_RS_REGISTER_COUNT 2
 
-#define RPMRS_ATTR(_name) \
-	__ATTR(_name, S_IRUGO|S_IWUSR, \
-		msm_rpmrs_resource_attr_show, msm_rpmrs_resource_attr_store)
+#define RPMRS_ATTR(_name) (NULL)
 
 struct msm_rpmrs_resource {
 	struct msm_rpm_iv_pair rs[MSM_RPMRS_MAX_RS_REGISTER_COUNT];
@@ -150,33 +140,6 @@ static DECLARE_BITMAP(msm_rpmrs_listed, MSM_RPM_ID_LAST);
 static DEFINE_SPINLOCK(msm_rpmrs_lock);
 
 #define MSM_RPMRS_VDD(v)  ((v) & (vdd_mask))
-
-/******************************************************************************
- * Attribute Definitions
- *****************************************************************************/
-static struct attribute *msm_rpmrs_attributes[] = {
-	&msm_rpmrs_pxo.ko_attr.attr,
-	&msm_rpmrs_l2_cache.ko_attr.attr,
-	&msm_rpmrs_vdd_mem.ko_attr.attr,
-	&msm_rpmrs_vdd_dig.ko_attr.attr,
-	NULL,
-};
-static struct attribute *msm_rpmrs_mode_attributes[] = {
-	&msm_rpmrs_rpm_ctl.ko_attr.attr,
-	NULL,
-};
-
-static struct attribute_group msm_rpmrs_attribute_group = {
-	.attrs = msm_rpmrs_attributes,
-};
-
-static struct attribute_group msm_rpmrs_mode_attribute_group = {
-	.attrs = msm_rpmrs_mode_attributes,
-};
-
-#define GET_RS_FROM_ATTR(attr) \
-	(container_of(attr, struct msm_rpmrs_resource, ko_attr))
-
 
 /******************************************************************************
  * Resource Specific Functions
@@ -417,17 +380,6 @@ static void msm_rpmrs_update_levels(void)
 			continue;
 
 		level->available = true;
-
-		for (k = 0; k < ARRAY_SIZE(msm_rpmrs_resources); k++) {
-			struct msm_rpmrs_resource *rs = msm_rpmrs_resources[k];
-
-			if (rs->beyond_limits &&
-					rs->beyond_limits(&level->rs_limits)) {
-				level->available = false;
-				break;
-			}
-		}
-
 	}
 }
 
@@ -651,131 +603,6 @@ static int msm_rpmrs_clear_common(
 }
 
 /******************************************************************************
- * Attribute Functions
- *****************************************************************************/
-
-static ssize_t msm_rpmrs_resource_attr_show(
-	struct kobject *kobj, struct kobj_attribute *attr, char *buf)
-{
-	struct kernel_param kp;
-	unsigned long flags;
-	unsigned int temp;
-	int rc;
-
-	spin_lock_irqsave(&msm_rpmrs_lock, flags);
-	/* special case active-set signal for MSM_RPMRS_ID_RPM_CTL */
-	if (GET_RS_FROM_ATTR(attr)->rs[0].id ==
-			msm_rpmrs_rpm_ctl.rs[0].id)
-		temp = GET_RS_FROM_ATTR(attr)->rs[0].value;
-	else
-		temp = GET_RS_FROM_ATTR(attr)->enable_low_power;
-	spin_unlock_irqrestore(&msm_rpmrs_lock, flags);
-
-	kp.arg = &temp;
-	rc = param_get_uint(buf, &kp);
-
-	if (rc > 0) {
-		strlcat(buf, "\n", PAGE_SIZE);
-		rc++;
-	}
-
-	return rc;
-}
-
-static ssize_t msm_rpmrs_resource_attr_store(struct kobject *kobj,
-	struct kobj_attribute *attr, const char *buf, size_t count)
-{
-	struct kernel_param kp;
-	unsigned long flags;
-	unsigned int temp;
-	int rc;
-
-	kp.arg = &temp;
-	rc = param_set_uint(buf, &kp);
-	if (rc)
-		return rc;
-
-	spin_lock_irqsave(&msm_rpmrs_lock, flags);
-	GET_RS_FROM_ATTR(attr)->enable_low_power = temp;
-
-	/* special case active-set signal for MSM_RPMRS_ID_RPM_CTL */
-	if (GET_RS_FROM_ATTR(attr)->rs[0].id ==
-			msm_rpmrs_rpm_ctl.rs[0].id) {
-		struct msm_rpm_iv_pair req;
-		req.id = msm_rpmrs_rpm_ctl.rs[0].id;
-		req.value = GET_RS_FROM_ATTR(attr)->enable_low_power;
-		GET_RS_FROM_ATTR(attr)->rs[0].value = req.value;
-
-		rc = msm_rpm_set_noirq(MSM_RPM_CTX_SET_0, &req, 1);
-		if (rc) {
-			pr_err("%s: failed to request RPM_CTL to %d: %d\n",
-				__func__, req.value, rc);
-		}
-	}
-
-	msm_rpmrs_update_levels();
-	spin_unlock_irqrestore(&msm_rpmrs_lock, flags);
-
-	return count;
-}
-
-static int __init msm_rpmrs_resource_sysfs_add(void)
-{
-	struct kobject *module_kobj = NULL;
-	struct kobject *low_power_kobj = NULL;
-	struct kobject *mode_kobj = NULL;
-	int rc = 0;
-
-	module_kobj = kset_find_obj(module_kset, KBUILD_MODNAME);
-	if (!module_kobj) {
-		pr_err("%s: cannot find kobject for module %s\n",
-			__func__, KBUILD_MODNAME);
-		rc = -ENOENT;
-		goto resource_sysfs_add_exit;
-	}
-
-	low_power_kobj = kobject_create_and_add(
-				"enable_low_power", module_kobj);
-	if (!low_power_kobj) {
-		pr_err("%s: cannot create kobject\n", __func__);
-		rc = -ENOMEM;
-		goto resource_sysfs_add_exit;
-	}
-
-	mode_kobj = kobject_create_and_add(
-				"mode", module_kobj);
-	if (!mode_kobj) {
-		pr_err("%s: cannot create kobject\n", __func__);
-		rc = -ENOMEM;
-		goto resource_sysfs_add_exit;
-	}
-
-	rc = sysfs_create_group(low_power_kobj, &msm_rpmrs_attribute_group);
-	if (rc) {
-		pr_err("%s: cannot create kobject attribute group\n", __func__);
-		goto resource_sysfs_add_exit;
-	}
-
-	rc = sysfs_create_group(mode_kobj, &msm_rpmrs_mode_attribute_group);
-	if (rc) {
-		pr_err("%s: cannot create kobject attribute group\n", __func__);
-		goto resource_sysfs_add_exit;
-	}
-
-	rc = 0;
-resource_sysfs_add_exit:
-	if (rc) {
-		if (low_power_kobj)
-			sysfs_remove_group(low_power_kobj,
-					&msm_rpmrs_attribute_group);
-		kobject_del(low_power_kobj);
-		kobject_del(mode_kobj);
-	}
-
-	return rc;
-}
-
-/******************************************************************************
  * Public Functions
  *****************************************************************************/
 
@@ -846,27 +673,6 @@ int msm_rpmrs_clear_noirq(int ctx, struct msm_rpm_iv_pair *req, int count)
 		"safely when local irqs are disabled.  Consider using "
 		"msm_rpmrs_clear or msm_rpmrs_clear_nosleep instead.");
 	return msm_rpmrs_clear_common(ctx, req, count, true);
-}
-
-void msm_rpmrs_show_resources(void)
-{
-	struct msm_rpmrs_resource *rs;
-	unsigned long flags;
-	int i;
-
-	spin_lock_irqsave(&msm_rpmrs_lock, flags);
-	for (i = 0; i < ARRAY_SIZE(msm_rpmrs_resources); i++) {
-		rs = msm_rpmrs_resources[i];
-		if (rs->rs[0].id < MSM_RPM_ID_LAST)
-			pr_info("%s: resource %s: buffered %d, value 0x%x\n",
-				__func__, rs->name,
-				test_bit(rs->rs[0].id, msm_rpmrs_buffered),
-				msm_rpmrs_buffer[rs->rs[0].id]);
-		else
-			pr_info("%s: resource %s: value %d\n",
-				__func__, rs->name, rs->rs[0].value);
-	}
-	spin_unlock_irqrestore(&msm_rpmrs_lock, flags);
 }
 
 s32 msm_cpuidle_get_deep_idle_latency(void)
@@ -1116,8 +922,6 @@ static int __init msm_rpmrs_init(void)
 		}
 	}
 
-	rc = msm_rpmrs_resource_sysfs_add();
-
 init_exit:
 	return rc;
 }
@@ -1136,8 +940,7 @@ static int __init msm_rpmrs_l2_init(void)
 
 		msm_pm_set_l2_flush_flag(0);
 
-		msm_rpmrs_l2_cache.beyond_limits =
-			msm_spm_l2_cache_beyond_limits;
+		msm_rpmrs_l2_cache.beyond_limits = NULL;
 		msm_rpmrs_l2_cache.aggregate = NULL;
 		msm_rpmrs_l2_cache.restore = NULL;
 

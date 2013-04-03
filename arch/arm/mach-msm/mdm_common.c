@@ -108,7 +108,7 @@ static DEFINE_SPINLOCK(mdm_devices_lock);
 static int ssr_count;
 static DEFINE_SPINLOCK(ssr_lock);
 
-static unsigned int mdm_debug_mask;
+#define mdm_debug_mask (0)
 int vddmin_gpios_sent;
 static struct mdm_ops *mdm_ops;
 
@@ -711,47 +711,6 @@ static int mdm_subsys_ramdumps(int want_dumps,
 	return mdm_drv->mdm_ram_dump_status;
 }
 
-/* Once the gpios are sent to RPM and debugging
- * starts, there is no way to stop it without
- * rebooting the device.
- */
-static int mdm_debug_mask_set(void *data, u64 val)
-{
-	if (!vddmin_gpios_sent &&
-		(val & MDM_DEBUG_MASK_VDDMIN_SETUP)) {
-		mdm_setup_vddmin_gpios();
-		vddmin_gpios_sent = 1;
-	}
-
-	mdm_debug_mask = val;
-	if (mdm_ops->debug_state_changed_cb)
-		mdm_ops->debug_state_changed_cb(mdm_debug_mask);
-	return 0;
-}
-
-static int mdm_debug_mask_get(void *data, u64 *val)
-{
-	*val = mdm_debug_mask;
-	return 0;
-}
-
-DEFINE_SIMPLE_ATTRIBUTE(mdm_debug_mask_fops,
-			mdm_debug_mask_get,
-			mdm_debug_mask_set, "%llu\n");
-
-static int mdm_debugfs_init(void)
-{
-	struct dentry *dent;
-
-	dent = debugfs_create_dir("mdm_dbg", 0);
-	if (IS_ERR(dent))
-		return PTR_ERR(dent);
-
-	debugfs_create_file("debug_mask", 0644, dent, NULL,
-			&mdm_debug_mask_fops);
-	return 0;
-}
-
 static const struct file_operations mdm_modem_fops = {
 	.owner		= THIS_MODULE,
 	.open		= mdm_modem_open,
@@ -1144,7 +1103,6 @@ static int __init mdm_modem_init(void)
 		return ret;
 
 	INIT_LIST_HEAD(&mdm_devices);
-	mdm_debugfs_init();
 	return platform_driver_register(&mdm_modem_driver);
 }
 

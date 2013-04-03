@@ -64,7 +64,6 @@ struct sdio_tty {
 	wait_queue_head_t   waitq;
 	struct tty_driver *tty_drv;
 	struct tty_struct *tty_str;
-	int debug_msg_on;
 	char *read_buf;
 	enum sdio_tty_state sdio_tty_state;
 	int is_sdio_open;
@@ -80,14 +79,7 @@ struct dentry *sdio_tty_debug_root;
 struct dentry *sdio_tty_debug_info;
 #endif
 
-#define DEBUG_MSG(sdio_tty_drv, x...) if (sdio_tty_drv->debug_msg_on) pr_info(x)
-
-/*
- * Enable sdio_tty debug messages
- * By default the sdio_tty debug messages are turned off
- */
-static int csvt_debug_msg_on;
-module_param(csvt_debug_msg_on, int, 0);
+#define DEBUG_MSG(sdio_tty_drv, x...)
 
 static void sdio_tty_read(struct work_struct *work)
 {
@@ -505,7 +497,7 @@ static const struct tty_operations sdio_tty_ops = {
 };
 
 int sdio_tty_init_tty(char *tty_name, char *sdio_ch_name,
-			enum sdio_tty_devices device_id, int debug_msg_on)
+			enum sdio_tty_devices device_id)
 {
 	int ret = 0;
 	int i = 0;
@@ -596,11 +588,6 @@ int sdio_tty_init_tty(char *tty_name, char *sdio_ch_name,
 	}
 
 	sdio_tty_drv->sdio_tty_state = TTY_REGISTERED;
-	if (debug_msg_on) {
-		pr_info(SDIO_TTY_MODULE_NAME ": %s: turn on debug msg for %s",
-			__func__, sdio_tty_drv->tty_dev_name);
-		sdio_tty_drv->debug_msg_on = debug_msg_on;
-	}
 	return 0;
 }
 
@@ -660,7 +647,6 @@ static int sdio_tty_probe(struct platform_device *pdev)
 	enum sdio_tty_devices device_id = id->driver_data;
 	char *device_name = NULL;
 	char *channel_name = NULL;
-	int debug_msg_on = 0;
 	int ret = 0;
 
 	pr_debug(SDIO_TTY_MODULE_NAME ": %s for %s", __func__, pdev->name);
@@ -669,12 +655,10 @@ static int sdio_tty_probe(struct platform_device *pdev)
 	case SDIO_CSVT:
 		device_name = SDIO_TTY_CSVT_DEV;
 		channel_name = SDIO_TTY_CH_CSVT;
-		debug_msg_on = csvt_debug_msg_on;
 		break;
 	case SDIO_CSVT_TEST_APP:
 		device_name = SDIO_TTY_CSVT_TEST_DEV;
 		channel_name = SDIO_TTY_CH_CSVT;
-		debug_msg_on = csvt_debug_msg_on;
 		break;
 	default:
 		pr_err(SDIO_TTY_MODULE_NAME ": %s Invalid device:%s, id:%d",
@@ -684,8 +668,7 @@ static int sdio_tty_probe(struct platform_device *pdev)
 	}
 
 	if (device_name) {
-		ret = sdio_tty_init_tty(device_name, channel_name,
-					device_id, debug_msg_on);
+		ret = sdio_tty_init_tty(device_name, channel_name, device_id);
 		if (ret) {
 			pr_err(SDIO_TTY_MODULE_NAME ": %s: sdio_tty_init_tty "
 				"failed for dev:%s", __func__, device_name);

@@ -477,6 +477,9 @@ static int mipi_samsung_disp_send_cmd(struct msm_fb_data_type *mfd,
 		;
 	}
 
+	if (cmd == PANEL_ON)
+		reenable_mdnie();
+
 	if (!cmd_size)
 		goto unknown_command;
 

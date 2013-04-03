@@ -15,7 +15,7 @@
  *  BAM DMUX module.
  */
 
-#define DEBUG
+#undef CONFIG_DEBUG_FS
 
 #include <linux/delay.h>
 #include <linux/module.h>
@@ -158,8 +158,6 @@ struct tx_pkt_info {
 	uint32_t len;
 	struct work_struct work;
 	struct list_head list_node;
-	unsigned ts_sec;
-	unsigned long ts_nsec;
 };
 
 struct rx_pkt_info {
@@ -305,122 +303,13 @@ static int in_global_reset;
 #define LOG_MESSAGE_MAX_SIZE 80
 struct kfifo bam_dmux_state_log;
 static uint32_t bam_dmux_state_logging_disabled;
-static DEFINE_SPINLOCK(bam_dmux_logging_spinlock);
 static int bam_dmux_uplink_vote;
 static int bam_dmux_power_state;
 
-static void bam_dmux_log(const char *fmt, ...)
-					__printf(1, 2);
-
-
-#define DMUX_LOG_KERR(fmt...) \
-do { \
-	bam_dmux_log(fmt); \
-	pr_err(fmt); \
-} while (0)
-
-/**
- * Log a state change along with a small message.
- *
- * Complete size of messsage is limited to @todo.
- */
-static void bam_dmux_log(const char *fmt, ...)
-{
-	char buff[LOG_MESSAGE_MAX_SIZE];
-	unsigned long flags;
-	va_list arg_list;
-	unsigned long long t_now;
-	unsigned long nanosec_rem;
-	int len = 0;
-
-	if (bam_dmux_state_logging_disabled)
-		return;
-
-	t_now = sched_clock();
-	nanosec_rem = do_div(t_now, 1000000000U);
-
-	/*
-	 * States
-	 * D: 1 = Power collapse disabled
-	 * R: 1 = in global reset
-	 * P: 1 = BAM is powered up
-	 * A: 1 = BAM initialized and ready for data
-	 *
-	 * V: 1 = Uplink vote for power
-	 * U: 1 = Uplink active
-	 * W: 1 = Uplink Wait-for-ack
-	 * A: 1 = Uplink ACK received
-	 * #: >=1 On-demand uplink vote
-	 * D: 1 = Disconnect ACK active
-	 */
-	len += scnprintf(buff, sizeof(buff),
-		"<DMUX> %u.%09lu %c%c%c%c %c%c%c%c%d%c ",
-		(unsigned)t_now, nanosec_rem,
-		a2_pc_disabled ? 'D' : 'd',
-		in_global_reset ? 'R' : 'r',
-		bam_dmux_power_state ? 'P' : 'p',
-		bam_connection_is_active ? 'A' : 'a',
-		bam_dmux_uplink_vote ? 'V' : 'v',
-		bam_is_connected ?  'U' : 'u',
-		wait_for_ack ? 'W' : 'w',
-		ul_wakeup_ack_completion.done ? 'A' : 'a',
-		atomic_read(&ul_ondemand_vote),
-		disconnect_ack ? 'D' : 'd'
-		);
-
-	va_start(arg_list, fmt);
-	len += vscnprintf(buff + len, sizeof(buff) - len, fmt, arg_list);
-	va_end(arg_list);
-	memset(buff + len, 0x0, sizeof(buff) - len);
-
-	spin_lock_irqsave(&bam_dmux_logging_spinlock, flags);
-	if (kfifo_avail(&bam_dmux_state_log) < LOG_MESSAGE_MAX_SIZE) {
-		char junk[LOG_MESSAGE_MAX_SIZE];
-		int ret;
-
-		ret = kfifo_out(&bam_dmux_state_log, junk, sizeof(junk));
-		if (ret != LOG_MESSAGE_MAX_SIZE) {
-			pr_err("%s: unable to empty log %d\n", __func__, ret);
-			spin_unlock_irqrestore(&bam_dmux_logging_spinlock,
-					flags);
-			return;
-		}
-	}
-	kfifo_in(&bam_dmux_state_log, buff, sizeof(buff));
-	spin_unlock_irqrestore(&bam_dmux_logging_spinlock, flags);
-}
-
-static inline void set_tx_timestamp(struct tx_pkt_info *pkt)
-{
-	unsigned long long t_now;
-
-	t_now = sched_clock();
-	pkt->ts_nsec = do_div(t_now, 1000000000U);
-	pkt->ts_sec = (unsigned)t_now;
-}
-
-static inline void verify_tx_queue_is_empty(const char *func)
-{
-	unsigned long flags;
-	struct tx_pkt_info *info;
-	int reported = 0;
-
-	spin_lock_irqsave(&bam_tx_pool_spinlock, flags);
-	list_for_each_entry(info, &bam_tx_pool, list_node) {
-		if (!reported) {
-			bam_dmux_log("%s: tx pool not empty\n", func);
-			if (!in_global_reset)
-				pr_err("%s: tx pool not empty\n", func);
-			reported = 1;
-		}
-		bam_dmux_log("%s: node=%p ts=%u.%09lu\n", __func__,
-			&info->list_node, info->ts_sec, info->ts_nsec);
-		if (!in_global_reset)
-			pr_err("%s: node=%p ts=%u.%09lu\n", __func__,
-			&info->list_node, info->ts_sec, info->ts_nsec);
-	}
-	spin_unlock_irqrestore(&bam_tx_pool_spinlock, flags);
-}
+#define DMUX_LOG_KERR(fmt, ...) do { } while (0)
+#define bam_dmux_log(fmt, ...) do { } while (0)
+#define set_tx_timestamp(pkt)
+#define verify_tx_queue_is_empty(func)
 
 static void queue_rx(void)
 {
@@ -746,20 +635,6 @@ static void bam_mux_write_done(struct work_struct *work)
 	info_expected = list_first_entry(&bam_tx_pool,
 			struct tx_pkt_info, list_node);
 	if (unlikely(info != info_expected)) {
-		struct tx_pkt_info *errant_pkt;
-
-		DMUX_LOG_KERR("%s: bam_tx_pool mismatch .next=%p,"
-				" list_node=%p, ts=%u.%09lu\n",
-				__func__, bam_tx_pool.next, &info->list_node,
-				info->ts_sec, info->ts_nsec
-				);
-
-		list_for_each_entry(errant_pkt, &bam_tx_pool, list_node) {
-			DMUX_LOG_KERR("%s: node=%p ts=%u.%09lu\n", __func__,
-			&errant_pkt->list_node, errant_pkt->ts_sec,
-			errant_pkt->ts_nsec);
-
-		}
 		spin_unlock_irqrestore(&bam_tx_pool_spinlock, flags);
 		BUG();
 	}

@@ -23,8 +23,6 @@
 
 #include "modem_notifier.h"
 
-#define DEBUG
-
 static struct srcu_notifier_head modem_notifier_list;
 static struct workqueue_struct *modem_notifier_wq;
 

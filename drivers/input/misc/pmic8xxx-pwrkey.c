@@ -23,9 +23,17 @@
 #include <linux/mfd/pm8xxx/core.h>
 #include <linux/input/pmic8xxx-pwrkey.h>
 
+#include <linux/cpufreq.h>
+
 #define PON_CNTL_1 0x1C
 #define PON_CNTL_PULL_UP BIT(7)
 #define PON_CNTL_TRIG_DELAY_MASK (0x7)
+
+static int current_pressed;
+static struct work_struct interaction_work;
+static void do_interaction(struct work_struct *work) {
+	cpufreq_set_interactivity(current_pressed, INTERACT_ID_OTHER);
+}
 
 /**
  * struct pmic8xxx_pwrkey - pmic8xxx pwrkey information
@@ -54,6 +62,9 @@ static irqreturn_t pwrkey_press_irq(int irq, void *_pwrkey)
 	input_report_key(pwrkey->pwr, KEY_POWER, 1);
 	input_sync(pwrkey->pwr);
 
+	current_pressed = 1;
+	schedule_work(&interaction_work);
+
 	return IRQ_HANDLED;
 }
 
@@ -71,6 +82,9 @@ static irqreturn_t pwrkey_release_irq(int irq, void *_pwrkey)
 
 	input_report_key(pwrkey->pwr, KEY_POWER, 0);
 	input_sync(pwrkey->pwr);
+
+	current_pressed = 0;
+	schedule_work(&interaction_work);
 
 	return IRQ_HANDLED;
 }
@@ -213,6 +227,8 @@ static int __devinit pmic8xxx_pwrkey_probe(struct platform_device *pdev)
 
 	device_init_wakeup(&pdev->dev, pdata->wakeup);
 
+	INIT_WORK(&interaction_work, do_interaction);
+
 	return 0;
 
 free_press_irq:
@@ -241,6 +257,9 @@ static int __devexit pmic8xxx_pwrkey_remove(struct platform_device *pdev)
 	input_unregister_device(pwrkey->pwr);
 	platform_set_drvdata(pdev, NULL);
 	kfree(pwrkey);
+
+	current_pressed = 0;
+	cpufreq_set_interactivity(0, INTERACT_ID_OTHER);
 
 	return 0;
 }

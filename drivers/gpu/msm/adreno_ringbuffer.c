@@ -383,6 +383,7 @@ int adreno_ringbuffer_start(struct adreno_ringbuffer *rb, unsigned int init_ram)
 			     rb->memptrs_desc.gpuaddr +
 			     GSL_RB_MEMPTRS_RPTR_OFFSET);
 
+#if __adreno_is_a3xx
 	if (adreno_is_a3xx(adreno_dev)) {
 		/* enable access protection to privileged registers */
 		adreno_regwrite(device, A3XX_CP_PROTECT_CTRL, 0x00000007);
@@ -408,6 +409,7 @@ int adreno_ringbuffer_start(struct adreno_ringbuffer *rb, unsigned int init_ram)
 		/* VBIF registers */
 		adreno_regwrite(device, A3XX_CP_PROTECT_REG_C, 0x6B00C000);
 	}
+#endif
 
 	if (adreno_is_a2xx(adreno_dev)) {
 		/* explicitly clear all cp interrupts */
@@ -719,6 +721,7 @@ adreno_ringbuffer_addcmds(struct adreno_ringbuffer *rb,
 		GSL_RB_WRITE(ringcmds, rcmd_gpu, CP_INT_CNTL__RB_INT_MASK);
 	}
 
+#if __adreno_is_a3xx
 	if (adreno_is_a3xx(adreno_dev)) {
 		/* Dummy set-constant to trigger context rollover */
 		GSL_RB_WRITE(ringcmds, rcmd_gpu,
@@ -727,6 +730,7 @@ adreno_ringbuffer_addcmds(struct adreno_ringbuffer *rb,
 			(0x4<<16)|(A3XX_HLSQ_CL_KERNEL_GROUP_X_REG - 0x2000));
 		GSL_RB_WRITE(ringcmds, rcmd_gpu, 0);
 	}
+#endif
 
 	if (flags & KGSL_CMD_FLAGS_EOF) {
 		GSL_RB_WRITE(ringcmds, rcmd_gpu, cp_nop_packet(1));

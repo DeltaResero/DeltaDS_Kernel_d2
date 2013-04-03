@@ -11,6 +11,8 @@
  *
  */
 
+#include "adreno.h"
+#if __adreno_is_a3xx
 #ifndef _A300_REG_H
 #define _A300_REG_H
 
@@ -545,4 +547,5 @@
 #define SP0_ICL1_MISSES                0x1A
 #define SP_FS_CFLOW_INSTRUCTIONS       0x0C
 
+#endif
 #endif

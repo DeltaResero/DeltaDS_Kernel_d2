@@ -69,10 +69,7 @@ enum {
 	MSM_PM_DEBUG_HOTPLUG = BIT(8),
 };
 
-static int msm_pm_debug_mask = 1;
-module_param_named(
-	debug_mask, msm_pm_debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP
-);
+#define msm_pm_debug_mask (0)
 static int msm_pm_retention_tz_call;
 
 /******************************************************************************
@@ -87,6 +84,7 @@ enum {
 #define SCM_L2_RETENTION	(0x2)
 #define SCM_CMD_TERMINATE_PC	(0x2)
 
+#if 0
 static char *msm_pm_mode_attr_labels[MSM_PM_MODE_ATTR_NR] = {
 	[MSM_PM_MODE_ATTR_SUSPEND] = "suspend_enabled",
 	[MSM_PM_MODE_ATTR_IDLE] = "idle_enabled",
@@ -114,10 +112,13 @@ static char *msm_pm_sleep_mode_labels[MSM_PM_SLEEP_MODE_NR] = {
 	[MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE] =
 		"standalone_power_collapse",
 };
+#endif
 
 static struct hrtimer pm_hrtimer;
 static struct msm_pm_sleep_ops pm_sleep_ops;
 static bool msm_pm_ldo_retention_enabled = true;
+
+#if 0
 /*
  * Write out the attribute.
  */
@@ -325,6 +326,7 @@ static int __init msm_pm_mode_sysfs_add(void)
 mode_sysfs_add_exit:
 	return ret;
 }
+#endif
 
 /******************************************************************************
  * Configure Hardware before/after Low Power Mode
@@ -786,8 +788,7 @@ int msm_pm_idle_prepare(struct cpuidle_device *dev,
 		mode = (enum msm_pm_sleep_mode) cpuidle_get_statedata(st_usage);
 		idx = MSM_PM_MODE(dev->cpu, mode);
 
-		allow = msm_pm_sleep_modes[idx].idle_enabled &&
-				msm_pm_sleep_modes[idx].idle_supported;
+		allow = msm_pm_sleep_modes[idx].idle_supported;
 
 		switch (mode) {
 		case MSM_PM_SLEEP_MODE_POWER_COLLAPSE:
@@ -963,7 +964,7 @@ void msm_pm_cpu_enter_lowpower(unsigned int cpu)
 		struct msm_pm_platform_data *mode;
 
 		mode = &msm_pm_sleep_modes[MSM_PM_MODE(cpu, i)];
-		allow[i] = mode->suspend_supported && mode->suspend_enabled;
+		allow[i] = mode->suspend_supported;
 	}
 
 	if (MSM_PM_DEBUG_HOTPLUG & msm_pm_debug_mask)
@@ -1037,7 +1038,7 @@ static int msm_pm_enter(suspend_state_t state)
 		struct msm_pm_platform_data *mode;
 
 		mode = &msm_pm_sleep_modes[MSM_PM_MODE(0, i)];
-		allow[i] = mode->suspend_supported && mode->suspend_enabled;
+		allow[i] = mode->suspend_supported;
 	}
 
 	if (allow[MSM_PM_SLEEP_MODE_POWER_COLLAPSE]) {
@@ -1220,7 +1221,6 @@ static int __init msm_pm_init(void)
 		MSM_PM_STAT_SUSPEND,
 	};
 
-	msm_pm_mode_sysfs_add();
 	msm_pm_add_stats(enable_stats, ARRAY_SIZE(enable_stats));
 
 	suspend_set_ops(&msm_pm_ops);

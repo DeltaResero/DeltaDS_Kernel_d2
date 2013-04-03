@@ -22,6 +22,8 @@
 #include <linux/notifier.h>
 #include <asm/cputime.h>
 
+struct cpufreq_frequency_table *acpuclk_get_full_freq_table(unsigned int cpu);
+
 static spinlock_t cpufreq_stats_lock;
 
 #define CPUFREQ_STATDEVICE_ATTR(_name, _mode, _show) \
@@ -271,10 +273,11 @@ static int cpufreq_stat_notifier_policy(struct notifier_block *nb,
 	unsigned int cpu = policy->cpu;
 	if (val != CPUFREQ_NOTIFY)
 		return 0;
-	table = cpufreq_frequency_get_table(cpu);
+	table = acpuclk_get_full_freq_table(cpu);
 	if (!table)
 		return 0;
 	ret = cpufreq_stats_create_table(policy, table);
+	kfree(table);
 	if (ret)
 		return ret;
 	return 0;
@@ -326,11 +329,12 @@ static int cpufreq_stats_create_table_cpu(unsigned int cpu)
 	if (!policy)
 		return -ENODEV;
 
-	table = cpufreq_frequency_get_table(cpu);
+	table = acpuclk_get_full_freq_table(cpu);
 	if (!table)
 		goto out;
 
 	ret = cpufreq_stats_create_table(policy, table);
+	kfree(table);
 
 out:
 	cpufreq_cpu_put(policy);

@@ -9,9 +9,6 @@
  *
  */
 
-#define SEC_TOUCHKEY_DEBUG
-/* #define SEC_TOUCHKEY_VERBOSE_DEBUG */
-
 #include <linux/module.h>
 #include <linux/input.h>
 #include <linux/init.h>
@@ -31,6 +28,7 @@
 #include <linux/workqueue.h>
 #include <linux/leds.h>
 #include <asm/mach-types.h>
+#include <linux/cpufreq.h>
 
 #define CYPRESS_GEN		0X00
 #define CYPRESS_FW_VER		0X01
@@ -104,6 +102,12 @@ static void cypress_touchkey_late_resume(struct early_suspend *h);
 
 static int touchkey_led_status;
 static int touchled_cmd_reversed;
+
+static int current_pressed;
+static struct work_struct interaction_work;
+static void do_interaction(struct work_struct *work) {
+	cpufreq_set_interactivity(current_pressed, INTERACT_ID_SOFTKEY);
+}
 
 static void cypress_touchkey_led_work(struct work_struct *work)
 {
@@ -235,13 +239,12 @@ static irqreturn_t cypress_touchkey_interrupt(int irq, void *dev_id)
 	TOUCHKEY_LOG(info->keycode[code], press);
 #endif
 
-	if (touch_is_pressed && press) {
-		printk(KERN_ERR "[TouchKey] don't send event because touch is pressed.\n");
-		printk(KERN_ERR "[TouchKey] touch_pressed = %d\n",
-							touch_is_pressed);
-	} else {
+	if (!(touch_is_pressed && press)) {
 		input_report_key(info->input_dev, info->keycode[code], press);
 		input_sync(info->input_dev);
+		if (press) current_pressed |= 1 << code;
+		else current_pressed &= ~(1 << code);
+		schedule_work(&interaction_work);
 	}
 
 out:
@@ -861,6 +864,9 @@ static int __devinit cypress_touchkey_probe(struct i2c_client *client,
 		dev_err(&client->dev, "fail to allocate input device.\n");
 		goto err_input_dev_alloc;
 	}
+
+	INIT_WORK(&interaction_work, do_interaction);
+	current_pressed = 0;
 
 	info->client = client;
 	info->input_dev = input_dev;

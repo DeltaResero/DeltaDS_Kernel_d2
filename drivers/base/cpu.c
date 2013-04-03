@@ -41,7 +41,9 @@ static ssize_t __ref store_online(struct device *dev,
 	struct cpu *cpu = container_of(dev, struct cpu, dev);
 	ssize_t ret;
 
+#ifdef CONFIG_MSM_RUN_QUEUE_STATS
 	cpu_hotplug_driver_lock();
+#endif
 	switch (buf[0]) {
 	case '0':
 		ret = cpu_down(cpu->dev.id);
@@ -56,7 +58,9 @@ static ssize_t __ref store_online(struct device *dev,
 	default:
 		ret = -EINVAL;
 	}
+#ifdef CONFIG_MSM_RUN_QUEUE_STATS
 	cpu_hotplug_driver_unlock();
+#endif
 
 	if (ret >= 0)
 		ret = count;

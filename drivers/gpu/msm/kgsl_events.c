@@ -73,7 +73,6 @@ int kgsl_add_event(struct kgsl_device *device, u32 id, u32 ts,
 	 */
 
 	if (timestamp_cmp(cur_ts, ts) >= 0) {
-		trace_kgsl_fire_event(id, ts, 0);
 		cb(device, priv, id, ts);
 		return 0;
 	}
@@ -88,8 +87,6 @@ int kgsl_add_event(struct kgsl_device *device, u32 id, u32 ts,
 	event->func = cb;
 	event->owner = owner;
 	event->created = jiffies;
-
-	trace_kgsl_register_event(id, ts);
 
 	/* inc refcount to avoid race conditions in cleanup */
 	if (context)
@@ -151,8 +148,6 @@ void kgsl_cancel_events_ctxt(struct kgsl_device *device,
 		 */
 		list_del(&event->list);
 
-		trace_kgsl_fire_event(id, cur, jiffies - event->created);
-
 		if (event->func)
 			event->func(device, event->priv, id, cur);
 
@@ -194,9 +189,6 @@ void kgsl_cancel_events(struct kgsl_device *device,
 		 */
 		list_del(&event->list);
 
-		trace_kgsl_fire_event(KGSL_MEMSTORE_GLOBAL, cur,
-			jiffies - event->created);
-
 		if (event->func)
 			event->func(device, event->priv, KGSL_MEMSTORE_GLOBAL,
 				cur);
@@ -229,9 +221,6 @@ static void _process_event_list(struct kgsl_device *device,
 		 * to the timestamp they wanted
 		 */
 		list_del(&event->list);
-
-		trace_kgsl_fire_event(id, event->timestamp,
-			jiffies - event->created);
 
 		if (event->func)
 			event->func(device, event->priv, id, event->timestamp);

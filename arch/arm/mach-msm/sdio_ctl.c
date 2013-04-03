@@ -39,7 +39,6 @@
 #define NUM_SDIO_CTL_PORTS 10
 #define DEVICE_NAME "sdioctl"
 #define MAX_BUF_SIZE 2048
-#define DEBUG
 
 static int msm_sdio_ctl_debug_mask;
 module_param_named(debug_mask, msm_sdio_ctl_debug_mask,
