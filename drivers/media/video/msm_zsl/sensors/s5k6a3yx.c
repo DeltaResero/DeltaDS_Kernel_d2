@@ -16,7 +16,7 @@
 #define SENSOR_NAME "s5k6a3yx"
 #define PLATFORM_DRIVER_NAME "msm_camera_s5k6a3yx"
 
-DEFINE_MUTEX(s5k6a3yx_mut);
+static DEFINE_MUTEX(s5k6a3yx_mut);
 static struct msm_sensor_ctrl_t s5k6a3yx_s_ctrl;
 
 static struct msm_camera_i2c_reg_conf s5k6a3yx_start_settings[] = {
@@ -234,7 +234,11 @@ void sensor_native_control(void __user *arg)
 
 static int s5k6a3yx_sensor_config(void __user *argp)
 {
-	return msm_sensor_config(&s5k6a3yx_s_ctrl, argp);
+	int rc;
+	mutex_lock(&s5k6a3yx_mut);
+	rc = msm_sensor_config(&s5k6a3yx_s_ctrl, argp);
+	mutex_unlock(&s5k6a3yx_mut);
+	return rc;
 }
 
 static int s5k6a3yx_sensor_open_init(const struct msm_camera_sensor_info *data)
@@ -244,7 +248,11 @@ static int s5k6a3yx_sensor_open_init(const struct msm_camera_sensor_info *data)
 
 static int s5k6a3yx_sensor_release(void)
 {
-	return msm_sensor_release(&s5k6a3yx_s_ctrl);
+	int rc;
+	mutex_lock(&s5k6a3yx_mut);
+	rc = msm_sensor_release(&s5k6a3yx_s_ctrl);
+	mutex_unlock(&s5k6a3yx_mut);
+	return rc;
 }
 
 static const struct i2c_device_id s5k6a3yx_i2c_id[] = {
@@ -546,7 +554,7 @@ static struct msm_sensor_ctrl_t s5k6a3yx_s_ctrl = {
 	.sensor_exp_gain_info = &s5k6a3yx_exp_gain_info,
 	.cam_mode = MSM_SENSOR_MODE_INVALID,
 	.csi_params = &s5k6a3yx_csi_params_array[0],
-	.msm_sensor_mutex = &s5k6a3yx_mut,
+	//.msm_sensor_mutex = &s5k6a3yx_mut,
 	.sensor_i2c_driver = &s5k6a3yx_i2c_driver,
 	.sensor_v4l2_subdev_info = s5k6a3yx_subdev_info,
 	.sensor_v4l2_subdev_info_size = ARRAY_SIZE(s5k6a3yx_subdev_info),

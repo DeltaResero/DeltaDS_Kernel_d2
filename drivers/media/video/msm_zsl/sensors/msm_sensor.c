@@ -341,7 +341,7 @@ int32_t msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl, void __user *argp)
 		(void *)argp,
 		sizeof(struct sensor_cfg_data)))
 		return -EFAULT;
-	mutex_lock(s_ctrl->msm_sensor_mutex);
+	//mutex_lock(s_ctrl->msm_sensor_mutex);
 	CDBG("msm_sensor_config: cfgtype = %d\n",
 	cdata.cfgtype);
 		switch (cdata.cfgtype) {
@@ -455,7 +455,7 @@ int32_t msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl, void __user *argp)
 			break;
 		}
 
-	mutex_unlock(s_ctrl->msm_sensor_mutex);
+	//mutex_unlock(s_ctrl->msm_sensor_mutex);
 
 	return rc;
 }
@@ -541,9 +541,9 @@ probe_failure:
 
 int32_t msm_sensor_release(struct msm_sensor_ctrl_t *s_ctrl)
 {
-	mutex_lock(s_ctrl->msm_sensor_mutex);
+	//mutex_lock(s_ctrl->msm_sensor_mutex);
 	s_ctrl->func_tbl->sensor_power_down(s_ctrl->sensordata);
-	mutex_unlock(s_ctrl->msm_sensor_mutex);
+	//mutex_unlock(s_ctrl->msm_sensor_mutex);
 	CDBG("%s completed\n", __func__);
 	return 0;
 }
