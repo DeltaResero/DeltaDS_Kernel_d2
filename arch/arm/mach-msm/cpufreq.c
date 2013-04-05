@@ -27,6 +27,7 @@
 #include <linux/cpumask.h>
 #include <linux/sched.h>
 #include <linux/suspend.h>
+#include <linux/slab.h>
 #include <mach/socinfo.h>
 #include <mach/cpufreq.h>
 
@@ -207,7 +208,7 @@ static inline int msm_cpufreq_limits_init(void)
 
 	for_each_possible_cpu(cpu) {
 		limit = &per_cpu(cpu_freq_info, cpu);
-		table = cpufreq_frequency_get_table(cpu);
+		table = acpuclk_get_full_freq_table(cpu);
 		if (table == NULL) {
 			pr_err("%s: error reading cpufreq table for cpu %d\n",
 					__func__, cpu);
@@ -219,6 +220,7 @@ static inline int msm_cpufreq_limits_init(void)
 			if (table[i].frequency < min)
 				min = table[i].frequency;
 		}
+		kfree(table);
 		limit->allowed_min = min;
 		limit->allowed_max = max;
 		limit->min = min;

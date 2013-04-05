@@ -96,4 +96,9 @@ void acpuclk_register(struct acpuclk_data *data);
  */
 void acpuclk_enable_oc_freqs(unsigned int freq);
 
+/**
+ * acpuclk_get_full_freq_table() - get all possible frequency steppings
+ */
+struct cpufreq_frequency_table *acpuclk_get_full_freq_table(unsigned int cpu);
+
 #endif /*__ARCH_ARM_MACH_MSM_ACPUCLOCK_H*/

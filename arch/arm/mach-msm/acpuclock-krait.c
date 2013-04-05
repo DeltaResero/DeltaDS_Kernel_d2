@@ -1372,7 +1372,9 @@ static struct attribute_group dkp_attr_group = {
 	.name = "dkp",
 };
 
-/* Full frequency table helper for cpufreq */
+/* Full frequency table helper for cpufreq.  Creates a new table that must be
+ * kfree()'d by caller.
+ */
 struct cpufreq_frequency_table *acpuclk_get_full_freq_table(unsigned int cpu) {
 	struct cpufreq_frequency_table *tbl;
 	int i, freq_cnt = 0;
