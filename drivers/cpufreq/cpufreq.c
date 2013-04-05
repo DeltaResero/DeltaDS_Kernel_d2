@@ -29,6 +29,7 @@
 #include <linux/completion.h>
 #include <linux/mutex.h>
 #include <linux/syscore_ops.h>
+#include <linux/kmod.h>
 
 #include <trace/events/power.h>
 
@@ -516,6 +517,22 @@ static ssize_t show_scaling_governor(struct cpufreq_policy *policy, char *buf)
 	return -EINVAL;
 }
 
+static struct mpd_work_struct {
+	struct work_struct work;
+	int hotplug;
+} toggle_mpd_work;
+static void do_toggle_mpd(struct work_struct *work) {
+	char *argv[] = {
+		(((struct mpd_work_struct *)work)->hotplug
+			? "/system/bin/start" : "/system/bin/stop"),
+		"mpdecision",
+		NULL,
+	};
+	static char *env[] = {
+		"PATH=/system/bin",
+	};
+	call_usermodehelper(argv[0], argv, env, UMH_NO_WAIT);
+}
 
 /**
  * store_scaling_governor - store policy for the specified CPU
@@ -526,6 +543,8 @@ static ssize_t store_scaling_governor(struct cpufreq_policy *policy,
 	unsigned int ret = -EINVAL;
 	char	str_governor[16];
 	struct cpufreq_policy new_policy;
+	int j;
+	int hotplug = 1;
 
 	ret = cpufreq_get_policy(&new_policy, policy->cpu);
 	if (ret)
@@ -545,6 +564,47 @@ static ssize_t store_scaling_governor(struct cpufreq_policy *policy,
 
 	policy->user_policy.policy = policy->policy;
 	policy->user_policy.governor = policy->governor;
+
+	/* Handle governor flags:
+	 * ALLCPUS: cores all need to run the same governor
+	 * HOTPLUG: governor hotplugs and doesn't need mpdecision
+	 */
+	if (policy->governor->flags & BIT(GOVFLAGS_HOTPLUG))
+		hotplug = 0;
+	for_each_possible_cpu(j) {
+		struct cpufreq_policy *remote;
+		if (j == policy->cpu)
+			continue;
+		remote = cpufreq_cpu_get(j);
+		if (!remote) {
+			strncpy(per_cpu(cpufreq_policy_save, j).gov,
+				policy->governor->name, CPUFREQ_NAME_LEN);
+			continue;
+		}
+		if (lock_policy_rwsem_write(j))
+			goto out_nolock;
+		if (cpufreq_get_policy(&new_policy, j))
+			goto out_nopol;
+		if (((policy->governor->flags & BIT(GOVFLAGS_ALLCPUS)) ||
+		     (new_policy.governor->flags & BIT(GOVFLAGS_ALLCPUS))) &&
+		     remote) {
+			new_policy.governor = policy->governor;
+			__cpufreq_set_policy(remote, &new_policy);
+		}
+//out:
+		if (new_policy.governor->flags & BIT(GOVFLAGS_HOTPLUG))
+			hotplug = 0;
+out_nopol:
+		unlock_policy_rwsem_write(j);
+out_nolock:
+		cpufreq_cpu_put(remote);
+	}
+
+	printk(KERN_WARNING "CF: hotplug count: %i\n", hotplug);
+
+	// Toggle ROM's mpdecision.
+	toggle_mpd_work.hotplug = hotplug;
+	schedule_work((struct work_struct *) &toggle_mpd_work);
 
 	sysfs_notify(&policy->kobj, NULL, "scaling_governor");
 
@@ -2033,6 +2093,7 @@ int cpufreq_register_driver(struct cpufreq_driver *driver_data)
 	}
 
 	INIT_WORK((struct work_struct *) &enable_oc_work, do_enable_oc);
+	INIT_WORK((struct work_struct *) &toggle_mpd_work, do_toggle_mpd);
 
 	register_hotcpu_notifier(&cpufreq_cpu_notifier);
 	pr_debug("driver %s up and running\n", driver_data->name);

@@ -182,6 +182,11 @@ enum {
 	INTERACT_ID_OTHER,
 };
 
+enum {
+	GOVFLAGS_HOTPLUG,
+	GOVFLAGS_ALLCPUS,
+};
+
 void cpufreq_set_interactivity(int on, int idbit);
 
 struct cpufreq_governor {
@@ -195,6 +200,7 @@ struct cpufreq_governor {
 	unsigned int max_transition_latency; /* HW must be able to switch to
 			next freq faster than this value in nano secs or we
 			will fallback to performance governor */
+	unsigned int	flags;
 	struct list_head	governor_list;
 	struct module		*owner;
 };
