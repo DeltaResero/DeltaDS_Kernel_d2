@@ -518,20 +518,23 @@ static ssize_t show_scaling_governor(struct cpufreq_policy *policy, char *buf)
 	return -EINVAL;
 }
 
+void msm_rq_stats_enable(int enable);
 static struct mpd_work_struct {
 	struct work_struct work;
 	int hotplug;
 } toggle_mpd_work;
 static void do_toggle_mpd(struct work_struct *work) {
+	int enable = ((struct mpd_work_struct *)work)->hotplug;
 	char *argv[] = {
-		(((struct mpd_work_struct *)work)->hotplug
-			? "/system/bin/start" : "/system/bin/stop"),
+		enable ? "/system/bin/start" : "/system/bin/stop",
 		"mpdecision",
 		NULL,
 	};
 	static char *env[] = {
 		"PATH=/system/bin",
 	};
+	// No need to update stats without mpdecision
+	msm_rq_stats_enable(enable);
 	call_usermodehelper(argv[0], argv, env, UMH_NO_WAIT);
 }
 
@@ -592,7 +595,6 @@ static ssize_t store_scaling_governor(struct cpufreq_policy *policy,
 			new_policy.governor = policy->governor;
 			__cpufreq_set_policy(remote, &new_policy);
 		}
-//out:
 		if (new_policy.governor->flags & BIT(GOVFLAGS_HOTPLUG))
 			hotplug = 0;
 out_nopol:
@@ -600,8 +602,6 @@ out_nopol:
 out_nolock:
 		cpufreq_cpu_put(remote);
 	}
-
-	printk(KERN_WARNING "CF: hotplug count: %i\n", hotplug);
 
 	// Toggle ROM's mpdecision.
 	toggle_mpd_work.hotplug = hotplug;

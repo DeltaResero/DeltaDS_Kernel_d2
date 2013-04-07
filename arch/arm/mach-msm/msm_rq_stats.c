@@ -39,6 +39,7 @@
 
 struct notifier_block freq_transition;
 struct notifier_block cpu_hotplug;
+static int notifiers_registered;
 
 struct cpu_load_data {
 	cputime64_t prev_cpu_idle;
@@ -371,6 +372,21 @@ static int init_rq_attribs(void)
 	return err;
 }
 
+void msm_rq_stats_enable(int enable) {
+	rq_info.init = enable;
+	if (enable == notifiers_registered)
+		return;
+	if (enable) {
+		cpufreq_register_notifier(&freq_transition,
+					CPUFREQ_TRANSITION_NOTIFIER);
+		register_hotcpu_notifier(&cpu_hotplug);
+	} else {
+		cpufreq_unregister_notifier(&freq_transition,
+					CPUFREQ_TRANSITION_NOTIFIER);
+		unregister_hotcpu_notifier(&cpu_hotplug);
+	}
+}
+
 static int __init msm_rq_stats_init(void)
 {
 	int ret;
@@ -409,6 +425,7 @@ static int __init msm_rq_stats_init(void)
 	cpufreq_register_notifier(&freq_transition,
 					CPUFREQ_TRANSITION_NOTIFIER);
 	register_hotcpu_notifier(&cpu_hotplug);
+	notifiers_registered = 1;
 
 	return ret;
 }
