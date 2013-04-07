@@ -627,6 +627,20 @@ static ssize_t show_UV_mV_table(struct cpufreq_policy *policy,
 	return acpuclk_show_vdd_table(buf, "%umhz: %u mV\n", 1000, 1000);
 }
 
+/* Per-core vmin interface */
+void acpuclk_set_override_vmin(int enable);
+int acpuclk_get_override_vmin(void);
+static ssize_t store_override_vmin(struct cpufreq_policy *policy,
+					const char *buf, size_t count) {
+	int val;
+	if (sscanf(buf, "%i", &val) != 1)
+		return -EINVAL;
+	acpuclk_set_override_vmin(val);
+	return count;
+}
+static ssize_t show_override_vmin(struct cpufreq_policy *policy, char *buf) {
+	return sprintf(buf, "%u\n", acpuclk_get_override_vmin());
+}
 
 /**
  * show_scaling_driver - show the cpufreq driver currently loaded
@@ -753,6 +767,7 @@ cpufreq_freq_attr_rw(scaling_max_freq);
 cpufreq_freq_attr_rw(scaling_governor);
 cpufreq_freq_attr_rw(scaling_setspeed);
 cpufreq_freq_attr_rw(UV_mV_table);
+cpufreq_freq_attr_rw(override_vmin);
 
 static struct attribute *default_attrs[] = {
 	&cpuinfo_min_freq.attr,
@@ -768,6 +783,7 @@ static struct attribute *default_attrs[] = {
 	&scaling_available_governors.attr,
 	&scaling_setspeed.attr,
 	&UV_mV_table.attr,
+	&override_vmin.attr,
 	NULL
 };
 

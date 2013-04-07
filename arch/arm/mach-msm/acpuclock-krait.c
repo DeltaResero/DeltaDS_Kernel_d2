@@ -39,7 +39,7 @@
 #include "acpuclock-krait.h"
 #include "avs.h"
 
-#define FREQ_TABLE_SIZE 40
+#define FREQ_TABLE_SIZE 34
 
 /* MUX source selects. */
 #define PRI_SRC_SEL_SEC_SRC	0
@@ -1287,7 +1287,7 @@ ssize_t acpuclk_store_vdd_table(const char *buf, size_t count) {
 		len += thislen;
 		while (table[idx] < 10000) table[idx] *= 1000;
 	}
-	if (idx == FREQ_TABLE_SIZE && len == count - 1) {
+	if (idx == (FREQ_TABLE_SIZE - 1) && len == count - 1) {
 		if (acpuclk_update_vdd_table(FREQ_TABLE_SIZE, table))
 			return count;
 		else
@@ -1344,6 +1344,18 @@ void acpuclk_enable_oc_freqs(unsigned int freq) {
 	drv.l2_freq_tbl[tgt->l2_level].bw_level = 7;
 
 	cpufreq_table_init();
+}
+
+void acpuclk_set_override_vmin(int enable) {
+	if (enable) {
+		final_vmin = 700000;
+	} else {
+		final_vmin = krait_needs_vmin() ?
+			1150000 : 700000;
+	}
+}
+int acpuclk_get_override_vmin(void) {
+	return final_vmin < 1150000;
 }
 
 static ssize_t store_vmin(struct kobject *kobj, struct attribute *attr,
