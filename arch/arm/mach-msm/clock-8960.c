@@ -6835,6 +6835,7 @@ struct clock_init_data msm8960_clock_init_data __initdata = {
 	.late_init = msm8960_clock_late_init,
 };
 
+#if 0
 struct clock_init_data apq8064_clock_init_data __initdata = {
 	.table = msm_clocks_8064,
 	.size = ARRAY_SIZE(msm_clocks_8064),
@@ -6858,3 +6859,4 @@ struct clock_init_data msm8930_pm8917_clock_init_data __initdata = {
 	.post_init = msm8960_clock_post_init,
 	.late_init = msm8960_clock_late_init,
 };
+#endif
