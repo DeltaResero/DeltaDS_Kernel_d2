@@ -481,6 +481,7 @@ static ssize_t store_scaling_max_freq
 		enable_oc_work.freq = new_policy.max;
 		enable_oc_work.policy = policy;
 		schedule_work((struct work_struct *) &enable_oc_work);
+		ret = 0;
 	} else {
 		ret = __cpufreq_set_policy(policy, &new_policy);
 		policy->user_policy.max = policy->max;
