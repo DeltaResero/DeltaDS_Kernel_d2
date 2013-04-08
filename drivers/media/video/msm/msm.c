@@ -986,6 +986,7 @@ static int msm_open(struct file *f)
 		msm_queue_init(&pcam->eventData_q, "eventData");
 	}
 	pcam_inst->vbqueue_initialized = 0;
+	pcam_inst->sequence = 0;
 	rc = 0;
 
 	f->private_data = &pcam_inst->eventHandle;
@@ -1106,6 +1107,7 @@ void msm_release_ion_client(struct kref *ref)
 		struct msm_cam_media_controller, refcount);
 	pr_err("%s Calling ion_client_destroy\n", __func__);
 	ion_client_destroy(mctl->client);
+	mctl->client = NULL;
 }
 
 static int msm_close(struct file *f)
