@@ -76,7 +76,9 @@ static char V255_300CD_G_LSB;
 
 static char V255_300CD_B_MSB;
 static char V255_300CD_B_LSB;
-int color_mods[21] = { 0, 0, 5, -18, -16, -10, 0, 0, 3, 0, 0, 3, 0, 0, 3, 0, 0, 3, 0, 0, 3 };
+int trinity[21] = { 0, 0, 5, -18, -16, -10, 0, 0, 3, 0, 0, 3, 0, 0, 3, 0, 0, 3, 0, 0, 3 };
+int stock[21];
+int *color_mods = stock;
 struct SMART_DIM *gpsmart;
 
 static int char_to_int(char data1)
@@ -93,36 +95,7 @@ static int char_to_int(char data1)
 
 void trinity_load_colors(unsigned int val)
 {
-	int i=0;
-	if (val == 1)
-	{
-		color_mods[0] = 0;
-		color_mods[1] = 0;
-		color_mods[2] = 5;
-		color_mods[3] = -18;
-		color_mods[4] = -16;
-		color_mods[5] = -10;
-		color_mods[6] = 0;
-		color_mods[7] = 0;
-		color_mods[8] = 3;
-		color_mods[9] = 0;
-		color_mods[10] = 0;
-		color_mods[11] = 3;
-		color_mods[12] = 0;
-		color_mods[13] = 0;
-		color_mods[14] = 3;
-		color_mods[15] = 0;
-		color_mods[16] = 0;
-		color_mods[17] = 3;
-		color_mods[18] = 0;
-		color_mods[19] = 0;
-		color_mods[20] = 3;
-	}
-	else
-	{
-		for (i = 0; i < 21; i++)
-			color_mods[i] = 0;
-	}
+	color_mods = val ? trinity : stock;
 	smart_dimming_init(gpsmart);
 }
 
@@ -1564,7 +1537,7 @@ int smart_dimming_init(struct SMART_DIM *psmart)
 	memset(pBuffer, 0x00, 256);
 #endif
 	gpsmart = psmart;
-	
+
 	gamma_cell_determine(psmart->ldi_revision);
 	set_max_lux_table();
 
