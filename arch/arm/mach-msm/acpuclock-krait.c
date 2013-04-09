@@ -40,6 +40,9 @@
 #include "avs.h"
 
 #define FREQ_TABLE_SIZE 34
+#define MIN_VDD   (700000)
+#define VMIN_VDD (1150000)
+#define MAX_VDD  (1400000)
 
 /* MUX source selects. */
 #define PRI_SRC_SEL_SEC_SRC	0
@@ -1042,17 +1045,6 @@ static const int krait_needs_vmin(void)
 	};
 }
 
-#if 0
-static void krait_apply_vmin(struct acpu_level *tbl)
-{
-	for (; tbl->speed.khz != 0; tbl++) {
-		if (tbl->vdd_core < 1150000)
-			tbl->vdd_core = 1150000;
-		tbl->avsdscr_setting = 0;
-	}
-}
-#endif
-
 static int __init get_speed_bin(u32 pte_efuse)
 {
 	uint32_t speed_bin;
@@ -1230,6 +1222,11 @@ static int acpuclk_update_all_vdd(int adj) {
 	}
 	return 1;
 }
+#define sanity_check(v) \
+	if (v < 10000) \
+		v = (v * 1000) + ((v % 5 == 2) ? 500 : 0); \
+	if (v > MAX_VDD || v < MIN_VDD) \
+		return -EINVAL;
 /* My kingdom for a regular expression! */
 ssize_t acpuclk_store_vdd_table(const char *buf, size_t count) {
 	unsigned int freq, volt;
@@ -1273,7 +1270,7 @@ ssize_t acpuclk_store_vdd_table(const char *buf, size_t count) {
 	}
 	if (thislen == count - 1) {
 		while (freq < 10000) freq *= 1000;
-		while (volt < 10000) volt *= 1000;
+		sanity_check(volt);
 		if (acpuclk_update_one_vdd(freq, volt) == 1)
 			return count;
 		else
@@ -1285,7 +1282,7 @@ ssize_t acpuclk_store_vdd_table(const char *buf, size_t count) {
 		ret = sscanf(buf + len, " %u%n", &table[idx], &thislen);
 		if (!ret) break;
 		len += thislen;
-		while (table[idx] < 10000) table[idx] *= 1000;
+		sanity_check(table[idx]);
 	}
 	if (idx == (FREQ_TABLE_SIZE - 1) && len == count - 1) {
 		if (acpuclk_update_vdd_table(FREQ_TABLE_SIZE, table))
@@ -1333,8 +1330,8 @@ static struct attribute_group vdd_attr_group = {
 void acpuclk_enable_oc_freqs(unsigned int freq) {
 	struct acpu_level *tgt = drv.acpu_freq_tbl;
 
-	drv.scalable[CPU0].vreg[VREG_CORE].max_vdd = 1400000;
-	drv.scalable[CPU1].vreg[VREG_CORE].max_vdd = 1400000;
+	drv.scalable[CPU0].vreg[VREG_CORE].max_vdd = MAX_VDD;
+	drv.scalable[CPU1].vreg[VREG_CORE].max_vdd = MAX_VDD;
 
 	for (; tgt->speed.khz; tgt++) {
 		if (tgt->speed.khz > 1512000)
@@ -1348,14 +1345,14 @@ void acpuclk_enable_oc_freqs(unsigned int freq) {
 
 void acpuclk_set_override_vmin(int enable) {
 	if (enable) {
-		final_vmin = 700000;
+		final_vmin = MIN_VDD;
 	} else {
 		final_vmin = krait_needs_vmin() ?
-			1150000 : 700000;
+			VMIN_VDD : MIN_VDD;
 	}
 }
 int acpuclk_get_override_vmin(void) {
-	return final_vmin < 1150000;
+	return final_vmin < VMIN_VDD;
 }
 
 static ssize_t store_vmin(struct kobject *kobj, struct attribute *attr,
@@ -1412,9 +1409,9 @@ int __init acpuclk_krait_init(struct device *dev,
 	hw_init();
 
 	if (krait_needs_vmin())
-		final_vmin = 1150000;
+		final_vmin = VMIN_VDD;
 	else
-		final_vmin = 700000;
+		final_vmin = MIN_VDD;
 
 	cpufreq_table_init();
 	dcvs_freq_init();
