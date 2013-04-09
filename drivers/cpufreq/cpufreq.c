@@ -604,7 +604,7 @@ out_nolock:
 	}
 
 	// Toggle ROM's mpdecision.
-	toggle_mpd_work.hotplug = hotplug;
+	toggle_mpd_work.hotplug = (hotplug ? 1 : 0);
 	schedule_work((struct work_struct *) &toggle_mpd_work);
 
 	sysfs_notify(&policy->kobj, NULL, "scaling_governor");
