@@ -1194,7 +1194,7 @@ static int acpuclk_update_vdd_table(int num, unsigned int table[]) {
 			tgt->vdd_core = table[i];
 		}
 	} else {
-		for (i = num; i > 0; i--, tgt++) {
+		for (i = num - 1; i >= 0; i--, tgt++) {
 			if (!tgt->vdd_core)
 				break;
 			tgt->vdd_core = table[i];
@@ -1284,8 +1284,10 @@ ssize_t acpuclk_store_vdd_table(const char *buf, size_t count) {
 		len += thislen;
 		sanity_check(table[idx]);
 	}
+	// skip trailing whitespace for voltage control
+	while (buf[len] == ' ') len++;
 	if (idx == (FREQ_TABLE_SIZE - 1) && len == count - 1) {
-		if (acpuclk_update_vdd_table(FREQ_TABLE_SIZE, table))
+		if (acpuclk_update_vdd_table(idx, table))
 			return count;
 		else
 			return -EINVAL;
@@ -1297,9 +1299,9 @@ ssize_t acpuclk_store_vdd_table(const char *buf, size_t count) {
 }
 ssize_t acpuclk_show_vdd_table(char *buf, char *fmt, int fdiv, int vdiv) {
 	int len;
-	struct acpu_level *tgt = drv.acpu_freq_tbl;
+	struct acpu_level *tgt = &drv.acpu_freq_tbl[FREQ_TABLE_SIZE-2];
 
-	for (len = 0; tgt->speed.khz; tgt++) {
+	for (len = 0; tgt >= drv.acpu_freq_tbl; tgt--) {
 		len += sprintf(buf + len, fmt,
 			tgt->speed.khz / fdiv, tgt->vdd_core / vdiv);
 	}

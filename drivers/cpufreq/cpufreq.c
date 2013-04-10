@@ -29,6 +29,8 @@
 #include <linux/completion.h>
 #include <linux/mutex.h>
 #include <linux/syscore_ops.h>
+
+// For mpdecision hack
 #include <linux/kmod.h>
 
 #include <trace/events/power.h>
@@ -519,12 +521,7 @@ static ssize_t show_scaling_governor(struct cpufreq_policy *policy, char *buf)
 }
 
 void msm_rq_stats_enable(int enable);
-static struct mpd_work_struct {
-	struct work_struct work;
-	int hotplug;
-} toggle_mpd_work;
-static void do_toggle_mpd(struct work_struct *work) {
-	int enable = ((struct mpd_work_struct *)work)->hotplug;
+static void __ref do_toggle_mpd(int enable) {
 	char *argv[] = {
 		enable ? "/system/bin/start" : "/system/bin/stop",
 		"mpdecision",
@@ -533,9 +530,9 @@ static void do_toggle_mpd(struct work_struct *work) {
 	static char *env[] = {
 		"PATH=/system/bin",
 	};
+	call_usermodehelper(argv[0], argv, env, UMH_NO_WAIT);
 	// No need to update stats without mpdecision
 	msm_rq_stats_enable(enable);
-	call_usermodehelper(argv[0], argv, env, UMH_NO_WAIT);
 }
 
 /**
@@ -604,8 +601,7 @@ out_nolock:
 	}
 
 	// Toggle ROM's mpdecision.
-	toggle_mpd_work.hotplug = (hotplug ? 1 : 0);
-	schedule_work((struct work_struct *) &toggle_mpd_work);
+	do_toggle_mpd(!!hotplug);
 
 	sysfs_notify(&policy->kobj, NULL, "scaling_governor");
 
@@ -2110,7 +2106,6 @@ int cpufreq_register_driver(struct cpufreq_driver *driver_data)
 	}
 
 	INIT_WORK((struct work_struct *) &enable_oc_work, do_enable_oc);
-	INIT_WORK((struct work_struct *) &toggle_mpd_work, do_toggle_mpd);
 
 	register_hotcpu_notifier(&cpufreq_cpu_notifier);
 	pr_debug("driver %s up and running\n", driver_data->name);
