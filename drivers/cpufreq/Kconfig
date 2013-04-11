@@ -103,7 +103,10 @@ config CPU_FREQ_DEFAULT_GOV_CONSERVATIVE
 config CPU_FREQ_DEFAULT_GOV_FREELUNCH
 	bool "freelunch"
 	select CPU_FREQ_GOV_FREELUNCH
-	select CPU_FREQ_GOV_PERFORMANCE
+
+config CPU_FREQ_DEFAULT_GOV_ASSWAX
+         bool "asswax"
+         select CPU_FREQ_GOV_ASSWAX
 
 config CPU_FREQ_DEFAULT_GOV_INTERACTIVE
 	bool "interactive"
@@ -214,6 +217,10 @@ config CPU_FREQ_GOV_CONSERVATIVE
 config CPU_FREQ_GOV_FREELUNCH
 	tristate "'freelunch' cpufreq governor"
 	depends on CPU_FREQ
+
+config CPU_FREQ_GOV_ASSWAX
+        tristate "'asswax' cpufreq governor"
+        depends on CPU_FREQ
 
 config CPU_FREQ_DVFS_MONITOR
 	bool "dvfs monitor"
