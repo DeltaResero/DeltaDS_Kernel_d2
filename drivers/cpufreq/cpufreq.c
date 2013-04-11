@@ -521,19 +521,6 @@ static ssize_t show_scaling_governor(struct cpufreq_policy *policy, char *buf)
 }
 
 void msm_rq_stats_enable(int enable);
-static void __ref do_toggle_mpd(int enable) {
-	char *argv[] = {
-		enable ? "/system/bin/start" : "/system/bin/stop",
-		"mpdecision",
-		NULL,
-	};
-	static char *env[] = {
-		"PATH=/system/bin",
-	};
-	call_usermodehelper(argv[0], argv, env, UMH_NO_WAIT);
-	// No need to update stats without mpdecision
-	msm_rq_stats_enable(enable);
-}
 
 /**
  * store_scaling_governor - store policy for the specified CPU
@@ -545,7 +532,7 @@ static ssize_t store_scaling_governor(struct cpufreq_policy *policy,
 	char	str_governor[16];
 	struct cpufreq_policy new_policy;
 	int j;
-	int hotplug = 1;
+	int needmpd = 1;
 
 	ret = cpufreq_get_policy(&new_policy, policy->cpu);
 	if (ret)
@@ -571,7 +558,7 @@ static ssize_t store_scaling_governor(struct cpufreq_policy *policy,
 	 * HOTPLUG: governor hotplugs and doesn't need mpdecision
 	 */
 	if (policy->governor->flags & BIT(GOVFLAGS_HOTPLUG))
-		hotplug = 0;
+		needmpd = 0;
 	for_each_possible_cpu(j) {
 		struct cpufreq_policy *remote;
 		if (j == policy->cpu)
@@ -593,15 +580,17 @@ static ssize_t store_scaling_governor(struct cpufreq_policy *policy,
 			__cpufreq_set_policy(remote, &new_policy);
 		}
 		if (new_policy.governor->flags & BIT(GOVFLAGS_HOTPLUG))
-			hotplug = 0;
+			needmpd = 0;
 out_nopol:
 		unlock_policy_rwsem_write(j);
 out_nolock:
 		cpufreq_cpu_put(remote);
 	}
 
-	// Toggle ROM's mpdecision.
-	do_toggle_mpd(!!hotplug);
+	/* Cripple ROM's mpdecision.  mpdecision will sleep until def_timer_ms
+	 * updates, so stopping the rq_stats hooks will effectively kill it.
+	 */
+	msm_rq_stats_enable(needmpd);
 
 	sysfs_notify(&policy->kobj, NULL, "scaling_governor");
 

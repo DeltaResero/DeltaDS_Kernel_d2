@@ -373,20 +373,25 @@ static int init_rq_attribs(void)
 }
 
 void msm_rq_stats_enable(int enable) {
-	rq_info.init = enable;
-	if (enable == notifiers_registered)
-		return;
-	if (enable) {
-		cpufreq_register_notifier(&freq_transition,
-					CPUFREQ_TRANSITION_NOTIFIER);
-		register_hotcpu_notifier(&cpu_hotplug);
-		notifiers_registered = 1;
-	} else {
-		cpufreq_unregister_notifier(&freq_transition,
-					CPUFREQ_TRANSITION_NOTIFIER);
-		unregister_hotcpu_notifier(&cpu_hotplug);
-		notifiers_registered = 0;
+	if (enable != notifiers_registered) {
+		if (enable) {
+			cpufreq_register_notifier(&freq_transition,
+						CPUFREQ_TRANSITION_NOTIFIER);
+			register_hotcpu_notifier(&cpu_hotplug);
+			notifiers_registered = 1;
+		} else {
+			cpufreq_unregister_notifier(&freq_transition,
+						CPUFREQ_TRANSITION_NOTIFIER);
+			unregister_hotcpu_notifier(&cpu_hotplug);
+			notifiers_registered = 0;
+		}
 	}
+	if (enable) {
+		rq_info.rq_poll_total_jiffies = 0;
+		rq_info.rq_poll_last_jiffy = jiffies;
+		rq_info.rq_avg = 0;
+	}
+	rq_info.init = enable;
 }
 
 static int __init msm_rq_stats_init(void)
