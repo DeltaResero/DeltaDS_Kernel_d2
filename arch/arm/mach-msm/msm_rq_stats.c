@@ -220,6 +220,10 @@ static int system_suspend_handler(struct notifier_block *nb,
 	case PM_HIBERNATION_PREPARE:
 	case PM_SUSPEND_PREPARE:
 		rq_info.hotplug_disabled = 1;
+		rq_info.init = 1;
+		break;
+	case PM_RESTORE_PREPARE:
+		rq_info.init = notifiers_registered;
 		break;
 	default:
 		return NOTIFY_DONE;

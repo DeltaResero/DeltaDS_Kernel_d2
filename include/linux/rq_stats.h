@@ -24,7 +24,7 @@ struct rq_data {
 	struct attribute_group *attr_group;
 	struct kobject *kobj;
 	struct work_struct def_timer_work;
-	int init;
+	volatile int init;
 };
 
 extern spinlock_t rq_lock;
