@@ -243,7 +243,8 @@ static int s5k6a3yx_sensor_config(void __user *argp)
 
 static int s5k6a3yx_sensor_open_init(const struct msm_camera_sensor_info *data)
 {
-	return msm_sensor_open_init(&s5k6a3yx_s_ctrl, data);
+	s5k6a3yx_s_ctrl.sensordata = data;
+	return 0;
 }
 
 static int s5k6a3yx_sensor_release(void)
@@ -522,8 +523,6 @@ static struct msm_sensor_fn_t s5k6a3yx_func_tbl = {
 	.sensor_config = s5k6a3yx_sensor_config,
 	.sensor_open_init = s5k6a3yx_sensor_open_init,
 	.sensor_release = s5k6a3yx_sensor_release,
-	.sensor_power_up = msm_sensor_power_up,
-	.sensor_power_down = msm_sensor_power_down,
 	.sensor_probe = msm_sensor_probe,
 };
 
@@ -554,7 +553,6 @@ static struct msm_sensor_ctrl_t s5k6a3yx_s_ctrl = {
 	.sensor_exp_gain_info = &s5k6a3yx_exp_gain_info,
 	.cam_mode = MSM_SENSOR_MODE_INVALID,
 	.csi_params = &s5k6a3yx_csi_params_array[0],
-	//.msm_sensor_mutex = &s5k6a3yx_mut,
 	.sensor_i2c_driver = &s5k6a3yx_i2c_driver,
 	.sensor_v4l2_subdev_info = s5k6a3yx_subdev_info,
 	.sensor_v4l2_subdev_info_size = ARRAY_SIZE(s5k6a3yx_subdev_info),
