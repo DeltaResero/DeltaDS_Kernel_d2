@@ -377,12 +377,13 @@ void msm_rq_stats_enable(int enable) {
 		if (enable) {
 			cpufreq_register_notifier(&freq_transition,
 						CPUFREQ_TRANSITION_NOTIFIER);
-			register_hotcpu_notifier(&cpu_hotplug);
+			// Reregistering this likes to hang, so let's not.
+			//register_hotcpu_notifier(&cpu_hotplug);
 			notifiers_registered = 1;
 		} else {
 			cpufreq_unregister_notifier(&freq_transition,
 						CPUFREQ_TRANSITION_NOTIFIER);
-			unregister_hotcpu_notifier(&cpu_hotplug);
+			//unregister_hotcpu_notifier(&cpu_hotplug);
 			notifiers_registered = 0;
 		}
 	}

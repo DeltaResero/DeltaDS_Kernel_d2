@@ -531,8 +531,6 @@ static ssize_t store_scaling_governor(struct cpufreq_policy *policy,
 	unsigned int ret = -EINVAL;
 	char	str_governor[16];
 	struct cpufreq_policy new_policy;
-	int j;
-	int needmpd = 1;
 
 	ret = cpufreq_get_policy(&new_policy, policy->cpu);
 	if (ret)
@@ -552,45 +550,6 @@ static ssize_t store_scaling_governor(struct cpufreq_policy *policy,
 
 	policy->user_policy.policy = policy->policy;
 	policy->user_policy.governor = policy->governor;
-
-	/* Handle governor flags:
-	 * ALLCPUS: cores all need to run the same governor
-	 * HOTPLUG: governor hotplugs and doesn't need mpdecision
-	 */
-	if (policy->governor->flags & BIT(GOVFLAGS_HOTPLUG))
-		needmpd = 0;
-	for_each_possible_cpu(j) {
-		struct cpufreq_policy *remote;
-		if (j == policy->cpu)
-			continue;
-		remote = cpufreq_cpu_get(j);
-		if (!remote) {
-			strncpy(per_cpu(cpufreq_policy_save, j).gov,
-				policy->governor->name, CPUFREQ_NAME_LEN);
-			continue;
-		}
-		if (lock_policy_rwsem_write(j))
-			goto out_nolock;
-		if (cpufreq_get_policy(&new_policy, j))
-			goto out_nopol;
-		if (((policy->governor->flags & BIT(GOVFLAGS_ALLCPUS)) ||
-		     (new_policy.governor->flags & BIT(GOVFLAGS_ALLCPUS))) &&
-		     remote) {
-			new_policy.governor = policy->governor;
-			__cpufreq_set_policy(remote, &new_policy);
-		}
-		if (new_policy.governor->flags & BIT(GOVFLAGS_HOTPLUG))
-			needmpd = 0;
-out_nopol:
-		unlock_policy_rwsem_write(j);
-out_nolock:
-		cpufreq_cpu_put(remote);
-	}
-
-	/* Cripple ROM's mpdecision.  mpdecision will sleep until def_timer_ms
-	 * updates, so stopping the rq_stats hooks will effectively kill it.
-	 */
-	msm_rq_stats_enable(needmpd);
 
 	sysfs_notify(&policy->kobj, NULL, "scaling_governor");
 
@@ -807,23 +766,87 @@ static ssize_t store(struct kobject *kobj, struct attribute *attr,
 {
 	struct cpufreq_policy *policy = to_policy(kobj);
 	struct freq_attr *fattr = to_attr(attr);
-	ssize_t ret = -EINVAL;
-	policy = cpufreq_cpu_get_sysfs(policy->cpu);
-	if (!policy)
-		goto no_policy;
+	ssize_t ret = count;
 
-	if (lock_policy_rwsem_write(policy->cpu) < 0)
-		goto fail;
+	int j, iter = 0, cpu = policy->cpu;
 
-	if (fattr->store)
-		ret = fattr->store(policy, buf, count);
-	else
-		ret = -EIO;
+	/* This is a pain, but it's easier to handle shared settings here.  If
+	 * we're setting governor, we check flags and toggle mpdecision and
+	 * possibly assign to all cores.  If we're setting minimum or maxiumum
+	 * frequency, we assign to all cores.
+	 *
+	 * GOVFLAGS_ALLCPUS: all cpus must use this governor
+	 * GOVFLAGS_HOTPLUG: this governor hotplugs and doesn't need mpdecision
+	 */
+	if (fattr->store == store_scaling_governor) {
+		char name[16];
+		unsigned int p = 0;
+		struct cpufreq_governor *t = NULL;
+		for (p = 0; p < 16; p++) {
+			if (buf[p] == 0 || buf[p] == '\n')
+				break;
+			name[p] = buf[p];
+		}
+		name[p] = 0;
+		cpufreq_parse_governor(name, &p, &t);
+		if (!t)
+			return -EINVAL;
+		if (t->flags & BIT(GOVFLAGS_ALLCPUS)) {
+			iter = 1;
+		} else {
+			// If cpu0 has ALLCPUS, they all do.
+			if (per_cpu(cpufreq_cpu_data, 0)->governor->flags &
+				BIT(GOVFLAGS_ALLCPUS)) {
+				iter = 1;
+			}
+		}
 
-	unlock_policy_rwsem_write(policy->cpu);
+		// If cpu0 can't enable cpu1, we need mpdecision
+		if (cpu == 0)
+			msm_rq_stats_enable(!(t->flags & BIT(GOVFLAGS_HOTPLUG)));
+	} else if (fattr->store == store_scaling_max_freq ||
+		   fattr->store == store_scaling_min_freq) {
+		iter = 1;
+	}
+
+	for_each_possible_cpu(j) {
+		if (!iter && (j != cpu)) continue;
+		/* Getting the policy the usual way here when it doesn't exist
+		 * has unexpected consequences.  Check first.
+		 */
+		if (!per_cpu(cpufreq_cpu_data, j)) {
+			// store won't work, so adjust saved values
+			if (fattr->store == store_scaling_governor)
+				strncpy(per_cpu(cpufreq_policy_save, j).gov,
+					buf, CPUFREQ_NAME_LEN);
+			else if (fattr->store == store_scaling_max_freq)
+				ret = sscanf(buf, "%u",
+					&per_cpu(cpufreq_policy_save, j).max) ?
+					ret : -EINVAL;
+			else if (fattr->store == store_scaling_min_freq)
+				ret = sscanf(buf, "%u",
+					&per_cpu(cpufreq_policy_save, j).min) ?
+					ret : -EINVAL;
+			continue;
+		}
+
+		// We have a policy, so it's safe to grab it.
+		policy = cpufreq_cpu_get_sysfs(j);
+
+		if (lock_policy_rwsem_write(j) < 0)
+			goto fail;
+
+		if (fattr->store) {
+			int sr = fattr->store(policy, buf, count);
+			ret = sr < 0 ? sr : ret;
+		} else
+			ret = -EIO;
+
+		unlock_policy_rwsem_write(j);
 fail:
-	cpufreq_cpu_put_sysfs(policy);
-no_policy:
+		cpufreq_cpu_put_sysfs(policy);
+	}
+
 	return ret;
 }
 
