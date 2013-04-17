@@ -104,13 +104,13 @@ static struct dbs_tuners {
 	.sampling_rate = 35000, /* 2 vsyncs */
 	.ignore_nice = 0,
 	.hotplug_up_cycles = 3,
-	.hotplug_down_cycles = 3,
+	.hotplug_down_cycles = 5,
 	.hotplug_up_load = 3,
 	.hotplug_up_usage = 600000,
 	.hotplug_down_usage = 225000,
 	.overestimate_khz = 35000,
 	.hispeed_thresh = 25000,
-	.hispeed_decrease = 25000,
+	.hispeed_decrease = 75000,
 	.interaction_sampling_rate = 10000,
 	.interaction_overestimate_khz = 175000,
 	.interaction_return_usage = 75000, /* crazy low, but XDA sucks otherwise */

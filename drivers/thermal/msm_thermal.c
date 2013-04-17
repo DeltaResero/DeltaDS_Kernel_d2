@@ -25,20 +25,24 @@
 #include <linux/of.h>
 #include <mach/cpufreq.h>
 
+#define CORE_CONTROL
+
 static int enabled;
 static struct msm_thermal_data msm_thermal_info;
 static uint32_t limited_max_freq = MSM_CPUFREQ_NO_LIMIT;
 static struct delayed_work check_temp_work;
+#ifdef CORE_CONTROL
 static bool core_control_enabled;
 static uint32_t cpus_offlined;
 static DEFINE_MUTEX(core_control_mutex);
+#endif
 
 static int limit_idx;
 static int limit_idx_low;
 static int limit_idx_high;
 static struct cpufreq_frequency_table *table;
 
-static int msm_thermal_get_freq_table(void)
+int msm_thermal_get_freq_table(void)
 {
 	int ret = 0;
 	int i = 0;
@@ -81,6 +85,7 @@ static int update_cpu_max_freq(int cpu, uint32_t max_freq)
 	return ret;
 }
 
+#ifdef CORE_CONTROL
 static void __cpuinit do_core_control(long temp)
 {
 	int i = 0;
@@ -114,7 +119,8 @@ static void __cpuinit do_core_control(long temp)
 			if (ret)
 				pr_err("%s: Error %d offline core %d\n",
 					KBUILD_MODNAME, ret, i);
-			cpus_offlined |= BIT(i);
+			else
+				cpus_offlined |= BIT(i);
 			break;
 		}
 	} else if (msm_thermal_info.core_control_mask && cpus_offlined &&
@@ -140,6 +146,7 @@ static void __cpuinit do_core_control(long temp)
 	}
 	mutex_unlock(&core_control_mutex);
 }
+#endif
 
 static void __cpuinit check_temp(struct work_struct *work)
 {
@@ -166,7 +173,9 @@ static void __cpuinit check_temp(struct work_struct *work)
 			limit_init = 1;
 	}
 
+#ifdef CORE_CONTROL
 	do_core_control(temp);
+#endif
 
 	if (temp >= msm_thermal_info.limit_temp_degC) {
 		if (limit_idx == limit_idx_low)
@@ -206,6 +215,7 @@ reschedule:
 				msecs_to_jiffies(msm_thermal_info.poll_ms));
 }
 
+#ifdef CORE_CONTROL
 static int __cpuinit msm_thermal_cpu_callback(struct notifier_block *nfb,
 		unsigned long action, void *hcpu)
 {
@@ -229,6 +239,7 @@ static int __cpuinit msm_thermal_cpu_callback(struct notifier_block *nfb,
 static struct notifier_block __refdata msm_thermal_cpu_notifier = {
 	.notifier_call = msm_thermal_cpu_callback,
 };
+#endif
 
 /**
  * We will reset the cpu frequencies limits here. The core online/offline
@@ -276,6 +287,7 @@ module_param_cb(enabled, &module_ops, &enabled, 0644);
 MODULE_PARM_DESC(enabled, "enforce thermal limit on cpu");
 
 
+#ifdef CORE_CONTROL
 /* Call with core_control_mutex locked */
 static int __cpuinit update_offline_cores(int val)
 {
@@ -421,6 +433,7 @@ done_cc_nodes:
 		kobject_del(cc_kobj);
 	return ret;
 }
+#endif
 
 int __devinit msm_thermal_init(struct msm_thermal_data *pdata)
 {
@@ -431,11 +444,15 @@ int __devinit msm_thermal_init(struct msm_thermal_data *pdata)
 	memcpy(&msm_thermal_info, pdata, sizeof(struct msm_thermal_data));
 
 	enabled = 1;
+#ifdef CORE_CONTROL
 	core_control_enabled = 1;
+#endif
 	INIT_DELAYED_WORK(&check_temp_work, check_temp);
 	schedule_delayed_work(&check_temp_work, 0);
 
+#ifdef CORE_CONTROL
 	register_cpu_notifier(&msm_thermal_cpu_notifier);
+#endif
 
 	return ret;
 }
@@ -518,8 +535,10 @@ int __init msm_thermal_device_init(void)
 	return platform_driver_register(&msm_thermal_device_driver);
 }
 
+#ifdef CORE_CONTROL
 int __init msm_thermal_late_init(void)
 {
 	return msm_thermal_add_cc_nodes();
 }
 module_init(msm_thermal_late_init);
+#endif

@@ -15,12 +15,25 @@
 #include <linux/cpufreq.h>
 #include <linux/init.h>
 
+#include <linux/workqueue.h>
+#include <linux/cpu.h>
+
+static struct work_struct cpu_up_work;
+static void __cpuinit do_cpu_up(struct work_struct *work) {
+	int j;
+	for_each_possible_cpu(j) {
+		if (!cpu_online(j))
+			cpu_up(j);
+	}
+}
 
 static int cpufreq_governor_performance(struct cpufreq_policy *policy,
 					unsigned int event)
 {
 	switch (event) {
 	case CPUFREQ_GOV_START:
+		INIT_WORK(&cpu_up_work, do_cpu_up);
+		schedule_work(&cpu_up_work);
 	case CPUFREQ_GOV_LIMITS:
 		pr_debug("setting to %u kHz because of event %u\n",
 						policy->max, event);
@@ -40,6 +53,7 @@ struct cpufreq_governor cpufreq_gov_performance = {
 	.name		= "performance",
 	.governor	= cpufreq_governor_performance,
 	.owner		= THIS_MODULE,
+	.flags		= BIT(GOVFLAGS_HOTPLUG) | BIT(GOVFLAGS_ALLCPUS),
 };
 
 

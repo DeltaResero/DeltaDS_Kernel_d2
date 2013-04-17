@@ -935,7 +935,7 @@ static void __init bus_init(const struct l2_level *l2_level)
 #ifdef CONFIG_CPU_FREQ_MSM
 static struct cpufreq_frequency_table freq_table[NR_CPUS][FREQ_TABLE_SIZE];
 
-static void cpufreq_table_init(void)
+static void cpufreq_table_init(int boot)
 {
 	int cpu;
 
@@ -968,6 +968,9 @@ static void cpufreq_table_init(void)
 		/* Register table with CPUFreq. */
 		cpufreq_frequency_table_get_attr(freq_table[cpu], cpu);
 
+		if (!boot)
+			continue;
+
 		/* Update maximum frequency, notify cpufreq core */
 		pol = cpufreq_cpu_get(cpu);
 		if (pol) {
@@ -985,10 +988,9 @@ static void __init dcvs_freq_init(void)
 	int i;
 
 	for (i = 0; drv.acpu_freq_tbl[i].speed.khz != 0; i++)
-		if (drv.acpu_freq_tbl[i].use_for_scaling)
-			msm_dcvs_register_cpu_freq(
-				drv.acpu_freq_tbl[i].speed.khz,
-				drv.acpu_freq_tbl[i].vdd_core / 1000);
+		msm_dcvs_register_cpu_freq(
+			drv.acpu_freq_tbl[i].speed.khz,
+			drv.acpu_freq_tbl[i].vdd_core / 1000);
 }
 
 static int __cpuinit acpuclk_cpu_callback(struct notifier_block *nfb,
@@ -1329,6 +1331,7 @@ static struct attribute_group vdd_attr_group = {
 };
 
 /* Enable OC frequencies.  Also bump max voltage & bus speed. */
+extern int msm_thermal_get_freq_table(void);
 void acpuclk_enable_oc_freqs(unsigned int freq) {
 	struct acpu_level *tgt = drv.acpu_freq_tbl;
 
@@ -1342,7 +1345,8 @@ void acpuclk_enable_oc_freqs(unsigned int freq) {
 	tgt--;
 	drv.l2_freq_tbl[tgt->l2_level].bw_level = 7;
 
-	cpufreq_table_init();
+	cpufreq_table_init(0);
+	msm_thermal_get_freq_table();
 }
 
 void acpuclk_set_override_vmin(int enable) {
@@ -1415,7 +1419,7 @@ int __init acpuclk_krait_init(struct device *dev,
 	else
 		final_vmin = MIN_VDD;
 
-	cpufreq_table_init();
+	cpufreq_table_init(1);
 	dcvs_freq_init();
 	acpuclk_register(&acpuclk_krait_data);
 	register_hotcpu_notifier(&acpuclk_cpu_notifier);

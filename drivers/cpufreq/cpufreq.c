@@ -438,6 +438,8 @@ static void do_enable_oc(struct work_struct *work) {
 		return;
 	new_policy.max = ((struct freq_work_struct *) work)->freq;
 	acpuclk_enable_oc_freqs(new_policy.max);
+	// __cpufreq_set_policy clobbers this, so hack it up.
+	policy->cpuinfo.max_freq = new_policy.max;
 	if (__cpufreq_set_policy(policy, &new_policy))
 		return;
 	policy->user_policy.max = policy->max;
