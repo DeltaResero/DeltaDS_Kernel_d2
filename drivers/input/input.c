@@ -53,6 +53,7 @@ static inline int is_event_supported(unsigned int code,
 	return code <= max && test_bit(code, bm);
 }
 
+/*
 static int input_defuzz_abs_event(int value, int old_val, int fuzz)
 {
 	if (fuzz) {
@@ -68,6 +69,7 @@ static int input_defuzz_abs_event(int value, int old_val, int fuzz)
 
 	return value;
 }
+*/
 
 /*
  * Pass event first through all filters and then, if event has not been
@@ -196,8 +198,10 @@ static int input_handle_abs_event(struct input_dev *dev,
 	}
 
 	if (pold) {
+		/*
 		*pval = input_defuzz_abs_event(*pval, *pold,
 						dev->absinfo[code].fuzz);
+		*/
 		if (*pold == *pval)
 			return INPUT_IGNORE_EVENT;
 
@@ -352,7 +356,7 @@ void input_event(struct input_dev *dev,
 	if (is_event_supported(type, dev->evbit, EV_MAX)) {
 
 		spin_lock_irqsave(&dev->event_lock, flags);
-		add_input_randomness(type, code, value);
+		//add_input_randomness(type, code, value);
 		input_handle_event(dev, type, code, value);
 		spin_unlock_irqrestore(&dev->event_lock, flags);
 	}

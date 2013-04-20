@@ -29,6 +29,8 @@
 
 //#define DEFER_STATS
 
+extern ktime_t get_idle_ns(int cpu);
+
 enum interaction_flags {
 	IFLAG_PRESSED = 1,
 	IFLAG_RUNNING = 2,
@@ -42,9 +44,8 @@ enum interaction_flags {
 static void do_dbs_timer(struct work_struct *work);
 
 struct cpu_dbs_info_s {
-	cputime64_t prev_cpu_idle;
-	cputime64_t prev_cpu_wall;
-	cputime64_t prev_cpu_nice;
+	ktime_t prev_cpu_idle;
+	ktime_t prev_cpu_wall;
 	struct cpufreq_policy *cur_policy;
 	struct delayed_work work;
 	unsigned int requested_freq;
@@ -82,7 +83,6 @@ static DEFINE_MUTEX(dbs_mutex);
 
 static struct dbs_tuners {
 	unsigned int sampling_rate;
-	unsigned int ignore_nice;
 
 	unsigned int hotplug_up_cycles;
 	unsigned int hotplug_down_cycles;
@@ -102,85 +102,19 @@ static struct dbs_tuners {
 	unsigned int interaction_hispeed;
 } dbs_tuners_ins = {
 	.sampling_rate = 35000, /* 2 vsyncs */
-	.ignore_nice = 0,
-	.hotplug_up_cycles = 3,
-	.hotplug_down_cycles = 5,
-	.hotplug_up_load = 3,
-	.hotplug_up_usage = 600000,
-	.hotplug_down_usage = 225000,
+	.hotplug_up_cycles = 2,
+	.hotplug_down_cycles = 4,
+	.hotplug_up_load = 2,
+	.hotplug_up_usage = 500000,
+	.hotplug_down_usage = 125000,
 	.overestimate_khz = 35000,
-	.hispeed_thresh = 25000,
+	.hispeed_thresh = 75000,
 	.hispeed_decrease = 75000,
 	.interaction_sampling_rate = 10000,
 	.interaction_overestimate_khz = 175000,
-	.interaction_return_usage = 75000, /* crazy low, but XDA sucks otherwise */
+	.interaction_return_usage = 125000, /* crazy low, but XDA sucks otherwise */
 	.interaction_return_cycles = 4, /* 3 vsyncs */
-	.interaction_hispeed = 1188000,
-};
-// }}}
-// {{{2 support function crap
-static inline cputime64_t get_cpu_idle_time_jiffy(unsigned int cpu,
-							cputime64_t *wall)
-{
-	cputime64_t idle_time;
-	cputime64_t cur_wall_time;
-	cputime64_t busy_time;
-
-	cur_wall_time = jiffies64_to_cputime64(get_jiffies_64());
-	busy_time =  kcpustat_cpu(cpu).cpustat[CPUTIME_USER];
-	busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_SYSTEM];
-	busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_IRQ];
-	busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_SOFTIRQ];
-	busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_STEAL];
-	busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_NICE];
-
-	idle_time = cur_wall_time - busy_time;
-	if (wall)
-		*wall = (cputime64_t)jiffies_to_usecs(cur_wall_time);
-
-	return (cputime64_t)jiffies_to_usecs(idle_time);
-}
-
-static inline cputime64_t get_cpu_idle_time(unsigned int cpu, cputime64_t *wall)
-{
-	u64 idle_time = get_cpu_idle_time_us(cpu, wall);
-
-	if (idle_time == -1ULL)
-		return get_cpu_idle_time_jiffy(cpu, wall);
-
-	return idle_time;
-}
-
-/* keep track of frequency transitions */
-static int
-dbs_cpufreq_notifier(struct notifier_block *nb, unsigned long val,
-		     void *data)
-{
-	struct cpufreq_freqs *freq = data;
-	struct cpu_dbs_info_s *this_dbs_info = &per_cpu(cs_cpu_dbs_info,
-							freq->cpu);
-
-	struct cpufreq_policy *policy;
-
-	if (!this_dbs_info->enable)
-		return 0;
-
-	policy = this_dbs_info->cur_policy;
-
-	/*
-	 * we only care if our internally tracked freq moves outside
-	 * the 'valid' ranges of freqency available to us otherwise
-	 * we do not change it
-	*/
-	if (this_dbs_info->requested_freq > policy->max
-			|| this_dbs_info->requested_freq < policy->min)
-		this_dbs_info->requested_freq = freq->new;
-
-	return 0;
-}
-
-static struct notifier_block dbs_cpufreq_notifier_block = {
-	.notifier_call = dbs_cpufreq_notifier
+	.interaction_hispeed = 1242000,
 };
 // }}}
 // {{{2 sysfs crap
@@ -215,7 +149,6 @@ static ssize_t store_##f							\
 define_one_global_rw(f);
 
 show_one(sampling_rate, sampling_rate);
-show_one(ignore_nice_load, ignore_nice);
 i_am_lazy(hotplug_up_cycles, 0, 100)
 i_am_lazy(hotplug_down_cycles, 0, 100)
 i_am_lazy(hotplug_up_load, 0, 100)
@@ -244,45 +177,11 @@ static ssize_t store_sampling_rate(struct kobject *a, struct attribute *b,
 	return count;
 }
 
-static ssize_t store_ignore_nice_load(struct kobject *a, struct attribute *b,
-				      const char *buf, size_t count)
-{
-	unsigned int input;
-	int ret;
-
-	unsigned int j;
-
-	ret = sscanf(buf, "%u", &input);
-	if (ret != 1)
-		return -EINVAL;
-
-	if (input > 1)
-		input = 1;
-
-	if (input == dbs_tuners_ins.ignore_nice) /* nothing to do */
-		return count;
-
-	dbs_tuners_ins.ignore_nice = input;
-
-	/* we need to re-evaluate prev_cpu_idle */
-	for_each_online_cpu(j) {
-		struct cpu_dbs_info_s *dbs_info;
-		dbs_info = &per_cpu(cs_cpu_dbs_info, j);
-		dbs_info->prev_cpu_idle = get_cpu_idle_time(j,
-						&dbs_info->prev_cpu_wall);
-		if (dbs_tuners_ins.ignore_nice)
-			dbs_info->prev_cpu_nice = kcpustat_cpu(j).cpustat[CPUTIME_NICE];
-	}
-	return count;
-}
-
 define_one_global_rw(sampling_rate);
-define_one_global_rw(ignore_nice_load);
 
 static struct attribute *dbs_attributes[] = {
 	&sampling_rate_min.attr,
 	&sampling_rate.attr,
-	&ignore_nice_load.attr,
 	&hotplug_up_cycles.attr,
 	&hotplug_down_cycles.attr,
 	&hotplug_up_load.attr,
@@ -317,8 +216,8 @@ static void do_cpu_down(struct work_struct *work) {
 static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 {
 	unsigned int load;
-	cputime64_t cur_wall_time, cur_idle_time;
-	unsigned int idle_time, wall_time;
+	ktime_t cur_wall_time, cur_idle_time;
+	ktime_t idle_time, wall_time;
 
 	struct cpufreq_policy *policy;
 
@@ -332,40 +231,20 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 	 */
 	policy = this_dbs_info->cur_policy;
 
-	cur_idle_time = get_cpu_idle_time(policy->cpu, &cur_wall_time);
-
-	wall_time = (unsigned int)
-		(cur_wall_time - this_dbs_info->prev_cpu_wall);
+	cur_wall_time = ktime_get();
+	wall_time = ktime_sub(cur_wall_time, this_dbs_info->prev_cpu_wall);
 	this_dbs_info->prev_cpu_wall = cur_wall_time;
 
-	idle_time = (unsigned int)
-		(cur_idle_time - this_dbs_info->prev_cpu_idle);
+	cur_idle_time = get_idle_ns(policy->cpu);
+	idle_time = ktime_sub(cur_idle_time, this_dbs_info->prev_cpu_idle);
 	this_dbs_info->prev_cpu_idle = cur_idle_time;
 
-	if (dbs_tuners_ins.ignore_nice) {
-		cputime64_t cur_nice;
-		unsigned long cur_nice_jiffies;
-
-		cur_nice = kcpustat_cpu(policy->cpu).cpustat[CPUTIME_NICE] -
-			this_dbs_info->prev_cpu_nice;
-		cur_nice_jiffies = (unsigned long)
-			cputime64_to_jiffies64(cur_nice);
-
-		this_dbs_info->prev_cpu_nice = kcpustat_cpu(policy->cpu).cpustat[CPUTIME_NICE];
-		idle_time += jiffies_to_usecs(cur_nice_jiffies);
-	}
-
 	/* Apparently, this happens. */
-	if (unlikely(idle_time > wall_time)) return;
+	if (unlikely(idle_time.tv64 > wall_time.tv64)) return;
 
-	/* KHz/us is not a good idea.  Increase precision a bit. */
-	while (wall_time > 2000) {
-		wall_time /= 10;
-		idle_time /= 10;
-	}
-
-	/* Assume we've only run for a small fraction of a second. */
-	load = policy->cur / wall_time * (wall_time - idle_time);
+	if (unlikely(wall_time.tv64 <= 1<<10)) return;
+	load = (policy->cur >> 10) * ktime_divns(ktime_sub(wall_time, idle_time),
+		wall_time.tv64 >> 10);
 
 	/* Hotplug? */
 	if (num_online_cpus() == 1) {
@@ -433,7 +312,7 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 	}
 
 	/* Set frequency */
-	this_dbs_info->requested_freq += load + dbs_tuners_ins.hispeed_thresh > policy->cur ?
+	this_dbs_info->requested_freq += (load + dbs_tuners_ins.hispeed_thresh > policy->cur) ?
 		this_dbs_info->max_freq : load + overestimate;
 	/* Bound request just outside available range
 	 * Ideally, this helps stabilize idle @ min, load @ max
@@ -516,13 +395,10 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 			j_dbs_info = &per_cpu(cs_cpu_dbs_info, j);
 			j_dbs_info->cur_policy = policy;
 
-			j_dbs_info->prev_cpu_idle = get_cpu_idle_time(j,
-						&j_dbs_info->prev_cpu_wall);
-			if (dbs_tuners_ins.ignore_nice) {
-				j_dbs_info->prev_cpu_nice =
-						kcpustat_cpu(j).cpustat[CPUTIME_NICE];
-			}
+			j_dbs_info->prev_cpu_idle = get_idle_ns(cpu);
+			j_dbs_info->prev_cpu_wall = ktime_get();
 		}
+		this_dbs_info->cpu = cpu;
 		this_dbs_info->requested_freq = policy->cur;
 		this_dbs_info->hotplug_cycle = 0;
 		this_dbs_info->defer_cycles = 0;
@@ -546,10 +422,6 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 				mutex_unlock(&dbs_mutex);
 				return rc;
 			}
-
-			cpufreq_register_notifier(
-					&dbs_cpufreq_notifier_block,
-					CPUFREQ_TRANSITION_NOTIFIER);
 		}
 		mutex_unlock(&dbs_mutex);
 
@@ -568,11 +440,6 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		 * Stop the timerschedule work, when this governor
 		 * is used for first time
 		 */
-		if (dbs_enable == 0)
-			cpufreq_unregister_notifier(
-					&dbs_cpufreq_notifier_block,
-					CPUFREQ_TRANSITION_NOTIFIER);
-
 		mutex_unlock(&dbs_mutex);
 		if (!dbs_enable)
 			sysfs_remove_group(cpufreq_global_kobject,
@@ -596,12 +463,11 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 
 	case CPUFREQ_GOV_INTERACT:
 		mutex_lock(&this_dbs_info->timer_mutex);
-		this_dbs_info->max_freq = max(this_dbs_info->max_freq, dbs_tuners_ins.interaction_hispeed);
 		if (!IGF(ENABLED)) {
 			ISF(ENABLED);
 			if (cancel_delayed_work_sync(&this_dbs_info->work)) {
-				this_dbs_info->prev_cpu_idle =
-					get_cpu_idle_time(policy->cpu, &this_dbs_info->prev_cpu_wall);
+				this_dbs_info->prev_cpu_idle = get_idle_ns(cpu);
+				this_dbs_info->prev_cpu_wall = ktime_get();
 				schedule_delayed_work_on(this_dbs_info->cpu, &this_dbs_info->work,
 					usecs_to_jiffies(dbs_tuners_ins.interaction_sampling_rate));
 			}

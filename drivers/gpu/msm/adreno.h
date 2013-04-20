@@ -104,7 +104,12 @@
 #define ADRENO_DEFAULT_PWRSCALE_POLICY  NULL
 #endif
 
+#ifdef CONFIG_DEBUG_FS
 void adreno_debugfs_init(struct kgsl_device *device);
+#else
+static inline void adreno_debugfs_init(struct kgsl_device *device)
+{ return; }
+#endif
 
 #define ADRENO_ISTORE_START 0x5000 /* Istore offset */
 
@@ -278,7 +283,12 @@ void adreno_regread(struct kgsl_device *device, unsigned int offsetwords,
 void adreno_regwrite(struct kgsl_device *device, unsigned int offsetwords,
 				unsigned int value);
 
+#ifdef CONFIG_DEBUG_FS
 int adreno_dump(struct kgsl_device *device, int manual);
+#else
+static inline int adreno_dump(struct kgsl_device *device, int manual)
+{ return 0; }
+#endif
 
 struct kgsl_memdesc *adreno_find_region(struct kgsl_device *device,
 						unsigned int pt_base,
@@ -296,8 +306,14 @@ void *adreno_snapshot(struct kgsl_device *device, void *snapshot, int *remain,
 
 int adreno_dump_and_exec_ft(struct kgsl_device *device);
 
+#ifdef CONFIG_DEBUG_FS
 void adreno_dump_rb(struct kgsl_device *device, const void *buf,
 			 size_t len, int start, int size);
+#else
+static inline void adreno_dump_rb(struct kgsl_device *device, const void *buf,
+	size_t len, int start, int size)
+{ return; }
+#endif
 
 unsigned int adreno_ft_detect(struct kgsl_device *device,
 						unsigned int *prev_reg_val);
