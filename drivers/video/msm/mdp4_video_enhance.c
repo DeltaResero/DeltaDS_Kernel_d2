@@ -34,6 +34,7 @@
 #include <linux/fb.h>
 #include <linux/msm_mdp.h>
 #include <linux/ioctl.h>
+#include <linux/dkp.h>
 
 #include "mdp4_video_enhance.h"
 #include "mdp4_video_tuning.h"
@@ -52,7 +53,7 @@
 #define MAX_LUT_SIZE	256
 
 u8 mDNIe_data[MAX_LUT_SIZE * 3];
-static u16 color_scaling_factors[3] = { 256, 256, 256 };
+static int scaling_factors[3] = { 256, 256, 256 };
 static unsigned int trinity_colors;
 
 int play_speed_1_5;
@@ -114,7 +115,7 @@ static int parse_text(char *src, int len)
 	int i, count, ret;
 	int index = 0;
 	int j = 0;
-	char *str_line[300];
+	char **str_line;
 	char *sstart;
 	char *c;
 	unsigned int data1, data2, data3;
@@ -124,6 +125,9 @@ static int parse_text(char *src, int len)
 	count = 0;
 	sstart = c;
 	sharpvalue = 0;
+	str_line = kmalloc(sizeof(char *)*300, GFP_KERNEL);
+	if (!str_line)
+		return -ENOMEM;
 
 	for (i = 0; i < len; i++, c++) {
 		char a = *c;
@@ -131,6 +135,10 @@ static int parse_text(char *src, int len)
 			if (c > sstart) {
 				str_line[count] = sstart;
 				count++;
+				if (count > 298) {
+					index = -EINVAL;
+					goto out;
+				}
 			}
 			*c = '\0';
 			sstart = c + 1;
@@ -161,6 +169,8 @@ static int parse_text(char *src, int len)
 			index++;
 		}
 	}
+out:
+	kfree(str_line);
 	return index;
 }
 
@@ -324,7 +334,7 @@ void lut_tune(int num, u8 *pLutTable)
 	b = cmap->blue;
 
 #define calc(dest, idx) \
-	tmp = pLutTable[j++] * color_scaling_factors[idx]; \
+	tmp = pLutTable[j++] * scaling_factors[idx]; \
 	dest = tmp / 256 + (tmp & 128 ? 1 : 0);
 	for (i = 0, j = 0; i < cmap->len; i++) {
 		calc(*r++, 0);
@@ -819,63 +829,16 @@ static DEVICE_ATTR(playspeed, 0664,
 			playspeed_store);
 
 /* For brightness scaling */
-static ssize_t scaling_factors_show(struct device *dev,
-			struct device_attribute *attr,
-			char *buf)
-{
-	DPRINT("called %s\n", __func__);
-	return sprintf(buf, "%u %u %u\n",
-		color_scaling_factors[0],
-		color_scaling_factors[1],
-		color_scaling_factors[2]);
-}
+static void bump_mdnie(void) { mDNIe_Set_Mode(current_mDNIe_Mode); }
+__DKP_ARR(scaling_factors, 0, 256, bump_mdnie);
 
-static ssize_t scaling_factors_store(struct device *dev,
-			struct device_attribute *attr,
-			const char *buf, size_t size)
-{
-	unsigned int r, g, b;
-	int ret;
-	ret = sscanf(buf, "%u %u %u", &r, &g, &b);
-	if (ret != 3)
-		return -EINVAL;
-	if (r > 256 || g > 256 || b > 256)
-		return -EINVAL;
-	color_scaling_factors[0] = r;
-	color_scaling_factors[1] = g;
-	color_scaling_factors[2] = b;
-	mDNIe_Set_Mode(current_mDNIe_Mode);
-	return size;
-}
-static DEVICE_ATTR(scaling_factors, 0664,
-			scaling_factors_show,
-			scaling_factors_store);
-
-void trinity_load_colors(unsigned int val);
-
-static ssize_t trinity_colors_show(struct device *dev,
-			struct device_attribute *attr,
-			char *buf)
-{
-	DPRINT("called %s\n", __func__);
-	return sprintf(buf, "%u\n", trinity_colors);
-}
-
-static ssize_t trinity_colors_store(struct device *dev,
-			struct device_attribute *attr,
-			const char *buf, size_t size)
-{
-	int ret;
-	ret = sscanf(buf, "%u", &trinity_colors);
-	if (ret != 1)
-		return -EINVAL;
+extern void trinity_load_colors(unsigned int val);
+extern void mipi_bump_gamma(void);
+static void bump_trinity(void) {
 	trinity_load_colors(trinity_colors);
-	return size;
+	mipi_bump_gamma();
 }
-
-static DEVICE_ATTR(trinity_colors, 0664,
-			trinity_colors_show,
-			trinity_colors_store);
+__DKP(trinity_colors, 0, 1, bump_trinity);
 
 void init_mdnie_class(void)
 {
@@ -934,14 +897,16 @@ void init_mdnie_class(void)
 			dev_attr_playspeed.attr.name);
 
 	if (device_create_file
-		(tune_mdnie_dev, &dev_attr_scaling_factors) < 0)
+		(tune_mdnie_dev, dkp_attrp(device, scaling_factors)) < 0)
 		pr_err("Failed to create device file(%s)!=n",
-			dev_attr_scaling_factors.attr.name);
+			dkp_attr(scaling_factors).name);
+	dkp_register(scaling_factors);
 
 	if (device_create_file
-		(tune_mdnie_dev, &dev_attr_trinity_colors) < 0)
+		(tune_mdnie_dev, dkp_attrp(device, trinity_colors)) < 0)
 		pr_err("Failed to create device file(%s)!=n",
-			dev_attr_trinity_colors.attr.name);
+			dkp_attr(trinity_colors).name);
+	dkp_register(trinity_colors);
 #ifdef MDP4_VIDEO_ENHANCE_TUNING
 	if (device_create_file(tune_mdnie_dev, &dev_attr_tuning) < 0) {
 		pr_err("Failed to create device file(%s)!\n",

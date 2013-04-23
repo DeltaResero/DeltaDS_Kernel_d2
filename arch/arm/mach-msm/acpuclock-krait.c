@@ -22,6 +22,7 @@
 #include <linux/cpufreq.h>
 #include <linux/cpu.h>
 #include <linux/regulator/consumer.h>
+#include <linux/dkp.h>
 
 #include <asm/mach-types.h>
 #include <asm/cpu.h>
@@ -1376,7 +1377,7 @@ static ssize_t show_vmin(struct kobject *kobj,
 		struct attribute *attr, char *buf) {
 	return sprintf(buf, "%u\n", final_vmin / 1000);
 }
-static struct global_attr vmin_attr = __ATTR(vmin, 0644,
+static struct global_attr vmin_attr = __ATTR(vmin, 0666,
 		show_vmin, store_vmin);
 static struct attribute *dkp_attributes[] = {
 	&vmin_attr.attr,
@@ -1428,6 +1429,7 @@ int __init acpuclk_krait_init(struct device *dev,
 		pr_err("Unable to create dkp group!\n");
 	if (sysfs_create_group(cpufreq_global_kobject, &vdd_attr_group))
 		pr_err("Unable to create vdd_table group!\n");
+	_dkp_register(dkp_gattr(vmin_attr));
 
 	return 0;
 }
