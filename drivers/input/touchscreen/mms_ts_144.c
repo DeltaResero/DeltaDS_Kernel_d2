@@ -461,7 +461,7 @@ static void release_all_fingers(struct mms_ts_info *info)
 #endif
 	int i;
 
-	printk(KERN_DEBUG "[TSP] %s\n", __func__);
+	//printk(KERN_DEBUG "[TSP] %s\n", __func__);
 
 	for (i = 0; i < MAX_FINGERS; i++) {
 #ifdef SEC_TSP_DEBUG

@@ -38,6 +38,7 @@
 #include <linux/sii9234.h>
 #include <linux/kobject.h>
 #include <linux/sysfs.h>
+#include <linux/dkp.h>
 
 /* FSA9480 I2C registers */
 #define FSA9485_REG_DEVID		0x01
@@ -140,6 +141,7 @@
 
 /* (1 = enabled) | (2 = state_usb) | (4 = state_fast) */
 static int force_fast_charge;
+static int fast_charge_setting;
 
 int uart_connecting;
 EXPORT_SYMBOL(uart_connecting);
@@ -1345,6 +1347,7 @@ static int fsa9485_resume(struct i2c_client *client)
 /* This is kind of hacky, but most of this code already abuses local_usbsw. */
 static inline void ffc_migrate(void) {
 	struct fsa9485_platform_data *pdata;
+	force_fast_charge = (force_fast_charge & ~1 ) | fast_charge_setting;
 	if (!local_usbsw || !local_usbsw->pdata) return;
 	pdata = local_usbsw->pdata;
 	if (pdata->usb_cb && pdata->charger_cb) {
@@ -1361,29 +1364,10 @@ static inline void ffc_migrate(void) {
 		}
 	}
 }
-
-static ssize_t ffc_show(struct kobject *kobj,
-	struct kobj_attribute *attr, char *buf) {
-	return sprintf(buf, "%u\n", force_fast_charge & 1);
-}
-
-static ssize_t ffc_store(struct kobject *kobj,
-	struct kobj_attribute *attr, const char *buf, size_t count) {
-	int tmp;
-	if (sscanf(buf, "%u", &tmp)) {
-		if (!(tmp & ~1)) {
-			force_fast_charge = (force_fast_charge & 6) | tmp;
-			ffc_migrate();
-			return count;
-		}
-	}
-	return -EINVAL;
-}
-
-static struct kobj_attribute ffc_attr =
-	__ATTR(force_fast_charge, 0666, ffc_show, ffc_store);
-static struct attribute *ffc_attrs[] = { &ffc_attr.attr, NULL };
-static struct attribute_group ffc_attr_group = {
+__DKP_NAME(fast_charge_setting, force_fast_charge, 0, 1, ffc_migrate);
+static struct attribute *ffc_attrs[] = {
+	&dkp_attr(force_fast_charge), NULL };
+static struct attribute_group ffc_attr_group ={
 	.attrs = ffc_attrs,
 	.name = "fast_charge"
 };
@@ -1408,6 +1392,7 @@ static int __init fsa9485_init(void)
 {
 	if (sysfs_create_group(kernel_kobj, &ffc_attr_group))
 		pr_err("Unable to create fast_charge group!\n");
+	dkp_register(force_fast_charge);
 	return i2c_add_driver(&fsa9485_i2c_driver);
 }
 module_init(fsa9485_init);

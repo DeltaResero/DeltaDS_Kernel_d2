@@ -10,9 +10,6 @@
  *  handled in sched_fair.c)
  */
 
-//static u64 wall_times[NR_CPUS];
-//static u64 idle_times[NR_CPUS];
-
 #ifdef CONFIG_SMP
 static int
 select_task_rq_idle(struct task_struct *p, int sd_flag, int flags)
@@ -28,9 +25,6 @@ static void bump_idle_stat(struct rq *rq, struct task_struct *idle)
 
 	idle->se.sum_exec_runtime += delta;
 	idle->se.exec_start = rq->clock_task;
-	//idle_times[rq->cpu] += delta;
-	//wall_times[rq->cpu] = rq->clock_task;
-	//wall_times[rq->cpu] = ktime_get().tv64;
 }
 /*
  * Idle tasks are unconditionally rescheduled:
@@ -91,18 +85,14 @@ static unsigned int get_rr_interval_idle(struct rq *rq, struct task_struct *task
 	return 0;
 }
 
-ktime_t get_idle_ns(int cpu) {
+ktime_t get_idle_ktime(unsigned int cpu) {
+	if (cpu > NR_CPUS) {
+		WARN_ONCE(1, KERN_ERR "Called with illegal cpu %i", cpu);
+		return (ktime_t) { .tv64 = 0 };
+	}
 	return (ktime_t) { .tv64 = cpu_rq(cpu)->idle->se.sum_exec_runtime };
-	//return (ktime_t) { .tv64 = idle_times[cpu] };
 }
-EXPORT_SYMBOL(get_idle_ns);
-
-/*
-ktime_t get_wall_ns(int cpu) {
-	return (ktime_t) { .tv64 = wall_times[cpu] };
-}
-EXPORT_SYMBOL(get_wall_ns);
-*/
+EXPORT_SYMBOL(get_idle_ktime);
 
 /*
  * Simple, special scheduling class for the per-CPU idle tasks:
