@@ -78,7 +78,7 @@ static char V255_300CD_B_MSB;
 static char V255_300CD_B_LSB;
 int trinity[21] = { 0, 0, 5, -18, -16, -10, 0, 0, 3, 0, 0, 3, 0, 0, 3, 0, 0, 3, 0, 0, 3 };
 int stock[21];
-int *color_mods = stock;
+int *color_mods = trinity;
 struct SMART_DIM *gpsmart;
 
 static int char_to_int(char data1)

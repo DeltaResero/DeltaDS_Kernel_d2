@@ -423,9 +423,9 @@ static void cpufreq_asswax_freq_change_time_work(struct work_struct *work)
 	struct cpufreq_policy *policy;
 	unsigned int relation = CPUFREQ_RELATION_L;
 	for_each_possible_cpu(cpu) {
+		if (!work_cpumask_test_and_clear(cpu))
+			continue;
 		this_asswax = &per_cpu(asswax_info, cpu);
-		//if (!work_cpumask_test_and_clear(cpu))
-			//continue;
 
 		ramp_dir = this_asswax->ramp_dir;
 		this_asswax->ramp_dir = 0;

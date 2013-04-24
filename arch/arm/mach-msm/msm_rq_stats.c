@@ -39,7 +39,7 @@
 
 struct notifier_block freq_transition;
 struct notifier_block cpu_hotplug;
-static int notifiers_registered;
+static char notifiers_registered;
 
 struct cpu_load_data {
 	cputime64_t prev_cpu_idle;
@@ -376,7 +376,25 @@ static int init_rq_attribs(void)
 	return err;
 }
 
+/* Certain kernels (KT747) remove the mpdecision service from their ramdisk.
+ * dkp doesn't include its own ramdisk, so if it's flashed after KT747,
+ * mpdecision will be unavailable.  This is bad, so make sure that mpdecision
+ * is running.
+ */
+static inline void start_mpdecision(void) {
+	static char *mpargv[] = {
+		"/system/bin/mpdecision",
+		"--no_sleep", "--avg_comp",
+	};
+	char *mpenv[] = {
+		"PATH=/system/bin",
+	};
+	call_usermodehelper(mpargv[0], mpargv, mpenv, UMH_NO_WAIT);
+}
+
 void msm_rq_stats_enable(int enable) {
+	// Bump this to calm mpdecision down.
+	rq_info.hotplug_disabled = !enable;
 	if (enable != notifiers_registered) {
 		if (enable) {
 			printk(KERN_DEBUG "rq-stats: enable cpufreq notifier\n");
@@ -400,6 +418,23 @@ void msm_rq_stats_enable(int enable) {
 		}
 		printk(KERN_DEBUG "rq-stats: rq_info.init = %i\n", enable);
 		rq_info.init = enable;
+	}
+	if (enable) {
+		static char filterfirst = 1;
+		struct task_struct *tsk;
+
+		// mpdecision doesn't start until after the first gov change.
+		if (filterfirst) {
+			filterfirst = 0;
+			return;
+		}
+
+		for_each_process(tsk) {
+			if (strstr(tsk->comm, "mpdecision"))
+				return;
+		}
+		printk(KERN_DEBUG "rq-stats: starting mpdecision...\n");
+		start_mpdecision();
 	}
 }
 
