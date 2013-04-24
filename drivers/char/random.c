@@ -39,6 +39,21 @@
  * DAMAGE.
  */
 
+/* Portions of this code are derived from frandom.c, which is distributed with
+ * the following copyright notice:
+ *
+ * frandom.c:
+ * 	Fast pseudo-random generator
+ *
+ *      (c) Copyright 2003-2011 Eli Billauer
+ *      http://www.billauer.co.il
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ */
+
 /*
  * (now, with legal B.S. out of the way.....)
  *
@@ -290,7 +305,7 @@ static int random_read_wakeup_thresh = 64;
  * should wake up processes which are selecting or polling on write
  * access to /dev/random.
  */
-static int random_write_wakeup_thresh = 128;
+static int random_write_wakeup_thresh = 1024;
 
 /*
  * When the input pool goes over trickle_thresh, start dropping most
@@ -298,6 +313,22 @@ static int random_write_wakeup_thresh = 128;
  */
 
 static int trickle_thresh __read_mostly = INPUT_POOL_WORDS * 28;
+
+/*
+ * Track pool depletions.  Any time insufficient entropy is available for a
+ * read, this counter is incremented.
+ */
+static int random_depletions = 0;
+
+/* Erandom stuff */
+static void init_rand_state(void);
+static void erandom_get_random_bytes(char *buf, size_t count);
+static DEFINE_SPINLOCK(erandom_lock);
+static unsigned int erandom_bytes_read = 0;
+static int erandom_stir_thresh = 4096;
+static u8 erandom_S[256];
+static u8 erandom_i;
+static u8 erandom_j;
 
 static DEFINE_PER_CPU(int, trickle_count);
 
@@ -400,7 +431,7 @@ static DECLARE_WAIT_QUEUE_HEAD(random_write_wait);
 static struct fasync_struct *fasync;
 
 #if 0
-static bool debug;
+static int debug;
 module_param(debug, bool, 0644);
 #define DEBUG_ENT(fmt, arg...) do { \
 	if (debug) \
@@ -865,6 +896,7 @@ static size_t account(struct entropy_store *r, size_t nbytes, int min,
 
 	/* Can we pull enough? */
 	if (r->entropy_count / 8 < min + reserved) {
+		random_depletions++;
 		nbytes = 0;
 	} else {
 		/* If limited, never pull more than available */
@@ -1032,7 +1064,8 @@ static ssize_t extract_entropy_user(struct entropy_store *r, void __user *buf,
  */
 void get_random_bytes(void *buf, int nbytes)
 {
-	extract_entropy(&nonblocking_pool, buf, nbytes, 0, 0);
+	//get_random_bytes_arch(buf, nbytes);
+	erandom_get_random_bytes(buf, nbytes);
 }
 EXPORT_SYMBOL(get_random_bytes);
 
@@ -1057,7 +1090,7 @@ void get_random_bytes_arch(void *buf, int nbytes)
 
 		if (!arch_get_random_long(&v))
 			break;
-		
+
 		memcpy(p, &v, chunk);
 		p += chunk;
 		nbytes -= chunk;
@@ -1110,9 +1143,10 @@ static int rand_initialize(void)
 	init_std_data(&input_pool);
 	init_std_data(&blocking_pool);
 	init_std_data(&nonblocking_pool);
+	init_rand_state();
 	return 0;
 }
-module_init(rand_initialize);
+core_initcall(rand_initialize);
 
 #ifdef CONFIG_BLOCK
 void rand_initialize_disk(struct gendisk *disk)
@@ -1128,6 +1162,108 @@ void rand_initialize_disk(struct gendisk *disk)
 		disk->random = state;
 }
 #endif
+
+static inline void swap_byte(u8 *a, u8 *b) {
+	u8 swapByte;
+
+	swapByte = *a;
+	*a = *b;
+	*b = swapByte;
+}
+
+static void init_rand_state(void) {
+	unsigned int k;
+	u8 seed[256];
+
+	get_random_bytes_arch(seed, 256);
+
+	for (k=0; k<256; k++)
+		erandom_S[k] = k;
+
+	for (k = 0, erandom_j = 0; k < 256; k++) {
+		erandom_j = (erandom_j + erandom_S[k] + seed[k]) & 0xff;
+		swap_byte(&erandom_S[k], &erandom_S[erandom_j]);
+	}
+
+	/* It's considered good practice to discard the first 256 bytes
+	   generated. So we do it:
+	*/
+
+	erandom_i=0; erandom_j=0;
+	for (k=0; k<256; k++) {
+		erandom_i = (erandom_i + 1) & 0xff;
+		erandom_j = (erandom_j + erandom_S[erandom_i]) & 0xff;
+		swap_byte(&erandom_S[erandom_i], &erandom_S[erandom_j]);
+	}
+}
+
+static void _erandom_get_random_bytes(u8 *buf, size_t count) {
+	size_t k;
+	long unsigned int v;
+
+	for (k=0; k<count; k++) {
+		erandom_i = (erandom_i + 1) & 0xff;
+		erandom_j = (erandom_j + erandom_S[erandom_i]) & 0xff;
+		swap_byte(&erandom_S[erandom_i], &erandom_S[erandom_j]);
+		buf[k] = erandom_S[(erandom_S[erandom_i] + erandom_S[erandom_j]) & 0xff];
+	}
+
+	/* RC4 is known to be predictable and to occasionally have very short
+	 * periods.  Since we don't need to decode later, we can swap bytes
+	 * periodically to stir the pool.
+	 */
+	erandom_bytes_read += count;
+	if (erandom_stir_thresh > 0 && erandom_bytes_read > erandom_stir_thresh) {
+		if (arch_get_random_long(&v)) {
+			erandom_bytes_read = 0;
+			for (; v; v >>= 16)
+				swap_byte(&erandom_S[v & 0xff], &erandom_S[(v >> 8) & 0xff]);
+		}
+	}
+	//get_random_bytes_arch(buf, count);
+}
+
+static inline void erandom_get_random_bytes(char *buf, size_t count) {
+	unsigned long flags;
+	spin_lock_irqsave(&erandom_lock, flags);
+	_erandom_get_random_bytes((u8 *)buf, count);
+	spin_unlock_irqrestore(&erandom_lock, flags);
+}
+
+static ssize_t
+erandom_read(struct file *file, char __user *buf, size_t nbytes, loff_t *ppos) {
+	u8 tmp[16];
+	int m;
+	unsigned long flags;
+	ssize_t ret = 0;
+
+	spin_lock_irqsave(&erandom_lock, flags);
+
+	while (nbytes) {
+		m = min((int)nbytes, 16);
+		if (need_resched()) {
+			spin_unlock_irqrestore(&erandom_lock, flags);
+			if (signal_pending(current)) {
+				if (ret == 0)
+					ret = -ERESTARTSYS;
+				break;
+			}
+			schedule();
+			spin_lock_irqsave(&erandom_lock, flags);
+		}
+
+		_erandom_get_random_bytes(tmp, m);
+		if (copy_to_user(buf, tmp, m))
+			break;
+
+		nbytes -= m;
+		ret += m;
+		buf += m;
+	}
+
+	spin_unlock_irqrestore(&erandom_lock, flags);
+	return ret;
+}
 
 static ssize_t
 random_read(struct file *file, char __user *buf, size_t nbytes, loff_t *ppos)
@@ -1183,12 +1319,6 @@ random_read(struct file *file, char __user *buf, size_t nbytes, loff_t *ppos)
 	}
 
 	return (count ? count : retval);
-}
-
-static ssize_t
-urandom_read(struct file *file, char __user *buf, size_t nbytes, loff_t *ppos)
-{
-	return extract_entropy_user(&nonblocking_pool, buf, nbytes);
 }
 
 static unsigned int
@@ -1304,7 +1434,7 @@ const struct file_operations random_fops = {
 };
 
 const struct file_operations urandom_fops = {
-	.read  = urandom_read,
+	.read  = erandom_read,
 	.write = random_write,
 	.unlocked_ioctl = random_ioctl,
 	.fasync = random_fasync,
@@ -1429,18 +1559,23 @@ ctl_table random_table[] = {
 		.mode		= 0444,
 		.proc_handler	= proc_do_uuid,
 	},
+	{
+		.procname	= "pool_depletions",
+		.data		= &random_depletions,
+		.maxlen		= sizeof(int),
+		.mode		= 0444,
+		.proc_handler	= proc_dointvec,
+	},
+	{
+		.procname	= "erandom_stir_thresh",
+		.data		= &erandom_stir_thresh,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
+	},
 	{ }
 };
 #endif 	/* CONFIG_SYSCTL */
-
-static u32 random_int_secret[MD5_MESSAGE_BYTES / 4] ____cacheline_aligned;
-
-static int __init random_int_secret_init(void)
-{
-	get_random_bytes(random_int_secret, sizeof(random_int_secret));
-	return 0;
-}
-late_initcall(random_int_secret_init);
 
 /*
  * Get a random word for internal kernel use only. Similar to urandom but
@@ -1448,22 +1583,9 @@ late_initcall(random_int_secret_init);
  * value is not cryptographically secure but for several uses the cost of
  * depleting entropy is too high
  */
-DEFINE_PER_CPU(__u32 [MD5_DIGEST_WORDS], get_random_int_hash);
-unsigned int get_random_int(void)
-{
-	__u32 *hash;
+unsigned int get_random_int(void) {
 	unsigned int ret;
-
-	if (arch_get_random_int(&ret))
-		return ret;
-
-	hash = get_cpu_var(get_random_int_hash);
-
-	hash[0] += current->pid + jiffies + get_cycles();
-	md5_transform(hash, random_int_secret);
-	ret = hash[0];
-	put_cpu_var(get_random_int_hash);
-
+	erandom_get_random_bytes((u8 *)&ret, sizeof(ret));
 	return ret;
 }
 

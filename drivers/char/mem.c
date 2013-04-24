@@ -884,6 +884,8 @@ static const struct memdev {
 #ifdef CONFIG_CRASH_DUMP
 	[12] = { "oldmem", 0, &oldmem_fops, NULL },
 #endif
+	[13] = { "erandom", 0666, &urandom_fops, NULL },
+	[14] = { "frandom", 0666, &urandom_fops, NULL },
 };
 
 static int memory_open(struct inode *inode, struct file *filp)
