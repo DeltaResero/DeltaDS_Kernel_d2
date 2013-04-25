@@ -32,6 +32,7 @@
 #include <asm/smp_plat.h>
 #include "acpuclock.h"
 #include <linux/suspend.h>
+#include <linux/delay.h>
 
 #define MAX_LONG_SIZE 24
 #define DEFAULT_RQ_POLL_JIFFIES 1
@@ -381,15 +382,39 @@ static int init_rq_attribs(void)
  * mpdecision will be unavailable.  This is bad, so make sure that mpdecision
  * is running.
  */
-static inline void start_mpdecision(void) {
+//static inline void start_mpdecision(void) {
+static struct delayed_work mpd_work;
+void check_for_mpd(struct work_struct *work) {
+	struct task_struct *tsk;
+	int cycle;
+	static char *srargv[] = {
+		"/system/bin/start",
+		"mpdecision", NULL,
+	};
 	static char *mpargv[] = {
 		"/system/bin/mpdecision",
 		"--no_sleep", "--avg_comp", NULL,
 	};
 	char *mpenv[] = {
+		"HOME=/", "TERM=linux",
 		"PATH=/system/bin", NULL,
 	};
-	call_usermodehelper(mpargv[0], mpargv, mpenv, UMH_NO_WAIT);
+	for (cycle = 0; cycle < 3; cycle++) {
+		for_each_process(tsk) {
+			if (strstr(tsk->comm, "mpdecision"))
+				return;
+		}
+		if (!cycle) {
+			printk(KERN_DEBUG "rq-stats: trying to start mpdecision (%i)...\n", cycle);
+			call_usermodehelper(srargv[0], srargv, mpenv, UMH_WAIT_PROC);
+		} else if (cycle == 1){
+			printk(KERN_DEBUG "rq-stats: trying to start mpdecision (%i)...\n", cycle);
+			call_usermodehelper(mpargv[0], mpargv, mpenv, UMH_WAIT_EXEC);
+		} else {
+			printk(KERN_DEBUG "rq-stats: couldn't start mpdecision...\n");
+		}
+		msleep(1000);
+	}
 }
 
 void msm_rq_stats_enable(int enable) {
@@ -419,6 +444,7 @@ void msm_rq_stats_enable(int enable) {
 		printk(KERN_DEBUG "rq-stats: rq_info.init = %i\n", enable);
 		rq_info.init = enable;
 	}
+	/*
 	if (enable) {
 		static char filterfirst = 1;
 		struct task_struct *tsk;
@@ -436,6 +462,7 @@ void msm_rq_stats_enable(int enable) {
 		printk(KERN_DEBUG "rq-stats: starting mpdecision...\n");
 		start_mpdecision();
 	}
+	*/
 }
 
 static int __init msm_rq_stats_init(void)
@@ -477,6 +504,9 @@ static int __init msm_rq_stats_init(void)
 					CPUFREQ_TRANSITION_NOTIFIER);
 	register_hotcpu_notifier(&cpu_hotplug);
 	notifiers_registered = 1;
+
+	INIT_DELAYED_WORK_DEFERRABLE(&mpd_work, check_for_mpd);
+	schedule_delayed_work(&mpd_work, 35 * HZ);
 
 	return ret;
 }
