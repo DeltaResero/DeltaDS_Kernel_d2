@@ -384,10 +384,10 @@ static int init_rq_attribs(void)
 static inline void start_mpdecision(void) {
 	static char *mpargv[] = {
 		"/system/bin/mpdecision",
-		"--no_sleep", "--avg_comp",
+		"--no_sleep", "--avg_comp", NULL,
 	};
 	char *mpenv[] = {
-		"PATH=/system/bin",
+		"PATH=/system/bin", NULL,
 	};
 	call_usermodehelper(mpargv[0], mpargv, mpenv, UMH_NO_WAIT);
 }

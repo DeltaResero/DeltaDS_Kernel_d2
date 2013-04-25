@@ -495,6 +495,9 @@ static void cpufreq_asswax_freq_change_time_work(struct work_struct *work)
 		// (idle cycles wake up the timer when the timer comes)
 		else if (timer_pending(&this_asswax->timer))
 			del_timer(&this_asswax->timer);
+
+		cpufreq_notify_utilization(policy,
+			(this_asswax->cur_cpu_load * policy->cur) / policy->max);
 	}
 }
 
@@ -815,7 +818,7 @@ static int cpufreq_governor_asswax(struct cpufreq_policy *new_policy,
 		flush_work(&freq_scale_work);
 		this_asswax->idle_exit_time = 0;
 
-		if (atomic_dec_return(&active_count) <= 1) {
+		if (atomic_dec_return(&active_count) < 1) {
 			sysfs_remove_group(cpufreq_global_kobject,
 					   &asswax_attr_group);
 			idle_notifier_unregister(&cpufreq_idle_nb);
