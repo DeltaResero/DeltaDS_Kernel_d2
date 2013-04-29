@@ -382,7 +382,6 @@ static int init_rq_attribs(void)
  * mpdecision will be unavailable.  This is bad, so make sure that mpdecision
  * is running.
  */
-//static inline void start_mpdecision(void) {
 static struct delayed_work mpd_work;
 void check_for_mpd(struct work_struct *work) {
 	struct task_struct *tsk;
@@ -418,8 +417,14 @@ void check_for_mpd(struct work_struct *work) {
 }
 
 void msm_rq_stats_enable(int enable) {
-	// Bump this to calm mpdecision down.
+	// Calm mpdecision down:
 	rq_info.hotplug_disabled = !enable;
+	if (!enable)
+		// make sure mpdecision sees hotplug_disabled
+		msleep(20);
+	else
+		// make sure cpu1 is down when mpdecision resumes
+		cpu_down(1);
 	if (enable != notifiers_registered) {
 		if (enable) {
 			printk(KERN_DEBUG "rq-stats: enable cpufreq notifier\n");
@@ -444,25 +449,7 @@ void msm_rq_stats_enable(int enable) {
 		printk(KERN_DEBUG "rq-stats: rq_info.init = %i\n", enable);
 		rq_info.init = enable;
 	}
-	/*
-	if (enable) {
-		static char filterfirst = 1;
-		struct task_struct *tsk;
-
-		// mpdecision doesn't start until after the first gov change.
-		if (filterfirst) {
-			filterfirst = 0;
-			return;
-		}
-
-		for_each_process(tsk) {
-			if (strstr(tsk->comm, "mpdecision"))
-				return;
-		}
-		printk(KERN_DEBUG "rq-stats: starting mpdecision...\n");
-		start_mpdecision();
-	}
-	*/
+	schedule_delayed_work(&mpd_work, 5 * HZ);
 }
 
 static int __init msm_rq_stats_init(void)
@@ -506,7 +493,6 @@ static int __init msm_rq_stats_init(void)
 	notifiers_registered = 1;
 
 	INIT_DELAYED_WORK_DEFERRABLE(&mpd_work, check_for_mpd);
-	schedule_delayed_work(&mpd_work, 35 * HZ);
 
 	return ret;
 }
