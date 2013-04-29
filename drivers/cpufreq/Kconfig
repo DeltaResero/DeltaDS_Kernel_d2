@@ -20,6 +20,10 @@ if CPU_FREQ
 config CPU_FREQ_TABLE
 	tristate
 
+config INTERACTION_HINTS
+	bool "Provide interaction hints to governors"
+	default y
+ 
 config CPU_FREQ_STAT
 	tristate "CPU frequency translation statistics"
 	select CPU_FREQ_TABLE

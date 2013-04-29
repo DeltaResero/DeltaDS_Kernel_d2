@@ -2056,35 +2056,72 @@ bool need_load_eval(struct cpu_dbs_common_info *cdbs,
 }
 EXPORT_SYMBOL_GPL(need_load_eval);
 
-/* Notify governors of touch immediately.
- * This may block while mutexes are locked, and should not be called in
- * interrupt context.
- */
-void cpufreq_set_interactivity(int on, int idbit) {
+#ifdef CONFIG_INTERACTION_HINTS
+static atomic_t want_interact_hints = ATOMIC_INIT(0);
+static atomic_t interactivity_state = ATOMIC_INIT(0);
+
+void cpufreq_want_interact_hints(int enable)
+{
+	if (enable)
+		atomic_inc(&want_interact_hints);
+	else
+		if (!atomic_dec_return(&want_interact_hints))
+			atomic_set(&interactivity_state, 0);
+}
+
+static void do_interactivity(struct work_struct *work);
+static DECLARE_WORK(interactivity_on_work, do_interactivity);
+static DECLARE_WORK(interactivity_off_work, do_interactivity);
+
+static void do_interactivity(struct work_struct *work) {
 	unsigned int j;
-	static int pressids = 0;
-	/* Filter events so we don't grab mutexes all over the place */
-	if (on) {
-	       int oldids;
-	       oldids = pressids;
-	       pressids |= 1 << idbit;
-	       if (oldids) return;
-	} else {
-	       pressids &= ~(1 << idbit);
-	       if (pressids) return;
-	}
-	/* Inform all available policies */
+
 	for_each_online_cpu(j) {
-	       struct cpufreq_policy *pol;
-	       pol = per_cpu(cpufreq_cpu_data, j);
-	       if (!pol) continue;
-	       /* Call governor directly, without __cpufreq_governor()'s
-	        * initializing stuff that doesn't apply here.
-	        */
-	       pol->governor->governor(pol,
-	               pressids ? CPUFREQ_GOV_INTERACT : CPUFREQ_GOV_NOINTERACT);
+		struct cpufreq_policy *pol;
+		if (lock_policy_rwsem_read(j))
+			continue;
+		pol = per_cpu(cpufreq_cpu_data, j);
+		if (unlikely(pol == NULL || pol->governor == NULL)) {
+			printk(KERN_DEBUG "%s: policy for cpu %u is null\n", __func__, j);
+		} else {
+			pol->governor->governor(pol,
+				work == &interactivity_on_work ?
+				CPUFREQ_GOV_INTERACT : CPUFREQ_GOV_NOINTERACT);
+		}
+		unlock_policy_rwsem_read(j);
 	}
 }
+
+void cpufreq_set_interactivity(int on, int idbit) {
+	unsigned int mask = 1 << idbit;
+	int old, new;
+
+	if (!atomic_read(&want_interact_hints))
+		return;
+
+	{
+	register unsigned long tmp;
+	__asm__ __volatile__(
+"1:     ldrex   %0, [%4]\n"
+"       mov     %1, %0\n"
+"       teq     %5, #0\n"
+"       orrne   %0, %0, %6\n"
+"       biceq   %0, %0, %6\n"
+"       strex   %2, %0, [%4]\n"
+"       teq     %2, #0\n"
+"       bne     1b"
+	: "=&r" (new), "=&r" (old), "=&r" (tmp), "+Qo" (interactivity_state.counter)
+	: "r" (&interactivity_state.counter), "lr" (on), "lr" (mask)
+	: "cc");
+	}
+
+	if (!old && new) {
+		schedule_work(&interactivity_on_work);
+	} else if (old && !new) {
+		schedule_work(&interactivity_off_work);
+	}
+}
+#endif
 
 /*********************************************************************
  *               REGISTER / UNREGISTER CPUFREQ DRIVER                *
