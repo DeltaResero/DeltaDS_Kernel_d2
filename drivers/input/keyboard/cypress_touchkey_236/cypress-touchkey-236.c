@@ -104,10 +104,12 @@ static int touchkey_led_status;
 static int touchled_cmd_reversed;
 
 static int current_pressed;
+#ifdef CONFIG_INTERACTION_HINTS
 static struct work_struct interaction_work;
 static void do_interaction(struct work_struct *work) {
 	cpufreq_set_interactivity(current_pressed, INTERACT_ID_SOFTKEY);
 }
+#endif
 
 static void cypress_touchkey_led_work(struct work_struct *work)
 {
@@ -244,7 +246,9 @@ static irqreturn_t cypress_touchkey_interrupt(int irq, void *dev_id)
 		input_sync(info->input_dev);
 		if (press) current_pressed |= 1 << code;
 		else current_pressed &= ~(1 << code);
+#ifdef CONFIG_INTERACTION_HINTS
 		schedule_work(&interaction_work);
+#endif
 	}
 
 out:
@@ -865,7 +869,9 @@ static int __devinit cypress_touchkey_probe(struct i2c_client *client,
 		goto err_input_dev_alloc;
 	}
 
+#ifdef CONFIG_INTERACTION_HINTS
 	INIT_WORK(&interaction_work, do_interaction);
+#endif
 	current_pressed = 0;
 
 	info->client = client;

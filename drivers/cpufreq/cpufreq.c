@@ -2027,6 +2027,7 @@ static struct notifier_block __refdata cpufreq_cpu_notifier = {
     .notifier_call = cpufreq_cpu_callback,
 };
 
+#ifdef CONFIG_INTERACTION_HINTS
 /* Notify governors of touch immediately.
  * This may block while mutexes are locked, and should not be called in
  * interrupt context.
@@ -2056,6 +2057,7 @@ void cpufreq_set_interactivity(int on, int idbit) {
 	               pressids ? CPUFREQ_GOV_INTERACT : CPUFREQ_GOV_NOINTERACT);
 	}
 }
+#endif
 
 /*********************************************************************
  *               REGISTER / UNREGISTER CPUFREQ DRIVER                *

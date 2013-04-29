@@ -30,10 +30,12 @@
 #define PON_CNTL_TRIG_DELAY_MASK (0x7)
 
 static int current_pressed;
+#ifdef CONFIG_INTERACTION_HINTS
 static struct work_struct interaction_work;
 static void do_interaction(struct work_struct *work) {
 	cpufreq_set_interactivity(current_pressed, INTERACT_ID_OTHER);
 }
+#endif
 
 /**
  * struct pmic8xxx_pwrkey - pmic8xxx pwrkey information
@@ -63,7 +65,9 @@ static irqreturn_t pwrkey_press_irq(int irq, void *_pwrkey)
 	input_sync(pwrkey->pwr);
 
 	current_pressed = 1;
+#ifdef CONFIG_INTERACTION_HINTS
 	schedule_work(&interaction_work);
+#endif
 
 	return IRQ_HANDLED;
 }
@@ -84,7 +88,9 @@ static irqreturn_t pwrkey_release_irq(int irq, void *_pwrkey)
 	input_sync(pwrkey->pwr);
 
 	current_pressed = 0;
+#ifdef CONFIG_INTERACTION_HINTS
 	schedule_work(&interaction_work);
+#endif
 
 	return IRQ_HANDLED;
 }
@@ -227,7 +233,9 @@ static int __devinit pmic8xxx_pwrkey_probe(struct platform_device *pdev)
 
 	device_init_wakeup(&pdev->dev, pdata->wakeup);
 
+#ifdef CONFIG_INTERACTION_HINTS
 	INIT_WORK(&interaction_work, do_interaction);
+#endif
 
 	return 0;
 
@@ -259,7 +267,9 @@ static int __devexit pmic8xxx_pwrkey_remove(struct platform_device *pdev)
 	kfree(pwrkey);
 
 	current_pressed = 0;
+#ifdef CONFIG_INTERACTION_HINTS
 	cpufreq_set_interactivity(0, INTERACT_ID_OTHER);
+#endif
 
 	return 0;
 }

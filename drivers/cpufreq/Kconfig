@@ -33,6 +33,10 @@ config CPU_FREQ_STAT
 
 	  If in doubt, say N.
 
+config INTERACTION_HINTS
+	bool "Provide interaction hints to governors"
+	default y
+
 config CPU_FREQ_STAT_DETAILS
 	bool "CPU frequency translation statistics details"
 	depends on CPU_FREQ_STAT
