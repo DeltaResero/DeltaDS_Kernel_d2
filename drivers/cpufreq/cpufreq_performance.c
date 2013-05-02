@@ -19,7 +19,7 @@
 #include <linux/cpu.h>
 
 static struct work_struct cpu_up_work;
-static void __cpuinit do_cpu_up(struct work_struct *work) {
+static void __ref do_cpu_up(struct work_struct *work) {
 	int j;
 	for_each_possible_cpu(j) {
 		if (!cpu_online(j))
