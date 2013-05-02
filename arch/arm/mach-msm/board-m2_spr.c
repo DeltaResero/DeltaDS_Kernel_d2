@@ -823,7 +823,7 @@ static void __init reserve_ion_memory(void)
 
 			if (fixed_position != NOT_FIXED)
 				fixed_size += heap->size;
-			else
+			else if (!use_cma)
 				reserve_mem_for_ion(MEMTYPE_EBI1, heap->size);
 
 			if (fixed_position == FIXED_LOW) {
@@ -4579,14 +4579,14 @@ static struct msm_rpmrs_level msm_rpmrs_levels[] = {
 		true,
 		415, 715, 340827, 475,
 	},
-
+#if defined(CONFIG_MSM_STANDALONE_POWER_COLLAPSE)
 	{
 		MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE,
 		MSM_RPMRS_LIMITS(ON, ACTIVE, MAX, ACTIVE),
 		true,
 		1300, 228, 1200000, 2000,
 	},
-
+#endif
 	{
 		MSM_PM_SLEEP_MODE_POWER_COLLAPSE,
 		MSM_RPMRS_LIMITS(ON, GDHS, MAX, ACTIVE),
