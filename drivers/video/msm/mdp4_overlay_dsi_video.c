@@ -1185,7 +1185,6 @@ static void mdp4_dsi_video_do_blt(struct msm_fb_data_type *mfd, int enable)
 			vsync_irq_enable(INTR_OVERLAY0_DONE,
 						MDP_OVERLAY0_TERM);
 			/* kickoff overlay0 engine */
-			mdp4_stat.kickoff_ov0++;
 			vctrl->ov_koff++;	/* make up for prefill */
 			outpdw(MDP_BASE + 0x0004, 0);
 		}
