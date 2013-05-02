@@ -1865,15 +1865,33 @@ static void add_header(struct buffer *b, struct module *mod)
 	buf_printf(b, "\n");
 	buf_printf(b, "MODULE_INFO(vermagic, VERMAGIC_STRING);\n");
 	buf_printf(b, "\n");
+	/* It's tough to determine whether init_module() exists in LTO
+	 * intermediates.  Instead, point to a weak init function and let the
+	 * linker figure out what to do.
+	 */
+#ifdef CONFIG_LTO
+	buf_printf(b, "int init_module(void) __attribute__((weak));\n");
+	buf_printf(b, "int init_module(void) { return 0; }\n");
+	buf_printf(b, "void cleanup_module(void) __attribute__((weak));\n");
+	buf_printf(b, "void cleanup_module(void) { return; }\n");
+	buf_printf(b, "\n");
+#endif
 	buf_printf(b, "__visible struct module __this_module\n");
 	buf_printf(b, "__attribute__((section(\".gnu.linkonce.this_module\"))) = {\n");
 	buf_printf(b, " .name = KBUILD_MODNAME,\n");
+#ifdef CONFIG_LTO
+	buf_printf(b, " .init = init_module,\n");
+	buf_printf(b, "#ifdef CONFIG_MODULE_UNLOAD\n"
+		      " .exit = cleanup_module,\n"
+		      "#endif\n");
+#else
 	if (mod->has_init)
 		buf_printf(b, " .init = init_module,\n");
 	if (mod->has_cleanup)
 		buf_printf(b, "#ifdef CONFIG_MODULE_UNLOAD\n"
 			      " .exit = cleanup_module,\n"
 			      "#endif\n");
+#endif
 	buf_printf(b, " .arch = MODULE_ARCH_INIT,\n");
 	buf_printf(b, "};\n");
 }
