@@ -29,9 +29,10 @@
 #include <linux/completion.h>
 #include <linux/mutex.h>
 #include <linux/syscore_ops.h>
+#include <linux/dkp.h>
 
 // For mpdecision hack
-#include <linux/kmod.h>
+//#include <linux/kmod.h>
 
 #include <trace/events/power.h>
 
@@ -522,11 +523,38 @@ static ssize_t show_scaling_governor(struct cpufreq_policy *policy, char *buf)
 	return -EINVAL;
 }
 
-void msm_rq_stats_enable(int enable);
+/**
+ * auto-hotplug tuners, to be merged into governor settings as needed
+ */
+int hotplug_intpulse = 0;
+int hotplug_sampling_periods = 15;
+int hotplug_sampling_rate = 2000 / HZ;
+int __used hotplug_enable_all_threshold = 1000;
+int hotplug_enable_one_threshold = 250;
+int hotplug_disable_one_threshold = 125;
+static __DKP(hotplug_intpulse, 0, 1, NULL);
+static __DKP(hotplug_sampling_periods, 2, 15, NULL);
+static __DKP(hotplug_sampling_rate, 1, 10, NULL);
+//static __DKP(hotplug_enable_all_threshold, 100, 1000, NULL);
+static __DKP(hotplug_enable_one_threshold, 100, 1000, NULL);
+static __DKP(hotplug_disable_one_threshold, 0, 1000, NULL);
+static struct attribute *hotplug_attrs[] = {
+	&dkp_attr(hotplug_intpulse),
+	&dkp_attr(hotplug_sampling_periods),
+	&dkp_attr(hotplug_sampling_rate),
+	//&dkp_attr(hotplug_enable_all_threshold),
+	&dkp_attr(hotplug_enable_one_threshold),
+	&dkp_attr(hotplug_disable_one_threshold),
+	NULL
+};
+static struct attribute_group hotplug_attr_grp = {
+    .attrs = hotplug_attrs,
+}; 
 
 /**
  * store_scaling_governor - store policy for the specified CPU
  */
+
 static ssize_t store_scaling_governor(struct cpufreq_policy *policy,
 					const char *buf, size_t count)
 {
@@ -552,6 +580,12 @@ static ssize_t store_scaling_governor(struct cpufreq_policy *policy,
 
 	policy->user_policy.policy = policy->policy;
 	policy->user_policy.governor = policy->governor;
+
+	// Add auto-hotplug tuners if governor doesn't hotplug
+	if (!policy->cpu && !(policy->governor->flags & BIT(GOVFLAGS_HOTPLUG))) {
+		hotplug_attr_grp.name = policy->governor->name;
+		sysfs_unmerge_group(cpufreq_global_kobject, &hotplug_attr_grp);
+	}
 
 	sysfs_notify(&policy->kobj, NULL, "scaling_governor");
 
@@ -763,12 +797,15 @@ no_policy:
 	return ret;
 }
 
+extern void msm_rq_stats_enable(int enable);
+
 static ssize_t store(struct kobject *kobj, struct attribute *attr,
 		     const char *buf, size_t count)
 {
 	struct cpufreq_policy *policy = to_policy(kobj);
 	struct freq_attr *fattr = to_attr(attr);
 	ssize_t ret = count;
+	char *govname;
 
 	int j, iter = 0, cpu = policy->cpu;
 
@@ -804,8 +841,10 @@ static ssize_t store(struct kobject *kobj, struct attribute *attr,
 		}
 
 		// If cpu0 can't enable cpu1, we need mpdecision
-		if (cpu == 0)
+		if (cpu == 0) {
 			msm_rq_stats_enable(!(t->flags & BIT(GOVFLAGS_HOTPLUG)));
+			govname = t->name;
+		}
 	} else if (fattr->store == store_scaling_max_freq ||
 		   fattr->store == store_scaling_min_freq) {
 		iter = 1;
@@ -2032,6 +2071,7 @@ static struct notifier_block __refdata cpufreq_cpu_notifier = {
  * This may block while mutexes are locked, and should not be called in
  * interrupt context.
  */
+inline void hotplug_boostpulse(void);
 void cpufreq_set_interactivity(int on, int idbit) {
 	unsigned int j;
 	static int pressids = 0;
@@ -2045,6 +2085,8 @@ void cpufreq_set_interactivity(int on, int idbit) {
 	       pressids &= ~(1 << idbit);
 	       if (pressids) return;
 	}
+	if (hotplug_intpulse)
+		hotplug_boostpulse();
 	/* Inform all available policies */
 	for_each_online_cpu(j) {
 	       struct cpufreq_policy *pol;

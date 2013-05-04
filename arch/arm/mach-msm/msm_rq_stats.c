@@ -377,12 +377,7 @@ static int init_rq_attribs(void)
 	return err;
 }
 
-/* Certain kernels (KT747) remove the mpdecision service from their ramdisk.
- * dkp doesn't include its own ramdisk, so if it's flashed after KT747,
- * mpdecision will be unavailable.  This is bad, so make sure that mpdecision
- * is running.
- */
-static struct delayed_work mpd_work;
+/*
 void check_for_mpd(struct work_struct *work) {
 	struct task_struct *tsk;
 	int cycle;
@@ -414,17 +409,20 @@ void check_for_mpd(struct work_struct *work) {
 		}
 		msleep(1000);
 	}
+	for_each_process(tsk
+}
+*/
+int mpdecision_available(void) {
+	struct task_struct *tsk;
+	for_each_process(tsk) {
+		if (unlikely(strstr(tsk->comm, "mpdecision"))) {
+			return 1;
+		}
+	}
+	return 0;
 }
 
-void msm_rq_stats_enable(int enable) {
-	// Calm mpdecision down:
-	rq_info.hotplug_disabled = !enable;
-	if (!enable)
-		// make sure mpdecision sees hotplug_disabled
-		msleep(20);
-	else
-		// make sure cpu1 is down when mpdecision resumes
-		cpu_down(1);
+static void mpdecision_enable(int enable) {
 	if (enable != notifiers_registered) {
 		if (enable) {
 			printk(KERN_DEBUG "rq-stats: enable cpufreq notifier\n");
@@ -442,6 +440,7 @@ void msm_rq_stats_enable(int enable) {
 	}
 	if (enable != rq_info.init) {
 		if (enable) {
+			cpu_up(1);
 			rq_info.rq_poll_total_jiffies = 0;
 			rq_info.rq_poll_last_jiffy = jiffies;
 			rq_info.rq_avg = 0;
@@ -449,7 +448,30 @@ void msm_rq_stats_enable(int enable) {
 		printk(KERN_DEBUG "rq-stats: rq_info.init = %i\n", enable);
 		rq_info.init = enable;
 	}
-	schedule_delayed_work(&mpd_work, 5 * HZ);
+}
+
+extern void hotplug_disable(bool flag);
+static void rq_hotplug_enable(int enable) {
+	if (mpdecision_available()) {
+		mpdecision_enable(enable);
+		hotplug_disable(1);
+	} else {
+		mpdecision_enable(0);
+		hotplug_disable(!enable);
+	}
+}
+
+static int hotplug_enable = 1;
+static struct delayed_work mpd_work;
+static void do_hotplug_enable(struct work_struct *work) {
+	rq_hotplug_enable(hotplug_enable);
+}
+
+// Give apps a second to start/stop mpdecision after setting governor
+void msm_rq_stats_enable(int enable) {
+	hotplug_enable = enable;
+	cancel_delayed_work_sync(&mpd_work);
+	schedule_delayed_work(&mpd_work, HZ);
 }
 
 static int __init msm_rq_stats_init(void)
@@ -492,7 +514,7 @@ static int __init msm_rq_stats_init(void)
 	register_hotcpu_notifier(&cpu_hotplug);
 	notifiers_registered = 1;
 
-	INIT_DELAYED_WORK_DEFERRABLE(&mpd_work, check_for_mpd);
+	INIT_DELAYED_WORK_DEFERRABLE(&mpd_work, do_hotplug_enable);
 
 	return ret;
 }

@@ -7,6 +7,8 @@
  * kobject appears at /sys/kernel/dkp
  *
  */
+#ifndef _LINUX_DKP_H
+#define _LINUX_DKP_H
 
 #include <linux/kobject.h>
 #include <linux/sysfs.h>
@@ -49,13 +51,15 @@ extern void _dkp_register(struct dkp_gattr *gattr);
 }
 
 #define __DKP_NAME(var,name,min,max,cb) \
-static struct dkp_gattr dkp_##name = __DKPATTR( \
+struct dkp_gattr dkp_##name = __DKPATTR( \
 	name, 0666, min, max, 1, &var, cb, NULL)
 
 #define __DKP(name,min,max,cb) __DKP_NAME(name,name,min,max,cb)
 
 #define __DKP_ARR_NAME(var,name,min,max,cb) \
-static struct dkp_gattr dkp_##name = __DKPATTR( \
+struct dkp_gattr dkp_##name = __DKPATTR( \
 	name, 0666, min, max, (sizeof(name)/sizeof(int)), var, cb, NULL)
 
 #define __DKP_ARR(name,min,max,cb) __DKP_ARR_NAME(name,name,min,max,cb)
+
+#endif

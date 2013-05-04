@@ -1362,7 +1362,7 @@ static inline void ffc_migrate(void) {
 		}
 	}
 }
-__DKP_NAME(fast_charge_setting, force_fast_charge, 0, 1, ffc_migrate);
+static __DKP_NAME(fast_charge_setting, force_fast_charge, 0, 1, ffc_migrate);
 static struct attribute *ffc_attrs[] = {
 	&dkp_attr(force_fast_charge), NULL };
 static struct attribute_group ffc_attr_group ={
