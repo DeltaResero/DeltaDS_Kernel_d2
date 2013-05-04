@@ -31,9 +31,6 @@
 #include <linux/syscore_ops.h>
 #include <linux/dkp.h>
 
-// For mpdecision hack
-//#include <linux/kmod.h>
-
 #include <trace/events/power.h>
 
 /**
@@ -549,7 +546,7 @@ static struct attribute *hotplug_attrs[] = {
 };
 static struct attribute_group hotplug_attr_grp = {
     .attrs = hotplug_attrs,
-}; 
+};
 
 /**
  * store_scaling_governor - store policy for the specified CPU
