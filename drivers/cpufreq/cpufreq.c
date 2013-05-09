@@ -427,6 +427,7 @@ static struct freq_work_struct {
 	struct cpufreq_policy *policy;
 } enable_oc_work;
 void acpuclk_enable_oc_freqs(unsigned int freq);
+extern int msm_thermal_get_freq_table(void);
 
 static void do_enable_oc(struct work_struct *work) {
 	struct cpufreq_policy new_policy;
@@ -441,6 +442,7 @@ static void do_enable_oc(struct work_struct *work) {
 	if (__cpufreq_set_policy(policy, &new_policy))
 		return;
 	policy->user_policy.max = policy->max;
+	msm_thermal_get_freq_table();
 }
 
 /**
@@ -2068,7 +2070,7 @@ static struct notifier_block __refdata cpufreq_cpu_notifier = {
  * This may block while mutexes are locked, and should not be called in
  * interrupt context.
  */
-inline void hotplug_boostpulse(void);
+void hotplug_boostpulse(void);
 void cpufreq_set_interactivity(int on, int idbit) {
 	unsigned int j;
 	static int pressids = 0;
