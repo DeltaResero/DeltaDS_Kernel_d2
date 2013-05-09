@@ -283,10 +283,6 @@ static int system_suspend_handler(struct notifier_block *nb,
 	case PM_HIBERNATION_PREPARE:
 	case PM_SUSPEND_PREPARE:
 		rq_info.hotplug_disabled = 1;
-		rq_info.init = 1;
-		break;
-	case PM_RESTORE_PREPARE:
-		rq_info.init = notifiers_registered;
 		break;
 	default:
 		return NOTIFY_DONE;
@@ -320,7 +316,7 @@ static void def_work_fn(struct work_struct *work)
 	 * isn't anymore.  We still need non-governor hotplug, so call
 	 * rq_hotplug_enable to migrate to auto-hotplug.
 	 */
-	if (rq_info.rq_poll_total_jiffies > HZ) {
+	if (unlikely(rq_info.rq_poll_total_jiffies > 2 * HZ && !rq_info.hotplug_disabled)) {
 		printk(KERN_DEBUG "rq-stats: where's mpdecision? migrating to auto-hotplug\n");
 		rq_hotplug_enable(1);
 	}
