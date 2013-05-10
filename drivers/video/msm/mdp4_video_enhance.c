@@ -54,7 +54,6 @@
 
 u8 mDNIe_data[MAX_LUT_SIZE * 3];
 static int scaling_factors[3] = { 256, 256, 256 };
-static unsigned int trinity_colors;
 
 int play_speed_1_5;
 #if defined(CONFIG_FB_MSM_MIPI_SAMSUNG_OLED_VIDEO_HD_PT) || \
@@ -832,14 +831,6 @@ static DEVICE_ATTR(playspeed, 0664,
 static void bump_mdnie(void) { mDNIe_Set_Mode(current_mDNIe_Mode); }
 static __DKP_ARR(scaling_factors, 0, 256, bump_mdnie);
 
-extern void trinity_load_colors(unsigned int val);
-extern void mipi_bump_gamma(void);
-static void bump_trinity(void) {
-	trinity_load_colors(trinity_colors);
-	mipi_bump_gamma();
-}
-static __DKP(trinity_colors, 0, 1, bump_trinity);
-
 void init_mdnie_class(void)
 {
 	mdnie_class = class_create(THIS_MODULE, "mdnie");
@@ -902,11 +893,6 @@ void init_mdnie_class(void)
 			dkp_attr(scaling_factors).name);
 	dkp_register(scaling_factors);
 
-	if (device_create_file
-		(tune_mdnie_dev, dkp_attrp(device, trinity_colors)) < 0)
-		pr_err("Failed to create device file(%s)!=n",
-			dkp_attr(trinity_colors).name);
-	dkp_register(trinity_colors);
 #ifdef MDP4_VIDEO_ENHANCE_TUNING
 	if (device_create_file(tune_mdnie_dev, &dev_attr_tuning) < 0) {
 		pr_err("Failed to create device file(%s)!\n",

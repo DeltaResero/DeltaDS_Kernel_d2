@@ -1420,6 +1420,7 @@ config MSM_SMD_LOGGING
 
 config MSM_IPC_LOGGING
 	bool "MSM Debug Logging for IPC Drivers"
+	default n
 	help
 	  This option allows the debug logging for IPC Drivers.
 

@@ -104,6 +104,7 @@ struct mdm_device {
 
 static struct list_head	mdm_devices;
 static DEFINE_SPINLOCK(mdm_devices_lock);
+static int disable_boot_timeout = 0;
 
 static int ssr_count;
 static DEFINE_SPINLOCK(ssr_lock);
@@ -138,6 +139,27 @@ static void mdm_device_list_remove(struct mdm_device *mdev)
 	spin_unlock_irqrestore(&mdm_devices_lock, flags);
 }
 
+static int param_set_disable_boot_timeout(const char *val,
+		const struct kernel_param *kp)
+{
+	int rcode;
+	pr_info("%s called\n",__func__);
+	rcode = param_set_bool(val, kp);
+	if (rcode)
+		pr_err("%s: Failed to set boot_timout_disabled flag\n",
+				__func__);
+	pr_info("%s: disable_boot_timeout is now %d\n",
+			__func__, disable_boot_timeout);
+	return rcode;
+}
+
+static struct kernel_param_ops disable_boot_timeout_ops = {
+	.set = param_set_disable_boot_timeout,
+	.get = param_get_bool,
+};
+module_param_cb(disable_boot_timeout, &disable_boot_timeout_ops,
+		&disable_boot_timeout, 0644);
+MODULE_PARM_DESC(disable_boot_timeout, "Disable panic on mdm bootup timeout");
 /* If the platform's cascading_ssr flag is set, the subsystem
  * restart module will restart the other modems so stop
  * monitoring them as well.
@@ -322,7 +344,8 @@ static void mdm2ap_status_check(struct work_struct *work)
 		if (gpio_get_value(mdm_drv->mdm2ap_status_gpio) == 0) {
 			pr_err("%s: MDM2AP_STATUS did not go high on mdm id %d\n",
 				   __func__, mdev->mdm_data.device_id);
-			mdm_start_ssr(mdev);
+			if (!disable_boot_timeout)
+				mdm_start_ssr(mdev);
 		}
 	}
 }
@@ -367,6 +390,7 @@ static long mdm_modem_ioctl(struct file *filp, unsigned int cmd,
 	int status, ret = 0;
 	struct mdm_device *mdev = filp->private_data;
 	struct mdm_modem_drv *mdm_drv;
+	struct mdm_device *l_mdev;
 
 	if (_IOC_TYPE(cmd) != CHARM_CODE) {
 		pr_err("%s: invalid ioctl code to mdm id %d\n",
@@ -452,6 +476,14 @@ static long mdm_modem_ioctl(struct file *filp, unsigned int cmd,
 		pr_debug("%s Image upgrade ioctl recieved\n", __func__);
 		if (mdm_drv->pdata->image_upgrade_supported &&
 				mdm_ops->image_upgrade_cb) {
+			list_for_each_entry(l_mdev, &mdm_devices, link) {
+				if (l_mdev != mdev) {
+					pr_debug("%s:setting mdm_rdy to false",
+							__func__);
+					atomic_set(&l_mdev->mdm_data.mdm_ready,
+							0);
+				}
+			}
 			get_user(status, (unsigned long __user *) arg);
 			mdm_ops->image_upgrade_cb(mdm_drv, status);
 		} else
