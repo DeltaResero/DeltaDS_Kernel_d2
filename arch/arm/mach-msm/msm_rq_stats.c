@@ -57,6 +57,68 @@ struct cpu_load_data {
 
 static DEFINE_PER_CPU(struct cpu_load_data, cpuload);
 
+int mpdecision_available(void) {
+	struct task_struct *tsk;
+	for_each_process(tsk) {
+		if (unlikely(strstr(tsk->comm, "mpdecision"))) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+static void mpdecision_enable(int enable) {
+	if (enable != notifiers_registered) {
+		if (enable) {
+			printk(KERN_DEBUG "rq-stats: enable cpufreq notifier\n");
+			cpufreq_register_notifier(&freq_transition,
+						CPUFREQ_TRANSITION_NOTIFIER);
+			// Reregistering this likes to hang, so let's not.
+			//register_hotcpu_notifier(&cpu_hotplug);
+		} else {
+			printk(KERN_DEBUG "rq-stats: disable cpufreq notifier\n");
+			cpufreq_unregister_notifier(&freq_transition,
+						CPUFREQ_TRANSITION_NOTIFIER);
+			//unregister_hotcpu_notifier(&cpu_hotplug);
+		}
+		notifiers_registered = enable;
+	}
+	if (enable != rq_info.init) {
+		if (enable) {
+			cpu_up(1);
+			rq_info.rq_poll_total_jiffies = 0;
+			rq_info.rq_poll_last_jiffy = jiffies;
+			rq_info.rq_avg = 0;
+		}
+		printk(KERN_DEBUG "rq-stats: rq_info.init = %i\n", enable);
+		rq_info.init = enable;
+	}
+}
+
+extern void hotplug_disable(bool flag);
+static void rq_hotplug_enable(int enable) {
+	if (mpdecision_available()) {
+		mpdecision_enable(enable);
+		hotplug_disable(1);
+	} else {
+		mpdecision_enable(0);
+		hotplug_disable(!enable);
+	}
+}
+
+static int hotplug_enable = 1;
+static struct delayed_work mpd_work;
+static void do_hotplug_enable(struct work_struct *work) {
+	rq_hotplug_enable(hotplug_enable);
+}
+
+// Give apps a second to start/stop mpdecision after setting governor
+void msm_rq_stats_enable(int enable) {
+	hotplug_enable = enable;
+	cancel_delayed_work_sync(&mpd_work);
+	schedule_delayed_work(&mpd_work, HZ);
+}
+
 static inline u64 get_cpu_idle_time_jiffy(unsigned int cpu, u64 *wall)
 {
 	u64 idle_time;
@@ -221,10 +283,6 @@ static int system_suspend_handler(struct notifier_block *nb,
 	case PM_HIBERNATION_PREPARE:
 	case PM_SUSPEND_PREPARE:
 		rq_info.hotplug_disabled = 1;
-		rq_info.init = 1;
-		break;
-	case PM_RESTORE_PREPARE:
-		rq_info.init = notifiers_registered;
 		break;
 	default:
 		return NOTIFY_DONE;
@@ -253,6 +311,15 @@ static void def_work_fn(struct work_struct *work)
 
 	/* Notify polling threads on change of value */
 	sysfs_notify(rq_info.kobj, NULL, "def_timer_ms");
+
+	/* If we're in this position, it means that mpdecision WAS running but
+	 * isn't anymore.  We still need non-governor hotplug, so call
+	 * rq_hotplug_enable to migrate to auto-hotplug.
+	 */
+	if (unlikely(rq_info.rq_poll_total_jiffies > 2 * HZ && !rq_info.hotplug_disabled)) {
+		printk(KERN_DEBUG "rq-stats: where's mpdecision? migrating to auto-hotplug\n");
+		rq_hotplug_enable(1);
+	}
 }
 
 static ssize_t run_queue_avg_show(struct kobject *kobj,
@@ -260,6 +327,14 @@ static ssize_t run_queue_avg_show(struct kobject *kobj,
 {
 	unsigned int val = 0;
 	unsigned long flags = 0;
+
+	/* Fingers crossed, we only get here when mpdecision initially
+	 * restarts, rather than at random while using hotplugging governors.
+	 */
+	if (unlikely(!rq_info.init)) {
+		printk(KERN_DEBUG "rq-stats: here comes mpdecision! stopping auto-hotplug\n");
+		rq_hotplug_enable(1);
+	}
 
 	spin_lock_irqsave(&rq_lock, flags);
 	/* rq avg currently available only on one core */
@@ -377,81 +452,6 @@ static int init_rq_attribs(void)
 	return err;
 }
 
-/* Certain kernels (KT747) remove the mpdecision service from their ramdisk.
- * dkp doesn't include its own ramdisk, so if it's flashed after KT747,
- * mpdecision will be unavailable.  This is bad, so make sure that mpdecision
- * is running.
- */
-static struct delayed_work mpd_work;
-void check_for_mpd(struct work_struct *work) {
-	struct task_struct *tsk;
-	int cycle;
-	static char *srargv[] = {
-		"/system/bin/start",
-		"mpdecision", NULL,
-	};
-	static char *mpargv[] = {
-		"/system/bin/mpdecision",
-		"--no_sleep", "--avg_comp", NULL,
-	};
-	char *mpenv[] = {
-		"HOME=/", "TERM=linux",
-		"PATH=/system/bin", NULL,
-	};
-	for (cycle = 0; cycle < 3; cycle++) {
-		for_each_process(tsk) {
-			if (strstr(tsk->comm, "mpdecision"))
-				return;
-		}
-		if (!cycle) {
-			printk(KERN_DEBUG "rq-stats: trying to start mpdecision (%i)...\n", cycle);
-			call_usermodehelper(srargv[0], srargv, mpenv, UMH_WAIT_PROC);
-		} else if (cycle == 1){
-			printk(KERN_DEBUG "rq-stats: trying to start mpdecision (%i)...\n", cycle);
-			call_usermodehelper(mpargv[0], mpargv, mpenv, UMH_WAIT_EXEC);
-		} else {
-			printk(KERN_DEBUG "rq-stats: couldn't start mpdecision...\n");
-		}
-		msleep(1000);
-	}
-}
-
-void msm_rq_stats_enable(int enable) {
-	// Calm mpdecision down:
-	rq_info.hotplug_disabled = !enable;
-	if (!enable)
-		// make sure mpdecision sees hotplug_disabled
-		msleep(20);
-	else
-		// make sure cpu1 is down when mpdecision resumes
-		cpu_down(1);
-	if (enable != notifiers_registered) {
-		if (enable) {
-			printk(KERN_DEBUG "rq-stats: enable cpufreq notifier\n");
-			cpufreq_register_notifier(&freq_transition,
-						CPUFREQ_TRANSITION_NOTIFIER);
-			// Reregistering this likes to hang, so let's not.
-			//register_hotcpu_notifier(&cpu_hotplug);
-		} else {
-			printk(KERN_DEBUG "rq-stats: disable cpufreq notifier\n");
-			cpufreq_unregister_notifier(&freq_transition,
-						CPUFREQ_TRANSITION_NOTIFIER);
-			//unregister_hotcpu_notifier(&cpu_hotplug);
-		}
-		notifiers_registered = enable;
-	}
-	if (enable != rq_info.init) {
-		if (enable) {
-			rq_info.rq_poll_total_jiffies = 0;
-			rq_info.rq_poll_last_jiffy = jiffies;
-			rq_info.rq_avg = 0;
-		}
-		printk(KERN_DEBUG "rq-stats: rq_info.init = %i\n", enable);
-		rq_info.init = enable;
-	}
-	schedule_delayed_work(&mpd_work, 5 * HZ);
-}
-
 static int __init msm_rq_stats_init(void)
 {
 	int ret;
@@ -492,7 +492,7 @@ static int __init msm_rq_stats_init(void)
 	register_hotcpu_notifier(&cpu_hotplug);
 	notifiers_registered = 1;
 
-	INIT_DELAYED_WORK_DEFERRABLE(&mpd_work, check_for_mpd);
+	INIT_DELAYED_WORK_DEFERRABLE(&mpd_work, do_hotplug_enable);
 
 	return ret;
 }

@@ -598,6 +598,7 @@ EXPORT_SYMBOL(dump_fpu);
 extern void kernel_thread_helper(void);
 asm(	".pushsection .text\n"
 "	.align\n"
+"	.global kernel_thread_helper\n"
 "	.type	kernel_thread_helper, #function\n"
 "kernel_thread_helper:\n"
 #ifdef CONFIG_TRACE_IRQFLAGS
@@ -614,6 +615,7 @@ asm(	".pushsection .text\n"
 extern void kernel_thread_exit(long code);
 asm(	".pushsection .text\n"
 "	.align\n"
+"	.global kernel_thread_exit\n"
 "	.type	kernel_thread_exit, #function\n"
 "kernel_thread_exit:\n"
 "	.fnstart\n"

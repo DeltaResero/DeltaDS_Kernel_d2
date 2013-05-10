@@ -20,6 +20,7 @@ ssize_t dkp_generic_store(struct kobject *kobj, struct attribute *attr,
 		const char *buf, size_t count) {
 	int i, l, t, r;
 	int *v;
+	void *p;
 	struct dkp_gattr *gattr = (struct dkp_gattr *)attr;
 	if (gattr->store && gattr->store != dkp_generic_store)
 		return gattr->store(kobj, (struct attribute *)gattr, buf, count);
@@ -36,7 +37,14 @@ ssize_t dkp_generic_store(struct kobject *kobj, struct attribute *attr,
 		count = -EINVAL;
 		goto out;
 	}
-	memcpy(gattr->ptr, v, gattr->cnt * sizeof(int));
+	p = gattr->ptr;
+	for (i = 0; i < gattr->cnt; i++) {
+		if (gattr->set)
+			gattr->set(p, v[i]);
+		else
+			*((int *)p) = v[i];
+		p += gattr->stride;
+	}
 	if (gattr->cb)
 		gattr->cb();
 out:
@@ -46,13 +54,21 @@ out:
 
 ssize_t dkp_generic_show(struct kobject *kobj, struct attribute *attr, char *buf) {
 	char *fmt;
-	int i, l;
+	int i, l, v;
+	void *p;
 	struct dkp_gattr *gattr = (struct dkp_gattr *)attr;
 	if (gattr->show && gattr->show != dkp_generic_show)
 		return gattr->show(kobj, (struct attribute *)gattr, buf);
 	fmt = gattr->fmt ? : "%i ";
-	for (i = 0, l = 0; i < gattr->cnt; i++)
-		l += sprintf(buf + l, fmt, gattr->ptr[i]);
+	p = gattr->ptr;
+	for (i = 0, l = 0; i < gattr->cnt; i++) {
+		if (gattr->get)
+			v = gattr->get(p);
+		else
+			v = *((int *)p);
+		l += sprintf(buf + l, fmt, v);
+		p += gattr->stride;
+	}
 	buf[l-1] = '\n';
 	return l;
 }

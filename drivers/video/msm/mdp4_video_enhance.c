@@ -830,7 +830,7 @@ static DEVICE_ATTR(playspeed, 0664,
 
 /* For brightness scaling */
 static void bump_mdnie(void) { mDNIe_Set_Mode(current_mDNIe_Mode); }
-__DKP_ARR(scaling_factors, 0, 256, bump_mdnie);
+static __DKP_ARR(scaling_factors, 0, 256, bump_mdnie);
 
 extern void trinity_load_colors(unsigned int val);
 extern void mipi_bump_gamma(void);
@@ -838,7 +838,7 @@ static void bump_trinity(void) {
 	trinity_load_colors(trinity_colors);
 	mipi_bump_gamma();
 }
-__DKP(trinity_colors, 0, 1, bump_trinity);
+static __DKP(trinity_colors, 0, 1, bump_trinity);
 
 void init_mdnie_class(void)
 {

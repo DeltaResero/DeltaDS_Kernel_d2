@@ -1332,7 +1332,6 @@ static struct attribute_group vdd_attr_group = {
 };
 
 /* Enable OC frequencies.  Also bump max voltage & bus speed. */
-extern int msm_thermal_get_freq_table(void);
 void acpuclk_enable_oc_freqs(unsigned int freq) {
 	struct acpu_level *tgt = drv.acpu_freq_tbl;
 
@@ -1347,7 +1346,6 @@ void acpuclk_enable_oc_freqs(unsigned int freq) {
 	drv.l2_freq_tbl[tgt->l2_level].bw_level = 7;
 
 	cpufreq_table_init(0);
-	msm_thermal_get_freq_table();
 }
 
 void acpuclk_set_override_vmin(int enable) {
