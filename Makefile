@@ -379,8 +379,7 @@ KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -Werror-implicit-function-declaration \
 		   -Wno-format-security \
 		   -Wno-sizeof-pointer-memaccess \
-		   -fno-delete-null-pointer-checks \
-		   $(CFLAGS_A15) $(CFLAGS_GR) $(CFLAGS_MOD)
+		   -fno-delete-null-pointer-checks
 KBUILD_AFLAGS_KERNEL :=
 KBUILD_CFLAGS_KERNEL :=
 KBUILD_AFLAGS   := -D__ASSEMBLY__
@@ -571,19 +570,49 @@ endif # $(dot-config)
 all: vmlinux
 
 ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
+# Optimize for size
 KBUILD_CFLAGS	+= -Os
-CFLAGS_A15	= -marm -mtune=cortex-a15 -mfpu=neon -mfloat-abi=softfp -march=armv7-a
-CFLAGS_GR	= -fgraphite-identity -ftree-loop-distribution -floop-block -ftree-loop-linear \
-		  -ftree-loop-im -fivopts -gcse-sm -fgcse-las
-CFLAGS_MOD	= -fmodulo-sched -fmodulo-sched-allow-regmoves
+# Generic ARM flags
+KBUILD_CFLAGS	+= -marm -mtune=cortex-a15 -march=armv7-a -mfpu=neon -mfloat-abi=softfp
+# Loop optimizations
+KBUILD_CFLAGS	+= -fgraphite-identity -ftree-loop-distribution -floop-block -ftree-loop-linear \
+		   -ftree-loop-im -fivopts
+# Modulo scheduling
+KBUILD_CFLAGS	+= -fmodulo-sched -fmodulo-sched-allow-regmoves
+# GCC extras
+KBUILD_CFLAGS	+= -fgcse-sm -fgcse-las -fsched-spec-load -fsched-pressure \
+		   -fsched-stalled-insns=0 -fsched-stalled-insns-dep=0 -fipa-pta
+# GCC params
+KBUILD_CFLAGS	+= --param max-gcse-memory=1073741824 \
+		   --param max-gcse-insertion-ratio=50 \
+		   --param max-tail-merge-comparisons=100 \
+		   --param max-tail-merge-iterations=4 \
+		   --param l1-cache-size=16 \
+		   --param l2-cache-size=1024 \
+		   --param max-vartrack-size=0
 else
+# Optimize for getting stuff done
 KBUILD_CFLAGS	+= -O3
-CFLAGS_A15	= -marm -mtune=cortex-a15 -mfpu=neon -mfloat-abi=softfp -march=armv7-a \
-		  -funsafe-math-optimizations -funroll-loops -mvectorize-with-neon-quad \
-		  -ftree-loop-im -fivopts -funswitch-loops -fgcse-sm -fgcse-las
-CFLAGS_GR	= -fgraphite-identity -floop-block -ftree-loop-linear \
-		  -floop-strip-mine -ftree-loop-distribution
-CFLAGS_MOD	= -fmodulo-sched -fmodulo-sched-allow-regmoves
+# Generic ARM flags
+KBUILD_CFLAGS	+= -marm -mtune=cortex-a15 -march=armv7-a -mfpu=neon -mfloat-abi=softfp \
+		   -mvectorize-with-neon-quad
+# Loop optimizations
+KBUILD_CFLAGS	+= -fgraphite-identity -ftree-loop-distribution -floop-block -ftree-loop-linear \
+		   -ftree-loop-im -fivopts -funswitch-loops -funroll-loops -floop-strip-mine
+# Modulo scheduling
+KBUILD_CFLAGS	+= -fmodulo-sched -fmodulo-sched-allow-regmoves
+# GCC extras
+KBUILD_CFLAGS	+= -fgcse-sm -fgcse-las -fsched-spec-load -fsched-pressure \
+		   -fsched-stalled-insns=0 -fsched-stalled-insns-dep=0 -fipa-pta \
+		   -fipa-matrix-reorg
+# GCC params
+KBUILD_CFLAGS	+= --param max-gcse-memory=1073741824 \
+		   --param max-gcse-insertion-ratio=50 \
+		   --param max-tail-merge-comparisons=100 \
+		   --param max-tail-merge-iterations=4 \
+		   --param l1-cache-size=16 \
+		   --param l2-cache-size=1024 \
+		   --param max-vartrack-size=0
 endif
 
 include $(srctree)/arch/$(SRCARCH)/Makefile

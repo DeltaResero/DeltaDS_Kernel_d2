@@ -2040,6 +2040,10 @@ config CP_ACCESS
 
 	  If unsure, say N.
 
+config ARCH_RANDOM_HWRNG
+	def_bool y
+	prompt "Use hwrng for random numbers" if EXPERT
+
 endmenu
 
 menu "Boot options"

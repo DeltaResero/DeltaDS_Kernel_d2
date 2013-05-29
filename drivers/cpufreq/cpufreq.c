@@ -583,7 +583,7 @@ static ssize_t store_scaling_governor(struct cpufreq_policy *policy,
 	// Add auto-hotplug tuners if governor doesn't hotplug
 	if (!policy->cpu && !(policy->governor->flags & BIT(GOVFLAGS_HOTPLUG))) {
 		hotplug_attr_grp.name = policy->governor->name;
-		sysfs_unmerge_group(cpufreq_global_kobject, &hotplug_attr_grp);
+		sysfs_merge_group(cpufreq_global_kobject, &hotplug_attr_grp);
 	}
 
 	sysfs_notify(&policy->kobj, NULL, "scaling_governor");
