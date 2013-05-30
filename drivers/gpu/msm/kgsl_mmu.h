@@ -96,7 +96,7 @@ enum kgsl_mmutype {
 	KGSL_MMU_TYPE_NONE
 };
 
-#define KGSL_FORCE_MMU KGSL_MMU_TYPE_GPU
+//#define KGSL_FORCE_MMU KGSL_MMU_TYPE_GPU
 
 struct kgsl_pagetable {
 	spinlock_t lock;
