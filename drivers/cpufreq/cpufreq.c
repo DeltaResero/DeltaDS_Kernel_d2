@@ -547,7 +547,7 @@ static struct attribute *hotplug_attrs[] = {
 	NULL
 };
 static struct attribute_group hotplug_attr_grp = {
-    .attrs = hotplug_attrs,
+	.attrs = hotplug_attrs,
 };
 
 /**
@@ -620,6 +620,10 @@ static ssize_t store_override_vmin(struct cpufreq_policy *policy,
 static ssize_t show_override_vmin(struct cpufreq_policy *policy, char *buf) {
 	return sprintf(buf, "%u\n", acpuclk_get_override_vmin());
 }
+
+/* Control gov/min/max linking across cores */
+static int link_core_settings = 1;
+static __DKP(link_core_settings, 0, 1, NULL);
 
 /**
  * show_scaling_driver - show the cpufreq driver currently loaded
@@ -816,37 +820,39 @@ static ssize_t store(struct kobject *kobj, struct attribute *attr,
 	 * GOVFLAGS_ALLCPUS: all cpus must use this governor
 	 * GOVFLAGS_HOTPLUG: this governor hotplugs and doesn't need mpdecision
 	 */
-	if (fattr->store == store_scaling_governor) {
-		char name[16];
-		unsigned int p = 0;
-		struct cpufreq_governor *t = NULL;
-		for (p = 0; p < 16; p++) {
-			if (buf[p] == 0 || buf[p] == '\n')
-				break;
-			name[p] = buf[p];
-		}
-		name[p] = 0;
-		cpufreq_parse_governor(name, &p, &t);
-		if (!t)
-			return -EINVAL;
-		if (t->flags & BIT(GOVFLAGS_ALLCPUS)) {
-			iter = 1;
-		} else {
-			// If cpu0 has ALLCPUS, they all do.
-			if (per_cpu(cpufreq_cpu_data, 0)->governor->flags &
-				BIT(GOVFLAGS_ALLCPUS)) {
-				iter = 1;
+	if (link_core_settings) {
+		if (fattr->store == store_scaling_governor) {
+			char name[16];
+			unsigned int p = 0;
+			struct cpufreq_governor *t = NULL;
+			for (p = 0; p < 16; p++) {
+				if (buf[p] == 0 || buf[p] == '\n')
+					break;
+				name[p] = buf[p];
 			}
-		}
+			name[p] = 0;
+			cpufreq_parse_governor(name, &p, &t);
+			if (!t)
+				return -EINVAL;
+			if (t->flags & BIT(GOVFLAGS_ALLCPUS)) {
+				iter = 1;
+			} else {
+				// If cpu0 has ALLCPUS, they all do.
+				if (per_cpu(cpufreq_cpu_data, 0)->governor->flags &
+					BIT(GOVFLAGS_ALLCPUS)) {
+					iter = 1;
+				}
+			}
 
-		// If cpu0 can't enable cpu1, we need mpdecision
-		if (cpu == 0) {
-			msm_rq_stats_enable(!(t->flags & BIT(GOVFLAGS_HOTPLUG)));
-			govname = t->name;
+			// If cpu0 can't enable cpu1, we need mpdecision
+			if (cpu == 0) {
+				msm_rq_stats_enable(!(t->flags & BIT(GOVFLAGS_HOTPLUG)));
+				govname = t->name;
+			}
+		} else if (fattr->store == store_scaling_max_freq ||
+			   fattr->store == store_scaling_min_freq) {
+			iter = 1;
 		}
-	} else if (fattr->store == store_scaling_max_freq ||
-		   fattr->store == store_scaling_min_freq) {
-		iter = 1;
 	}
 
 	for_each_possible_cpu(j) {
@@ -2222,6 +2228,8 @@ static int __init cpufreq_core_init(void)
 	cpufreq_global_kobject = kobject_create_and_add("cpufreq", &cpu_subsys.dev_root->kobj);
 	BUG_ON(!cpufreq_global_kobject);
 	register_syscore_ops(&cpufreq_syscore_ops);
+
+	dkp_register(link_core_settings);
 
 	return 0;
 }
