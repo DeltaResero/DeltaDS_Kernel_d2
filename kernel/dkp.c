@@ -1,5 +1,7 @@
 /*
  * dkp.c: dkp kobject and generic handlers
+ *
+ * Copyright (C) 2013 Ryan Pennucci
  */
 #include <linux/kobject.h>
 #include <linux/sysfs.h>
@@ -22,8 +24,6 @@ ssize_t dkp_generic_store(struct kobject *kobj, struct attribute *attr,
 	int *v;
 	void *p;
 	struct dkp_gattr *gattr = (struct dkp_gattr *)attr;
-	if (gattr->store && gattr->store != dkp_generic_store)
-		return gattr->store(kobj, (struct attribute *)gattr, buf, count);
 	v = kmalloc(gattr->cnt * sizeof(int), GFP_KERNEL);
 	if (!v)
 		return -ENOMEM;
@@ -32,7 +32,7 @@ ssize_t dkp_generic_store(struct kobject *kobj, struct attribute *attr,
 		if (!r || v[i] < gattr->min || v[i] > gattr->max) break;
 		t += l;
 	}
-	while (buf[t] == ' ' && t < count) l++;
+	while (buf[t] == ' ' && t < count) t++;
 	if (i != gattr->cnt || t < count - 1) {
 		count = -EINVAL;
 		goto out;
@@ -57,8 +57,6 @@ ssize_t dkp_generic_show(struct kobject *kobj, struct attribute *attr, char *buf
 	int i, l, v;
 	void *p;
 	struct dkp_gattr *gattr = (struct dkp_gattr *)attr;
-	if (gattr->show && gattr->show != dkp_generic_show)
-		return gattr->show(kobj, (struct attribute *)gattr, buf);
 	fmt = gattr->fmt ? : "%i ";
 	p = gattr->ptr;
 	for (i = 0, l = 0; i < gattr->cnt; i++) {
