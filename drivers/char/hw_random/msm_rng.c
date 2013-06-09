@@ -22,6 +22,7 @@
 #include <linux/io.h>
 #include <linux/err.h>
 #include <linux/types.h>
+#include <linux/workqueue.h>
 #include <mach/msm_iomap.h>
 #include <mach/socinfo.h>
 
@@ -118,18 +119,41 @@ static int (*random_func)(void *, size_t) = dummy_random;
 static void *randbuf;
 static int randbuf_bytes;
 static DEFINE_SPINLOCK(randbuf_lock);
+static struct work_struct randbuf_work;
+static void do_randbuf_fill(struct work_struct *work) {
+	unsigned long flags;
+	int bytes = RANDBUF_SIZE - randbuf_bytes;
+	int read;
+	void *buf = kmalloc(bytes, GFP_KERNEL);
+	if (!buf) return;
+
+	read = msm_rng_read(&msm_rng, buf, bytes, 0);
+
+	if (likely(read >= randbuf_bytes)) {
+		memmove(randbuf + read, randbuf, randbuf_bytes);
+		spin_lock_irqsave(&randbuf_lock, flags);
+	} else {
+		spin_lock_irqsave(&randbuf_lock, flags);
+		memmove(randbuf + read, randbuf, randbuf_bytes);
+	}
+	memcpy(randbuf, buf, read);
+	randbuf_bytes += read;
+	spin_unlock_irqrestore(&randbuf_lock, flags);
+
+	kfree(buf);
+}
 static int msm_get_random_bytes(void *data, size_t size) {
 	unsigned long flags;
 	spin_lock_irqsave(&randbuf_lock, flags);
+	if (randbuf_bytes < RANDBUF_SIZE / 4 && !work_pending(&randbuf_work))
+		schedule_work(&randbuf_work);
 	if (randbuf_bytes < size) {
-		randbuf_bytes += msm_rng_read(&msm_rng, randbuf + randbuf_bytes,
-			RANDBUF_SIZE - randbuf_bytes, 0);
-		if (randbuf_bytes < size)
-			size = 0;
+		spin_unlock_irqrestore(&randbuf_lock, flags);
+		return 0;
 	}
 	randbuf_bytes -= size;
-	spin_unlock_irqrestore(&randbuf_lock, flags);
 	memcpy(data, randbuf + randbuf_bytes, size);
+	spin_unlock_irqrestore(&randbuf_lock, flags);
 	return size;
 }
 int arch_get_random_long(unsigned long *v) {
@@ -242,15 +266,19 @@ static int __devinit msm_rng_probe(struct platform_device *pdev)
 		goto rollback_clk;
 	}
 
+#ifdef CONFIG_ARCH_RANDOM_HWRNG
 	/* Init the arch_random bits */
 	randbuf = kmalloc(RANDBUF_SIZE, GFP_KERNEL);
-	if (randbuf)
+	if (randbuf) {
+		randbuf_bytes = msm_rng_read(&msm_rng, randbuf, RANDBUF_SIZE, 0);
+		INIT_WORK(&randbuf_work, do_randbuf_fill);
 		random_func = msm_get_random_bytes;
-	else
+	} else {
 		printk(KERN_WARNING "msm_rng: can't allocate buffer\n");
+	}
 
-	/* Init erandom */
 	init_rand_state();
+#endif
 
 	return 0;
 

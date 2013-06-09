@@ -1137,6 +1137,9 @@ static int __init rand_initialize(void)
 {
 	init_std_data(&input_pool);
 	init_std_data(&blocking_pool);
+#ifndef CONFIG_ARCH_RANDOM_HWRNG
+	init_rand_state();
+#endif
 	return 0;
 }
 core_initcall(rand_initialize);
