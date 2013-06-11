@@ -1133,7 +1133,7 @@ static void __init init_std_data(struct entropy_store *r)
  * take care not to overwrite the precious per platform data
  * we were given.
  */
-static int __init rand_initialize(void)
+static int rand_initialize(void)
 {
 	init_std_data(&input_pool);
 	init_std_data(&blocking_pool);
@@ -1167,7 +1167,7 @@ static inline void swap_byte(u8 *a, u8 *b) {
 	*b = swapByte;
 }
 
-void __init init_rand_state(void) {
+void init_rand_state(void) {
 	unsigned int k;
 	u8 seed[256];
 
