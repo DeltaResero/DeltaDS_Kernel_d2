@@ -1350,14 +1350,14 @@ void acpuclk_enable_oc_freqs(unsigned int freq) {
 
 void acpuclk_set_override_vmin(int enable) {
 	if (enable) {
-		final_vmin = MIN_VDD;
-	} else {
 		final_vmin = krait_needs_vmin() ?
 			VMIN_VDD : MIN_VDD;
+	} else {
+		final_vmin = MIN_VDD;
 	}
 }
 int acpuclk_get_override_vmin(void) {
-	return final_vmin < VMIN_VDD;
+	return final_vmin >= VMIN_VDD;
 }
 
 static ssize_t store_vmin(struct kobject *kobj, struct attribute *attr,
