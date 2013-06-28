@@ -53,7 +53,7 @@
 #define DBG2(x...) DBG(DEBUG_MASK_LVL2, x)
 
 /* Configure device instances */
-#define RMNET_SMUX_DEVICE_COUNT (1)
+#define RMNET_SMUX_DEVICE_COUNT (2)
 
 /* allow larger frames */
 #define RMNET_DATA_LEN 2000

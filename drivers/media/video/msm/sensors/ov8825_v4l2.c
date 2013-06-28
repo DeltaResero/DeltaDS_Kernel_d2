@@ -190,7 +190,7 @@ static struct msm_camera_i2c_reg_conf ov8825_prev_settings[] = {
 	{0x380c, 0x0d},
 	{0x380d, 0xbc},
 	{0x380e, 0x04},
-	{0x380f, 0xf0},
+	{0x380f, 0xf4},
 	{0x3810, 0x00},
 	{0x3811, 0x08},
 	{0x3812, 0x00},
@@ -242,7 +242,7 @@ static struct msm_camera_i2c_reg_conf ov8825_snap_settings[] = {
 	{0x380c, 0x0e},
 	{0x380d, 0x00},
 	{0x380e, 0x09},
-	{0x380f, 0xb0},
+	{0x380f, 0xbf},
 	{0x3811, 0x10},
 	{0x3813, 0x06},
 	{0x3814, 0x11},
@@ -770,7 +770,7 @@ static struct msm_sensor_output_info_t ov8825_dimensions[] = {
 		.x_output = 0xCC0,
 		.y_output = 0x990,
 		.line_length_pclk = 0xE00,
-		.frame_length_lines = 0x9B0,
+		.frame_length_lines = 0x9BF,
 #if OV8825_2LANES
 		.vt_pixel_clk = 133400000,
 #else
@@ -783,7 +783,7 @@ static struct msm_sensor_output_info_t ov8825_dimensions[] = {
 		.x_output = 1632,
 		.y_output = 1224,
 		.line_length_pclk = 3516,
-		.frame_length_lines = 1264,
+		.frame_length_lines = 1268,
 		.vt_pixel_clk = 133400000,
 		.op_pixel_clk = 176000000,
 		.binning_factor = 1,
@@ -1084,11 +1084,12 @@ uint16_t ov8825_update_otp(struct msm_sensor_ctrl_t *s_ctrl)
 static int32_t ov8825_write_exp_gain(struct msm_sensor_ctrl_t *s_ctrl,
 		uint16_t gain, uint32_t line, int32_t luma_avg, uint16_t fgain)
 {
-	uint32_t fl_lines, offset;
+	uint32_t offset;
 	uint8_t int_time[3];
-
-	fl_lines =
-		(s_ctrl->curr_frame_length_lines * s_ctrl->fps_divider) / Q10;
+	uint32_t fl_lines = s_ctrl->curr_frame_length_lines;
+	if(s_ctrl->curr_res < MSM_SENSOR_RES_2)
+		fl_lines =
+			(s_ctrl->curr_frame_length_lines * s_ctrl->fps_divider) / Q10;
 	offset = s_ctrl->sensor_exp_gain_info->vert_offset;
 	if (line > (fl_lines - offset))
 		fl_lines = line + offset;
