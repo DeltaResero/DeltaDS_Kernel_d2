@@ -356,10 +356,14 @@ static int __init auto_hotplug_init(void)
 	INIT_DELAYED_WORK_DEFERRABLE(&hotplug_offline_work, hotplug_offline_work_fn);
 
 	/*
+	 * It's safe to assume that at some point during boot, governors will
+	 * be set, triggering an unpause call if auto-hotplug is needed.
+	 */
+	flags |= HOTPLUG_DISABLED;
+	/*
 	 * Give the system time to boot before fiddling with hotplugging.
 	 */
 	/*
-	flags |= HOTPLUG_PAUSED;
 	schedule_delayed_work_on(0, &hotplug_decision_work, HZ * 4);
 	schedule_delayed_work(&hotplug_unpause_work, HZ * 8);
 	*/
