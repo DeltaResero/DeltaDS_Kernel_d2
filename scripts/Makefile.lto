@@ -34,6 +34,9 @@ ifdef CONFIG_LTO_DEBUG
 	LTO_FINAL_CFLAGS += -dH -fdump-ipa-cgraph -fdump-ipa-inline-details # -Wl,-plugin-save-temps -save-temps
 	LTO_CFLAGS += 
 endif
+ifdef CONFIG_LTO_PARTITIONS
+	LTO_FINAL_CFLAGS += --param lto-partitions=${CONFIG_LTO_PARTITIONS}
+endif
 
 	# In principle gcc should pass through options in the object files,
 	# but it doesn't always work. So do it here manually
@@ -46,6 +49,7 @@ endif
 	LTO_FINAL_CFLAGS += $(filter -f%,${KBUILD_CFLAGS})
 	LTO_FINAL_CFLAGS += $(filter -m%,${KBUILD_CFLAGS})
 	LTO_FINAL_CFLAGS += $(filter -W%,${KBUILD_CFLAGS})
+	LTO_FINAL_CFLAGS += $(strip $(shell echo "${KBUILD_CFLAGS} " | sed -e 's/\(--param [^ ]\+\)\?[^ ]* /\1 /g'))
 
 	KBUILD_CFLAGS += ${LTO_CFLAGS}
 

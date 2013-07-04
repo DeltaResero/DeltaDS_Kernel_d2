@@ -1001,6 +1001,13 @@ config LTO_SLIM
           Requires recent Linux binutils and an AR=... wrapper that sets
 	  the linker plugin.
 
+config LTO_PARTITIONS
+	int "Number of LTO partitions"
+	depends on LTO
+	default 32
+	help
+	  The number of partitions GCC should create at final link time.
+
 config SYSCTL
 	bool
 

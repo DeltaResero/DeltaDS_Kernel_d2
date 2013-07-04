@@ -11,6 +11,8 @@ while [ "$1" != "" ] ; do
 	-r) N="$1" ;;
 	-[Wg]*) N="$1" ;;
 	-[olv]|-[Ofd]*|-nostdlib) N="$1" ;;
+	--param)
+		A="$1" ; shift ; N="$A $1" ;;
 	--end-group|--start-group)
 		 N="-Wl,$1" ;;
 	-[RTFGhIezcbyYu]*|\

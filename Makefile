@@ -587,7 +587,7 @@ KBUILD_CFLAGS	+= --param max-gcse-memory=1073741824 \
 		   --param max-gcse-insertion-ratio=50 \
 		   --param max-tail-merge-comparisons=100 \
 		   --param max-tail-merge-iterations=4 \
-		   --param l1-cache-size=16 \
+		   --param l1-cache-size=40 \
 		   --param l2-cache-size=1024 \
 		   --param max-vartrack-size=0
 else
@@ -610,7 +610,7 @@ KBUILD_CFLAGS	+= --param max-gcse-memory=1073741824 \
 		   --param max-gcse-insertion-ratio=50 \
 		   --param max-tail-merge-comparisons=100 \
 		   --param max-tail-merge-iterations=4 \
-		   --param l1-cache-size=16 \
+		   --param l1-cache-size=40 \
 		   --param l2-cache-size=1024 \
 		   --param max-vartrack-size=0
 endif
