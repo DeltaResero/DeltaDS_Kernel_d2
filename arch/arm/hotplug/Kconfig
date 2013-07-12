@@ -14,6 +14,12 @@ config ASMP
           Automatically hotplugs the multiple cpu cores on and off
           based on cpu load and suspend state
 
+config DYNAMIC_HOTPLUG
+	bool "Enable dynamic-hotplug cpu hotplug driver"
+	default y
+	help
+	  Generic Dynamic-hotplug cpu hotplug driver for ARM SOCs
+
 config INTELLI_PLUG
 	bool "Enable intelli-plug cpu hotplug driver"
 	default n
