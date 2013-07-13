@@ -208,7 +208,7 @@ static int __devinit msm_rng_enable_hw(struct msm_rng_device *msm_rng_dev)
 }
 
 /* Seed erandom's pool */
-void __init init_rand_state(void);
+void init_rand_state(void);
 
 static int __devinit msm_rng_probe(struct platform_device *pdev)
 {

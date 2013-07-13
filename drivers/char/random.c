@@ -321,7 +321,7 @@ static int trickle_thresh __read_mostly = INPUT_POOL_WORDS * 28;
 static int random_depletions = 0;
 
 /* Erandom stuff */
-void __init init_rand_state(void);
+void init_rand_state(void);
 static void erandom_get_random_bytes(char *buf, size_t count);
 static DEFINE_SPINLOCK(erandom_lock);
 static unsigned int erandom_bytes_read = 0;
@@ -1106,7 +1106,7 @@ EXPORT_SYMBOL(get_random_bytes_arch);
  * data into the pool to prepare it for use. The pool is not cleared
  * as that can only decrease the entropy in the pool.
  */
-static void __init init_std_data(struct entropy_store *r)
+static void init_std_data(struct entropy_store *r)
 {
 	int i;
 	ktime_t now = ktime_get_real();
