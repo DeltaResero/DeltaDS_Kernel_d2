@@ -58,8 +58,6 @@ union ktime {
 
 typedef union ktime ktime_t;		/* Kill this */
 
-extern ktime_t get_idle_ktime(unsigned int cpu);
-
 /*
  * ktime_t definitions when using the 64-bit scalar representation:
  */
