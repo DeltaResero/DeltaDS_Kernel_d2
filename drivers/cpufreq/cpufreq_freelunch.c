@@ -42,9 +42,8 @@ enum interaction_flags {
 static void do_dbs_timer(struct work_struct *work);
 
 struct cpu_dbs_info_s {
-	u64 prev_cpu_idle;
-	u64 prev_cpu_wall;
-	u64 last_get_idle, last_get_iowait;
+	ktime_t prev_cpu_idle;
+	ktime_t prev_cpu_wall;
 	struct cpufreq_policy *cur_policy;
 	struct delayed_work work;
 	unsigned int requested_freq;
@@ -223,8 +222,8 @@ static void do_cpu_down(struct work_struct *work) {
 static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 {
 	unsigned int load;
-	u64 cur_wall_time, cur_idle_time;
-	u64 idle_time, wall_time;
+	ktime_t cur_wall_time, cur_idle_time;
+	ktime_t idle_time, wall_time;
 
 	struct cpufreq_policy *policy;
 
@@ -238,22 +237,20 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 	 */
 	policy = this_dbs_info->cur_policy;
 
-	cur_wall_time = ktime_to_us(ktime_get());
-	wall_time = cur_wall_time - this_dbs_info->prev_cpu_wall;
+	cur_wall_time = ktime_get();
+	wall_time = ktime_sub(cur_wall_time, this_dbs_info->prev_cpu_wall);
 	this_dbs_info->prev_cpu_wall = cur_wall_time;
 
-	cur_idle_time = get_cpu_idle_time_us(policy->cpu, &this_dbs_info->last_get_idle) +
-		get_cpu_iowait_time_us(policy->cpu, &this_dbs_info->last_get_iowait);
-	idle_time = cur_idle_time - this_dbs_info->prev_cpu_idle;
+	cur_idle_time = get_idle_ktime(policy->cpu);
+	idle_time = ktime_sub(cur_idle_time, this_dbs_info->prev_cpu_idle);
 	this_dbs_info->prev_cpu_idle = cur_idle_time;
 
-	/* This shouldn't happen since we don't use the jiffy accumulators */
-	//if (unlikely(idle_time.tv64 > wall_time.tv64)) return;
+	/* Apparently, this happens. */
+	if (unlikely(idle_time.tv64 > wall_time.tv64)) return;
 
-	if (unlikely(wall_time < 1<<10)) return;
-	idle_time = wall_time - idle_time;
-	do_div(idle_time, wall_time >> 10);
-	load = (policy->cur >> 10) * idle_time;
+	if (unlikely(wall_time.tv64 <= 1<<10)) return;
+	load = (policy->cur >> 10) * ktime_divns(ktime_sub(wall_time, idle_time),
+		wall_time.tv64 >> 10);
 
 	/* Hotplug? */
 	if (num_online_cpus() == 1) {
@@ -297,7 +294,7 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 		overestimate = dbs_tuners_ins.overestimate_khz;
 	}
 
-	/* Update max_freq: will be >= load in the case of hispeed_divisor == 0 */
+	/* Update max_freq: will always be >= load */
 	if (unlikely(!dbs_tuners_ins.hispeed_decrease)) {
 		this_dbs_info->max_freq = load + overestimate;
 	} else if (likely(dbs_tuners_ins.hispeed_divisor)) {
@@ -319,7 +316,7 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 			this_dbs_info->max_freq = max(max(dbs_tuners_ins.interaction_hispeed,
 				this_dbs_info->max_freq), load + overestimate);
 		else if (inc)
-				this_dbs_info->max_freq = load + overestimate;
+			this_dbs_info->max_freq = load + overestimate;
 	}
 
 	/* Set frequency */
@@ -406,11 +403,8 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 			j_dbs_info = &per_cpu(cs_cpu_dbs_info, j);
 			j_dbs_info->cur_policy = policy;
 
-			j_dbs_info->last_get_idle = j_dbs_info->last_get_iowait = 0;
-			j_dbs_info->prev_cpu_idle =
-				get_cpu_idle_time_us(j, &j_dbs_info->last_get_idle) +
-				get_cpu_iowait_time_us(j, &j_dbs_info->last_get_iowait);
-			j_dbs_info->prev_cpu_wall = ktime_to_us(ktime_get());
+			j_dbs_info->prev_cpu_idle = get_idle_ktime(cpu);
+			j_dbs_info->prev_cpu_wall = ktime_get();
 		}
 		this_dbs_info->cpu = cpu;
 		this_dbs_info->requested_freq = policy->cur;
@@ -480,10 +474,8 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		if (!IGF(ENABLED)) {
 			ISF(ENABLED);
 			if (cancel_delayed_work_sync(&this_dbs_info->work)) {
-				this_dbs_info->prev_cpu_idle =
-					get_cpu_idle_time_us(j, &this_dbs_info->last_get_idle) +
-					get_cpu_iowait_time_us(j, &this_dbs_info->last_get_iowait);
-				this_dbs_info->prev_cpu_wall = ktime_to_us(ktime_get());
+				this_dbs_info->prev_cpu_idle = get_idle_ktime(cpu);
+				this_dbs_info->prev_cpu_wall = ktime_get();
 				schedule_delayed_work_on(this_dbs_info->cpu, &this_dbs_info->work,
 					usecs_to_jiffies(dbs_tuners_ins.interaction_sampling_rate));
 			}
