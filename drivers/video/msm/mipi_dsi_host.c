@@ -56,6 +56,7 @@ static struct mutex clk_mutex;
 
 static struct list_head pre_kickoff_list;
 static struct list_head post_kickoff_list;
+struct work_struct mdp_reset_work;
 
 enum {
 	STAT_DSI_START,
@@ -65,6 +66,11 @@ enum {
 };
 
 struct dcs_cmd_list	cmdlist;
+
+static void mdp_reset_wq_handler(struct work_struct *work)
+{
+	mdp4_mixer_reset(0);
+}
 
 void mipi_dsi_init(void)
 {
@@ -78,6 +84,7 @@ void mipi_dsi_init(void)
 	spin_lock_init(&dsi_clk_lock);
 	mutex_init(&cmd_mutex);
 	mutex_init(&clk_mutex);
+	INIT_WORK(&mdp_reset_work, mdp_reset_wq_handler);
 
 	INIT_LIST_HEAD(&pre_kickoff_list);
 	INIT_LIST_HEAD(&post_kickoff_list);
@@ -1771,7 +1778,7 @@ void mipi_dsi_fifo_status(void)
 		MIPI_OUTP(MIPI_DSI_BASE + 0x0008, status);
 		pr_err("%s: Error: status=%x\n", __func__, status);
 		mipi_dsi_sw_reset();
-		mdp4_mixer_reset(0);
+		schedule_work(&mdp_reset_work);
 	}
 }
 
