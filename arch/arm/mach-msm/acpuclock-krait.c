@@ -1300,13 +1300,22 @@ ssize_t acpuclk_store_vdd_table(const char *buf, size_t count) {
 	printk(KERN_DEBUG "acpuclk: %s\n", buf);
 	return -EINVAL;
 }
-ssize_t acpuclk_show_vdd_table(char *buf, char *fmt, int fdiv, int vdiv) {
-	int len;
-	struct acpu_level *tgt = &drv.acpu_freq_tbl[FREQ_TABLE_SIZE-2];
+ssize_t acpuclk_show_vdd_table(char *buf, char *fmt, int dir, int fdiv, int vdiv) {
+	int len = 0;
+	int i;
+	if (dir < 0) {
+		i = FREQ_TABLE_SIZE - 2;
+		dir = -1;
+	} else {
+		i = 0;
+		dir = 1;
+	}
 
-	for (len = 0; tgt >= drv.acpu_freq_tbl; tgt--) {
+	while (i >= 0 && i < FREQ_TABLE_SIZE - 1) {
+		struct acpu_level tgt = drv.acpu_freq_tbl[i];
 		len += sprintf(buf + len, fmt,
-			tgt->speed.khz / fdiv, tgt->vdd_core / vdiv);
+			tgt.speed.khz / fdiv, tgt.vdd_core / vdiv);
+		i += dir;
 	}
 	return len;
 }
@@ -1314,7 +1323,7 @@ ssize_t acpuclk_show_vdd_table(char *buf, char *fmt, int fdiv, int vdiv) {
 /* Global UV interface */
 static ssize_t show_vdd_levels(struct kobject *kobj,
 		struct attribute *attr, char *buf) {
-	return acpuclk_show_vdd_table(buf, "%8u: %8u\n", 1, 1);
+	return acpuclk_show_vdd_table(buf, "%8u: %8u\n", 1, 1, 1);
 }
 static ssize_t store_vdd_levels(struct kobject *kobj, struct attribute *attr,
 		const char *buf, size_t count) {

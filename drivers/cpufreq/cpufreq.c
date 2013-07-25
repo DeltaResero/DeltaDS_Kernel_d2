@@ -606,14 +606,14 @@ static ssize_t store_scaling_governor(struct cpufreq_policy *policy,
 
 /* Per-core UV interface */
 ssize_t acpuclk_store_vdd_table(const char *buf, size_t count);
-ssize_t acpuclk_show_vdd_table(char *buf, char *fmt, int fdiv, int vdiv);
+ssize_t acpuclk_show_vdd_table(char *buf, char *fmt, int dir, int fdiv, int vdiv);
 static ssize_t store_UV_mV_table(struct cpufreq_policy *policy,
 				const char *buf, size_t count) {
 	return acpuclk_store_vdd_table(buf, count);
 }
 static ssize_t show_UV_mV_table(struct cpufreq_policy *policy,
 				char *buf) {
-	return acpuclk_show_vdd_table(buf, "%umhz: %u mV\n", 1000, 1000);
+	return acpuclk_show_vdd_table(buf, "%umhz: %u mV\n", -1, 1000, 1000);
 }
 
 /* Per-core vmin interface */
