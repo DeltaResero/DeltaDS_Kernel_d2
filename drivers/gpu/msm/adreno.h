@@ -342,6 +342,9 @@ static inline int adreno_dump(struct kgsl_device *device, int manual)
 { return 0; }
 #endif
 
+unsigned int adreno_a3xx_rbbm_clock_ctl_default(struct adreno_device
+							*adreno_dev);
+
 struct kgsl_memdesc *adreno_find_region(struct kgsl_device *device,
 						unsigned int pt_base,
 						unsigned int gpuaddr,

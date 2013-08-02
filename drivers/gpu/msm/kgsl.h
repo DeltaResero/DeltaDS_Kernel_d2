@@ -71,7 +71,6 @@
 #define KGSL_STATS_ADD(_size, _stat, _max) \
 	do { } while (0)
 
-
 #define KGSL_MEMFREE_HIST_SIZE	((int)(PAGE_SIZE * 2))
 
 struct kgsl_memfree_hist_elem {
@@ -86,7 +85,6 @@ struct kgsl_memfree_hist {
 	unsigned int size;
 	struct kgsl_memfree_hist_elem *wptr;
 };
-
 
 struct kgsl_device;
 struct kgsl_context;
@@ -217,14 +215,6 @@ int kgsl_suspend_driver(struct platform_device *pdev, pm_message_t state);
 int kgsl_resume_driver(struct platform_device *pdev);
 void kgsl_early_suspend_driver(struct early_suspend *h);
 void kgsl_late_resume_driver(struct early_suspend *h);
-
-void kgsl_trace_regwrite(struct kgsl_device *device, unsigned int offset,
-		unsigned int value);
-
-void kgsl_trace_issueibcmds(struct kgsl_device *device, int id,
-		struct kgsl_ibdesc *ibdesc, int numibs,
-		unsigned int timestamp, unsigned int flags,
-		int result, unsigned int type);
 
 #ifdef CONFIG_MSM_KGSL_DRM
 extern int kgsl_drm_init(struct platform_device *dev);

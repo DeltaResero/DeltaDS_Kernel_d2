@@ -547,6 +547,9 @@ static void ib_parse_type0(struct kgsl_device *device, unsigned int *ptr,
 static inline int parse_ib(struct kgsl_device *device, unsigned int ptbase,
 		unsigned int gpuaddr, unsigned int dwords);
 
+static inline int parse_ib(struct kgsl_device *device, unsigned int ptbase,
+		unsigned int gpuaddr, unsigned int dwords);
+
 /* Add an IB as a GPU object, but first, parse it to find more goodies within */
 
 static int ib_add_gpu_object(struct kgsl_device *device, unsigned int ptbase,

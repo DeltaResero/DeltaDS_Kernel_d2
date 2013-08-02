@@ -55,48 +55,6 @@ static struct ion_client *kgsl_ion_client;
 
 static void kgsl_mem_entry_detach_process(struct kgsl_mem_entry *entry);
 
-#if 0
-/**
- * kgsl_trace_issueibcmds() - Call trace_issueibcmds by proxy
- * device: KGSL device
- * id: ID of the context submitting the command
- * ibdesc: Pointer to the list of IB descriptors
- * numib: Number of IBs in the list
- * timestamp: Timestamp assigned to the command batch
- * flags: Flags sent by the user
- * result: Result of the submission attempt
- * type: Type of context issuing the command
- *
- * Wrap the issueibcmds ftrace hook into a function that can be called from the
- * GPU specific modules.
- */
-void kgsl_trace_issueibcmds(struct kgsl_device *device, int id,
-		struct kgsl_ibdesc *ibdesc, int numibs,
-		unsigned int timestamp, unsigned int flags,
-		int result, unsigned int type)
-{
-	trace_kgsl_issueibcmds(device, id, ibdesc, numibs,
-		timestamp, flags, result, type);
-}
-EXPORT_SYMBOL(kgsl_trace_issueibcmds);
-
-/**
- * kgsl_trace_regwrite - call regwrite ftrace function by proxy
- * device: KGSL device
- * offset: dword offset of the register being written
- * value: Value of the register being written
- *
- * Wrap the regwrite ftrace hook into a function that can be called from the
- * GPU specific modules.
- */
-void kgsl_trace_regwrite(struct kgsl_device *device, unsigned int offset,
-		unsigned int value)
-{
-	trace_kgsl_regwrite(device, offset, value);
-}
-EXPORT_SYMBOL(kgsl_trace_regwrite);
-#endif
-
 int kgsl_memfree_hist_init(void)
 {
 	void *base;
@@ -716,7 +674,7 @@ void kgsl_late_resume_driver(struct early_suspend *h)
 {
 	struct kgsl_device *device = container_of(h,
 					struct kgsl_device, display_off);
-	KGSL_PWR_WARN(device, "late resume start\n");
+	KGSL_PWR_ERR(device, "late resume start\n");
 	mutex_lock(&device->mutex);
 	device->pwrctrl.restore_slumber = false;
 	if (device->pwrscale.policy == NULL)
@@ -742,7 +700,7 @@ void kgsl_late_resume_driver(struct early_suspend *h)
 	}
 
 	mutex_unlock(&device->mutex);
-	KGSL_PWR_WARN(device, "late resume end\n");
+	KGSL_PWR_ERR(device, "late resume end\n");
 }
 EXPORT_SYMBOL(kgsl_late_resume_driver);
 
@@ -1358,6 +1316,9 @@ static long kgsl_ioctl_rb_issueibcmds(struct kgsl_device_private *dev_priv,
 	context = kgsl_context_get_owner(dev_priv, param->drawctxt_id);
 	if (context == NULL) {
 		result = -EINVAL;
+		KGSL_DRV_ERR(dev_priv->device,
+			"invalid context_id %d\n",
+			param->drawctxt_id);
 		goto done;
 	}
 
@@ -2320,8 +2281,6 @@ kgsl_ioctl_gpumem_alloc_id(struct kgsl_device_private *dev_priv,
 	result = kgsl_mem_entry_attach_process(entry, private);
 	if (result != 0)
 		goto err;
-
-	kgsl_process_add_stats(private, entry->memtype, param->size);
 
 	param->id = entry->id;
 	param->flags = entry->memdesc.flags;
