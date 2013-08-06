@@ -4406,7 +4406,12 @@ static void vfe32_process_error_irq(
 		pr_err("vfe32_irq: camif errors\n");
 		reg_value = msm_camera_io_r(
 			axi_ctrl->share_ctrl->vfebase + VFE_CAMIF_STATUS);
-		if (reg_value & ~0x80000000) {
+		/* In case of camif errors, notify the applicaiton only
+		 * if overflow recovery is not active. If we are trying to
+		 * automatically recover, then we dont want to inform the
+		 * application of the error. */
+		if ((reg_value & ~0x80000000) &&
+				!atomic_read(&recovery_active)) {
 #if 0 ////Erased for bus overflow recovery patch, automatically recover.
 			v4l2_subdev_notify(&axi_ctrl->subdev,
 				NOTIFY_VFE_CAMIF_ERROR, (void *)NULL);

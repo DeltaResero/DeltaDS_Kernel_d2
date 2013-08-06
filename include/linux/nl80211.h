@@ -3171,6 +3171,7 @@ enum nl80211_acl_policy {
 	NL80211_ACL_POLICY_ACCEPT_UNLESS_LISTED,
 	NL80211_ACL_POLICY_DENY_UNLESS_LISTED,
 };
+
 /**
  * enum nl80211_crit_proto_id - nl80211 critical protocol identifiers
  *
