@@ -982,9 +982,8 @@ adreno_ringbuffer_issueibcmds(struct kgsl_device_private *dev_priv,
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
 	unsigned int *link;
 	unsigned int *cmds;
-	unsigned int i;
+	unsigned int i = 0;
 	struct adreno_context *drawctxt;
-	unsigned int start_index = 0;
 
 	if (device->state & KGSL_STATE_HUNG)
 		return -EBUSY;
@@ -1011,23 +1010,23 @@ adreno_ringbuffer_issueibcmds(struct kgsl_device_private *dev_priv,
 		numibs = 0;
 	}
 
-	cmds = link = kzalloc(sizeof(unsigned int) * (numibs * 3 + 4),
-				GFP_KERNEL);
-	if (!link) {
-		KGSL_CORE_ERR("kzalloc(%d) failed\n",
-			sizeof(unsigned int) * (numibs * 3 + 4));
-		return -ENOMEM;
-	}
-
 	/*When preamble is enabled, the preamble buffer with state restoration
 	commands are stored in the first node of the IB chain. We can skip that
 	if a context switch hasn't occured */
 
 	if (drawctxt->flags & CTXT_FLAGS_PREAMBLE &&
 		adreno_dev->drawctxt_active == drawctxt)
-		start_index = 1;
+		i = 1;
 
-	if (!start_index) {
+	cmds = link = kzalloc(sizeof(unsigned int) * ((numibs - i) * 3 + 4),
+				GFP_KERNEL);
+	if (unlikely(!link)) {
+		KGSL_CORE_ERR("kzalloc(%d) failed\n",
+			sizeof(unsigned int) * ((numibs - i) * 3 + 4));
+		return -ENOMEM;
+	}
+
+	if (!i) {
 		*cmds++ = cp_nop_packet(1);
 		*cmds++ = KGSL_START_OF_IB_IDENTIFIER;
 	} else {
@@ -1037,7 +1036,7 @@ adreno_ringbuffer_issueibcmds(struct kgsl_device_private *dev_priv,
 		*cmds++ = ibdesc[0].gpuaddr;
 		*cmds++ = ibdesc[0].sizedwords;
 	}
-	for (i = start_index; i < numibs; i++) {
+	for (; i < numibs; i++) {
 		if (unlikely(adreno_dev->ib_check_level >= 1 &&
 		    !_parse_ibs(dev_priv, ibdesc[i].gpuaddr,
 				ibdesc[i].sizedwords))) {
