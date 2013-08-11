@@ -333,7 +333,7 @@ static void def_work_fn(struct work_struct *work)
 	 * isn't anymore.  We still need non-governor hotplug, so call
 	 * rq_hotplug_enable to migrate to auto-hotplug.
 	 */
-	if (unlikely(rq_info.rq_poll_total_jiffies > 2 * HZ && !rq_info.hotplug_disabled)) {
+	if (!likely((rq_info.rq_poll_total_jiffies & 511) || rq_info.hotplug_disabled)) {
 		printk(KERN_DEBUG "rq-stats: where's mpdecision? migrating to auto-hotplug\n");
 		rq_hotplug_enable(1);
 	}
