@@ -1,8 +1,12 @@
 VERSION = 3
 PATCHLEVEL = 4
-SUBLEVEL = 53
+SUBLEVEL = 56
 EXTRAVERSION =
 NAME = Saber-toothed Squirrel
+
+# Build script hints
+DKP_LABEL = dkp for AOSP 4.2.x
+DKP_NAME = dkp-aosp42
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"

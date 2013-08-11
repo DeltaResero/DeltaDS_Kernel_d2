@@ -425,24 +425,31 @@ static struct freq_work_struct {
 	struct work_struct work;
 	unsigned int freq;
 	struct cpufreq_policy *policy;
-} enable_oc_work;
+};
 void acpuclk_enable_oc_freqs(unsigned int freq);
 extern int msm_thermal_get_freq_table(void);
 
 static void do_enable_oc(struct work_struct *work) {
+	int ret;
+	unsigned int new_max = ((struct freq_work_struct *) work)->freq;
 	struct cpufreq_policy new_policy;
 	struct cpufreq_policy *policy =
 		((struct freq_work_struct *) work)->policy;
-	if (cpufreq_get_policy(&new_policy, policy->cpu))
-		return;
-	new_policy.max = ((struct freq_work_struct *) work)->freq;
-	acpuclk_enable_oc_freqs(new_policy.max);
-	// __cpufreq_set_policy clobbers this, so hack it up.
-	policy->cpuinfo.max_freq = new_policy.max;
-	if (__cpufreq_set_policy(policy, &new_policy))
-		return;
-	policy->user_policy.max = policy->max;
+	acpuclk_enable_oc_freqs(new_max);
+	if (ret = cpufreq_get_policy(&new_policy, policy->cpu)) {
+                printk(KERN_ERR "%s: can't get policy (%i)!\n", __func__, ret);
+                goto out;
+	}
+	policy->cpuinfo.max_freq = new_policy.max = new_max;
+        printk(KERN_DEBUG "%s: set policy for cpu %i\n", __func__, policy->cpu);
+        if (ret = __cpufreq_set_policy(policy, &new_policy)) {
+                printk(KERN_ERR "%s: can't set policy (%i)!\n", __func__, ret);
+                goto out;
+        }
+        policy->user_policy.max = policy->max;
 	msm_thermal_get_freq_table();
+out:
+        kfree(work);
 }
 
 /**
@@ -482,10 +489,16 @@ static ssize_t store_scaling_max_freq
 		return -EINVAL;
 
 	if (new_policy.max > 1512000) {
-		enable_oc_work.freq = new_policy.max;
-		enable_oc_work.policy = policy;
-		schedule_work((struct work_struct *) &enable_oc_work);
-		ret = 0;
+		static struct freq_work_struct *enable_oc_work;
+		enable_oc_work = kzalloc(sizeof(struct freq_work_struct), GFP_KERNEL);
+		if (enable_oc_work) {
+			enable_oc_work->freq = new_policy.max;
+			enable_oc_work->policy = policy;
+			schedule_work((struct work_struct *) enable_oc_work);
+			ret = 0;
+		} else {
+			ret = -EINVAL;
+		}
 	} else {
 		ret = __cpufreq_set_policy(policy, &new_policy);
 		policy->user_policy.max = policy->max;
@@ -2195,8 +2208,6 @@ int cpufreq_register_driver(struct cpufreq_driver *driver_data)
 			goto err_if_unreg;
 		}
 	}
-
-	INIT_WORK((struct work_struct *) &enable_oc_work, do_enable_oc);
 
 	register_hotcpu_notifier(&cpufreq_cpu_notifier);
 	pr_debug("driver %s up and running\n", driver_data->name);

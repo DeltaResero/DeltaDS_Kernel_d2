@@ -1210,43 +1210,40 @@ static void __init hw_init(void)
 
 /* UV Stuff */
 static int acpuclk_update_vdd_table(int num, unsigned int table[]) {
-	int i;
-	struct acpu_level *tgt = drv.acpu_freq_tbl;
-	mutex_lock(&driver_lock);
-	if (table[0] < table[num-1]) {
-		for (i = 0; i < num; i++, tgt++) {
-			if (!tgt->vdd_core)
-				break;
-			tgt->vdd_core = table[i];
-		}
-	} else {
-		for (i = num - 1; i >= 0; i--, tgt++) {
-			if (!tgt->vdd_core)
-				break;
-			tgt->vdd_core = table[i];
-		}
-	}
-	mutex_unlock(&driver_lock);
+        int i, dir;
+        struct acpu_level *tgt;
+        if (table[0] < table[num-1]) {
+                i = 0;
+                dir = 1;
+        } else {
+                i = num - 1;
+                dir = -1;
+        }
+
+	for (tgt = drv.acpu_freq_tbl; tgt->vdd_core; tgt++) {
+		if (i < 0 || i > num)
+			return 1;
+                tgt->vdd_core = table[i];
+                i += dir;
+        }
 	return 0;
 }
 static int acpuclk_update_one_vdd(unsigned int freq, unsigned int uv) {
-	int ret = -EINVAL;
 	struct acpu_level *tgt = drv.acpu_freq_tbl;
 	for (; tgt->speed.khz; tgt++) {
 		if (tgt->speed.khz == freq) {
 			tgt->vdd_core = uv;
-			ret = 1;
-			break;
+			return 0;
 		}
 	}
-	return ret;
+	return -EINVAL;
 }
 static int acpuclk_update_all_vdd(int adj) {
 	struct acpu_level *tgt = drv.acpu_freq_tbl;
 	for (; tgt->speed.khz; tgt++) {
 		tgt->vdd_core += adj;
 	}
-	return 1;
+	return 0;
 }
 #define sanity_check(v) \
 	if (v < 10000) \
@@ -1274,7 +1271,7 @@ ssize_t acpuclk_store_vdd_table(const char *buf, size_t count) {
 			adjust *= 1000;
 	}
 	if (ret == 1) {
-		if (acpuclk_update_all_vdd(adjust) == 1)
+		if (!acpuclk_update_all_vdd(adjust))
 			return count;
 		else
 			return -EINVAL;
@@ -1297,7 +1294,7 @@ ssize_t acpuclk_store_vdd_table(const char *buf, size_t count) {
 	if (thislen == count - 1) {
 		while (freq < 10000) freq *= 1000;
 		sanity_check(volt);
-		if (acpuclk_update_one_vdd(freq, volt) == 1)
+		if (!acpuclk_update_one_vdd(freq, volt))
 			return count;
 		else
 			return -EINVAL;
@@ -1312,8 +1309,8 @@ ssize_t acpuclk_store_vdd_table(const char *buf, size_t count) {
 	}
 	// skip trailing whitespace for voltage control
 	while (buf[len] == ' ') len++;
-	if (idx == (FREQ_TABLE_SIZE - 1) && len == count - 1) {
-		if (acpuclk_update_vdd_table(idx, table))
+	if (idx == (FREQ_TABLE_SIZE - 1) && len == (count - 1)) {
+		if (!acpuclk_update_vdd_table(idx, table))
 			return count;
 		else
 			return -EINVAL;
