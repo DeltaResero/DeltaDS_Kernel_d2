@@ -492,6 +492,7 @@ static ssize_t store_scaling_max_freq
 		static struct freq_work_struct *enable_oc_work;
 		enable_oc_work = kzalloc(sizeof(struct freq_work_struct), GFP_KERNEL);
 		if (enable_oc_work) {
+			INIT_WORK((struct work_struct *) enable_oc_work, do_enable_oc);
 			enable_oc_work->freq = new_policy.max;
 			enable_oc_work->policy = policy;
 			schedule_work((struct work_struct *) enable_oc_work);

@@ -1323,43 +1323,64 @@ static long kgsl_ioctl_rb_issueibcmds(struct kgsl_device_private *dev_priv,
 		goto done;
 	}
 
-	if (unlikely(!param->numibs)) {
-		KGSL_DRV_ERR(dev_priv->device,
-			"Invalid numibs as parameter: %d\n",
-			 param->numibs);
-		result = -EINVAL;
-		goto done;
-	}
-
-	/*
-	 * Put a reasonable upper limit on the number of IBs that can be
-	 * submitted
-	 */
-
-	if (unlikely(param->numibs > 10000)) {
-		KGSL_DRV_ERR(dev_priv->device,
-			"Too many IBs submitted. count: %d max 10000\n",
+	if (param->flags & KGSL_CONTEXT_SUBMIT_IB_LIST) {
+		KGSL_DRV_INFO(dev_priv->device,
+			"Using IB list mode for ib submission, numibs: %d\n",
 			param->numibs);
-		result = -EINVAL;
-		goto done;
-	}
+		if (!param->numibs) {
+			KGSL_DRV_ERR(dev_priv->device,
+				"Invalid numibs as parameter: %d\n",
+				 param->numibs);
+			result = -EINVAL;
+			goto done;
+		}
 
-	ibdesc = kmalloc(sizeof(struct kgsl_ibdesc) * param->numibs,
-				GFP_KERNEL);
-	if (!ibdesc) {
-		KGSL_MEM_ERR(dev_priv->device,
-			"kzalloc(%d) failed\n",
-			sizeof(struct kgsl_ibdesc) * param->numibs);
-		result = -ENOMEM;
-		goto done;
-	}
+		/*
+		 * Put a reasonable upper limit on the number of IBs that can be
+		 * submitted
+		 */
 
-	if (copy_from_user(ibdesc, (void *)param->ibdesc_addr,
-			sizeof(struct kgsl_ibdesc) * param->numibs)) {
-		result = -EFAULT;
-		KGSL_DRV_ERR(dev_priv->device,
-			"copy_from_user failed\n");
-		goto free_ibdesc;
+		if (param->numibs > 10000) {
+			KGSL_DRV_ERR(dev_priv->device,
+				"Too many IBs submitted. count: %d max 10000\n",
+				param->numibs);
+			result = -EINVAL;
+			goto done;
+		}
+
+		ibdesc = kzalloc(sizeof(struct kgsl_ibdesc) * param->numibs,
+					GFP_KERNEL);
+		if (!ibdesc) {
+			KGSL_MEM_ERR(dev_priv->device,
+				"kzalloc(%d) failed\n",
+				sizeof(struct kgsl_ibdesc) * param->numibs);
+			result = -ENOMEM;
+			goto done;
+		}
+
+		if (copy_from_user(ibdesc, (void *)param->ibdesc_addr,
+				sizeof(struct kgsl_ibdesc) * param->numibs)) {
+			result = -EFAULT;
+			KGSL_DRV_ERR(dev_priv->device,
+				"copy_from_user failed\n");
+			goto free_ibdesc;
+		}
+	} else {
+		KGSL_DRV_INFO(dev_priv->device,
+			"Using single IB submission mode for ib submission\n");
+		/* If user space driver is still using the old mode of
+		 * submitting single ib then we need to support that as well */
+		ibdesc = kzalloc(sizeof(struct kgsl_ibdesc), GFP_KERNEL);
+		if (!ibdesc) {
+			KGSL_MEM_ERR(dev_priv->device,
+				"kzalloc(%d) failed\n",
+				sizeof(struct kgsl_ibdesc));
+			result = -ENOMEM;
+			goto done;
+		}
+		ibdesc[0].gpuaddr = param->ibdesc_addr;
+		ibdesc[0].sizedwords = param->numibs;
+		param->numibs = 1;
 	}
 
 	result = dev_priv->device->ftbl->issueibcmds(dev_priv,
