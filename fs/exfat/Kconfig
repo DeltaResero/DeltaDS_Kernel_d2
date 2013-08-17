@@ -1,0 +1,4 @@
+config EXFAT_FS
+	tristate "exFAT file system support"
+	select NLS
+	select NLS_UTF8
