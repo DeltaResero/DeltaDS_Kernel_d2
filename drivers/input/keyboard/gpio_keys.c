@@ -354,9 +354,6 @@ static void gpio_keys_gpio_work_func(struct work_struct *work)
 		container_of(work, struct gpio_button_data, work);
 
 	gpio_keys_gpio_report_event(bdata);
-#ifdef CONFIG_INTERACTION_HINTS
-	cpufreq_set_interactivity(0, INTERACT_ID_HARDKEY);
-#endif
 }
 
 static void gpio_keys_gpio_timer(unsigned long _data)
@@ -364,9 +361,6 @@ static void gpio_keys_gpio_timer(unsigned long _data)
 	struct gpio_button_data *bdata = (struct gpio_button_data *)_data;
 
 	schedule_work(&bdata->work);
-#ifdef CONFIG_INTERACTION_HINTS
-	cpufreq_set_interactivity(0, INTERACT_ID_HARDKEY);
-#endif
 }
 
 static irqreturn_t gpio_keys_gpio_isr(int irq, void *dev_id)

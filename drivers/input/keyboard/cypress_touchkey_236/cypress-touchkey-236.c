@@ -240,8 +240,6 @@ static irqreturn_t cypress_touchkey_interrupt(int irq, void *dev_id)
 	if (!(touch_is_pressed && press)) {
 		input_report_key(info->input_dev, info->keycode[code], press);
 		input_sync(info->input_dev);
-		if (press) current_pressed |= 1 << code;
-		else current_pressed &= ~(1 << code);
 #ifdef CONFIG_INTERACTION_HINTS
 		if (press) current_pressed |= 1 << code;
 		else current_pressed &= ~(1 << code);
