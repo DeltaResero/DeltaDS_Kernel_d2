@@ -577,6 +577,7 @@ static ssize_t store_scaling_governor(struct cpufreq_policy *policy,
 	char *envp[3];
 	char buf1[64];
 	char buf2[64];
+	bool need_hotplug = 0;
 
 	ret = cpufreq_get_policy(&new_policy, policy->cpu);
 	if (ret)
@@ -590,6 +591,11 @@ static ssize_t store_scaling_governor(struct cpufreq_policy *policy,
 						&new_policy.governor))
 		return -EINVAL;
 
+	if (!policy->cpu &&
+	    policy->governor != new_policy.governor &&
+	    !(new_policy.governor->flags & BIT(GOVFLAGS_HOTPLUG)))
+		need_hotplug = 1;
+
 	/* Do not use cpufreq_set_policy here or the user_policy.max
 	   will be wrongly overridden */
 	ret = __cpufreq_set_policy(policy, &new_policy);
@@ -598,7 +604,7 @@ static ssize_t store_scaling_governor(struct cpufreq_policy *policy,
 	policy->user_policy.governor = policy->governor;
 
 	// Add auto-hotplug tuners if governor doesn't hotplug
-	if (!policy->cpu && !(policy->governor->flags & BIT(GOVFLAGS_HOTPLUG))) {
+	if (need_hotplug) {
 		hotplug_attr_grp.name = policy->governor->name;
 		sysfs_merge_group(cpufreq_global_kobject, &hotplug_attr_grp);
 	}
