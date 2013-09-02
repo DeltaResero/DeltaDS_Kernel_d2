@@ -87,8 +87,9 @@ static void mpdecision_enable(int enable) {
 	if (enable != rq_info.init) {
 		if (enable) {
 			cpu_up(1);
+			rq_info.rq_poll_total_jiffies = 0;
+			rq_info.rq_poll_last_jiffy = jiffies;
 			rq_info.rq_avg = 0;
-			rq_info.def_start_time = ktime_to_ns(ktime_get());
 		}
 		printk(KERN_DEBUG "rq-stats: rq_info.init = %i\n", enable);
 		rq_info.init = enable;
@@ -332,7 +333,7 @@ static void def_work_fn(struct work_struct *work)
 	 * isn't anymore.  We still need non-governor hotplug, so call
 	 * rq_hotplug_enable to migrate to auto-hotplug.
 	 */
-	if (!likely((rq_info.def_interval & ((1<<12)-1)) || rq_info.hotplug_disabled)) {
+	if (!likely((rq_info.rq_poll_total_jiffies & 511) || rq_info.hotplug_disabled)) {
 		printk(KERN_DEBUG "rq-stats: where's mpdecision? migrating to auto-hotplug\n");
 		rq_hotplug_enable(1);
 	}
@@ -485,6 +486,8 @@ static int __init msm_rq_stats_init(void)
 	spin_lock_init(&rq_lock);
 	rq_info.rq_poll_jiffies = DEFAULT_RQ_POLL_JIFFIES;
 	rq_info.def_timer_jiffies = DEFAULT_DEF_TIMER_JIFFIES;
+	rq_info.rq_poll_last_jiffy = 0;
+	rq_info.def_timer_last_jiffy = 0;
 	rq_info.hotplug_disabled = 0;
 	ret = init_rq_attribs();
 
