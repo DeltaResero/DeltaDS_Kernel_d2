@@ -30,6 +30,7 @@
 #include <linux/mutex.h>
 #include <linux/syscore_ops.h>
 #include <linux/dkp.h>
+#include <linux/sched.h>
 
 #include <trace/events/power.h>
 
@@ -411,9 +412,39 @@ show_one(cpuinfo_min_freq, cpuinfo.min_freq);
 show_one(cpuinfo_max_freq, cpuinfo.max_freq);
 show_one(cpuinfo_transition_latency, cpuinfo.transition_latency);
 show_one(scaling_min_freq, min);
-show_one(scaling_max_freq, max);
+//show_one(scaling_max_freq, max);
 show_one(scaling_cur_freq, cur);
 show_one(cpu_utilization, util);
+
+static struct task_struct *thermald;
+static int check_current_is_thermald(void) {
+        int ret = 0;
+        if (current != thermald) {
+                if (!strcmp(current->comm, "thermald")) {
+                        printk(KERN_DEBUG "%s: found thermald (pid %u)!\n",
+                                __func__, current->pid);
+                        thermald = current;
+                        ret = 1;
+                }
+        } else {
+                ret = 1;
+        }
+        return ret;
+}
+
+static ssize_t show_scaling_max_freq(struct cpufreq_policy *policy, char *buf)
+{
+        int val = 0;
+        if (check_current_is_thermald()) {
+                if (policy->max >= policy->user_policy.max)
+                        val = 1512000;
+                else
+                        val = policy->max;
+        } else {
+                val = policy->max;
+        }
+        return sprintf(buf, "%u\n", val);
+}
 
 static int __cpufreq_set_policy(struct cpufreq_policy *data,
 				struct cpufreq_policy *policy);
@@ -479,6 +510,7 @@ static ssize_t store_scaling_max_freq
 {
 	unsigned int ret = -EINVAL;
 	struct cpufreq_policy new_policy;
+	bool is_thermald = 0;
 
 	ret = cpufreq_get_policy(&new_policy, policy->cpu);
 	if (ret)
@@ -487,6 +519,14 @@ static ssize_t store_scaling_max_freq
 	ret = sscanf(buf, "%u", &new_policy.max);
 	if (ret != 1)
 		return -EINVAL;
+
+        if (check_current_is_thermald()) {
+                printk(KERN_DEBUG "%s: mangling thermald frequency %u\n",
+			__func__, new_policy.max);
+                is_thermald = 1;
+                if (new_policy.max == 1512000)
+                        new_policy.max = policy->user_policy.max;
+        }
 
 	if (new_policy.max > 1512000) {
 		static struct freq_work_struct *enable_oc_work;
@@ -502,7 +542,8 @@ static ssize_t store_scaling_max_freq
 		}
 	} else {
 		ret = __cpufreq_set_policy(policy, &new_policy);
-		policy->user_policy.max = policy->max;
+		if (!is_thermald)
+			policy->user_policy.max = policy->max;
 	}
 
 	return ret ? ret : count;
