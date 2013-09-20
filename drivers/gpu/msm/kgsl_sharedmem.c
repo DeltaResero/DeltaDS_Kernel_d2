@@ -114,10 +114,9 @@ static void kgsl_page_alloc_free(struct kgsl_memdesc *memdesc)
 		vunmap(memdesc->hostptr);
 	}
 	if (memdesc->sg)
-		for_each_sg(memdesc->sg, sg, sglen, i) {
+		for_each_sg(memdesc->sg, sg, sglen, i){
 			if (sg->length == 0)
 				break;
-
 			__free_pages(sg_page(sg), get_order(sg->length));
 		}
 }
@@ -279,7 +278,6 @@ _kgsl_sharedmem_page_alloc(struct kgsl_memdesc *memdesc,
 	int pcount = 0, order, ret = 0;
 	int j, len, page_size, sglen_alloc, sglen = 0;
 	struct page **pages = NULL;
-	unsigned int pages_size = 0;
 	pgprot_t page_prot = pgprot_writecombine(PAGE_KERNEL);
 	void *ptr;
 	unsigned int align;
@@ -288,7 +286,6 @@ _kgsl_sharedmem_page_alloc(struct kgsl_memdesc *memdesc,
 
 	page_size = (align >= ilog2(SZ_64K) && size >= SZ_64K)
 			? SZ_64K : PAGE_SIZE;
-
 	/* update align flags for what we actually use */
 	if (page_size != PAGE_SIZE)
 		kgsl_memdesc_set_align(memdesc, ilog2(page_size));
@@ -304,12 +301,10 @@ _kgsl_sharedmem_page_alloc(struct kgsl_memdesc *memdesc,
 	memdesc->pagetable = pagetable;
 	memdesc->ops = &kgsl_page_alloc_ops;
 
-	memdesc->sg = kgsl_sg_alloc(sglen_alloc);
 	memdesc->sglen_alloc = sglen_alloc;
+	memdesc->sg = kgsl_sg_alloc(memdesc->sglen_alloc);
 
 	if (memdesc->sg == NULL) {
-		KGSL_CORE_ERR("vmalloc(%d) failed\n",
-			sglen_alloc * sizeof(struct scatterlist));
 		ret = -ENOMEM;
 		goto done;
 	}
@@ -328,15 +323,13 @@ _kgsl_sharedmem_page_alloc(struct kgsl_memdesc *memdesc,
 		pages = kmalloc(PAGE_SIZE, GFP_KERNEL);
 
 	if (pages == NULL) {
-		KGSL_CORE_ERR("page table alloc (%d) failed\n",
-			sglen_alloc * sizeof(struct page *));
 		ret = -ENOMEM;
 		goto done;
 	}
 
 	kmemleak_not_leak(memdesc->sg);
 
-	sg_init_table(memdesc->sg, sglen_alloc);
+	sg_init_table(memdesc->sg, memdesc->sglen_alloc);
 
 	len = size;
 
@@ -426,7 +419,6 @@ _kgsl_sharedmem_page_alloc(struct kgsl_memdesc *memdesc,
 	order = get_order(size);
 
 done:
-	if (pages_size > PAGE_SIZE * 2)
 	if ((memdesc->sglen_alloc * sizeof(struct page *)) > PAGE_SIZE)
 		vfree(pages);
 	else
