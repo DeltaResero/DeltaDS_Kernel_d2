@@ -14,7 +14,7 @@ obj-y += mdp.o
 obj-$(CONFIG_DEBUG_FS) += mdp_debugfs.o
 
 ifeq ($(CONFIG_FB_MSM_MDP40),y)
-obj-y += mdp4_util.o
+obj-y += mdp4_util.o fake_mdnie.o
 obj-$(CONFIG_FB_MSM_MIPI_SAMSUNG_OLED_CMD_QHD_PT) += mdp4_video_enhance.o
 obj-$(CONFIG_FB_MSM_MIPI_SAMSUNG_OLED_VIDEO_WVGA_PT) += mdp4_video_enhance.o
 obj-$(CONFIG_FB_MSM_MIPI_SAMSUNG_OLED_VIDEO_HD_PT) += mdp4_video_enhance.o

@@ -13,6 +13,7 @@
 #include <linux/lcd.h>
 #include <linux/wakelock.h>
 #include <linux/pm_qos.h>
+#include <linux/dkp.h>
 #include <mach/cpuidle.h>
 #include "mipi_samsung_oled.h"
 #include "mdp4.h"
@@ -1388,6 +1389,22 @@ static ssize_t panel_colors_store(struct device *dev, struct device_attribute *a
 
 static DEVICE_ATTR(panel_colors, S_IRUGO | S_IWUSR | S_IWGRP,
 			panel_colors_show, panel_colors_store);
+
+/* Slightly stagger these to allow them to snap into place in UIs. */
+static int mcm_temp_get(void *ptr) {
+	return 20 - Lpanel_colors * 10;
+}
+static void mcm_temp_set(void *ptr, int val) {
+	Lpanel_colors = (25 - val) / 10;
+	panel_load_colors(Lpanel_colors);
+	mipi_bump_gamma();
+}
+struct dkp_gattr dkp_mdnie_mcm_temperature = {
+	.attr = { .name = "mcm_temperature", .mode = 0666 },
+	.show = dkp_generic_show, .store = dkp_generic_store,
+	.min = -20, .max = 20, .cnt = 1,
+	.set = mcm_temp_set, .get = mcm_temp_get,
+};
 
 #ifdef READ_REGISTER_ESD
 #define ID_E5H_IDLE 0x80
