@@ -1395,9 +1395,12 @@ static int set_gamma_level(int bl_level, enum gamma_mode_list gamma_mode)
 	return aid_change;
 }
 
+extern void smart_mtp_bump_coeffs(void);
 extern void mipi_samsung_bump_backlight(int bl_level);
 void mipi_bump_gamma(void) {
-	int old = mipi_pd.lcd_current_cd_idx;
+	int old;
+	smart_mtp_bump_coeffs();
+	old = mipi_pd.lcd_current_cd_idx;
 	mipi_pd.lcd_current_cd_idx = -1;
 	mipi_samsung_bump_backlight((old + 2) * 10);
 }

@@ -31,8 +31,7 @@
 #include "mdp4_video_enhance.h"
 #endif
 
-unsigned int Lpanel_colors = 2;
-extern void panel_load_colors(unsigned int val);
+extern int panel_shift_coeff;
 extern void mipi_bump_gamma(void);
 
 static struct mipi_samsung_driver_data msd;
@@ -1360,50 +1359,25 @@ static DEVICE_ATTR(auto_brightness, S_IRUGO | S_IWUSR | S_IWGRP,
 
 #endif
 
-static ssize_t panel_colors_show(struct device *dev, struct device_attribute *attr, char *buf)
-{
-	return sprintf(buf, "%d\n", Lpanel_colors);
+static int panel_colors_get(void *ptr) {
+	return (20 - panel_shift_coeff) / 10;
 }
-
-static ssize_t panel_colors_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
-{
-	int ret;
-	unsigned int value;
-
-	ret = sscanf(buf, "%d\n", &value);
-	if (ret != 1)
-		return -EINVAL;
-
-	if (value < 0)
-		value = 0;
-	else if (value > 4)
-		value = 4;
-
-	Lpanel_colors = value;
-
-	panel_load_colors(Lpanel_colors);
-	mipi_bump_gamma();
-
-	return size;
+static void panel_colors_set(void *ptr, int val) {
+	panel_shift_coeff = 20 - val * 10;
 }
-
-static DEVICE_ATTR(panel_colors, S_IRUGO | S_IWUSR | S_IWGRP,
-			panel_colors_show, panel_colors_store);
-
-/* Slightly stagger these to allow them to snap into place in UIs. */
-static int mcm_temp_get(void *ptr) {
-	return 20 - Lpanel_colors * 10;
-}
-static void mcm_temp_set(void *ptr, int val) {
-	Lpanel_colors = (25 - val) / 10;
-	panel_load_colors(Lpanel_colors);
-	mipi_bump_gamma();
-}
+struct dkp_gattr dkp_panel_colors = {
+	.attr = { .name = "panel_colors", .mode = 0644 },
+	.show = dkp_generic_show, .store = dkp_generic_store,
+	.min = 0, .max = 4, .cnt = 1,
+	.set = panel_colors_set, .get = panel_colors_get,
+	.cb = mipi_bump_gamma
+};
 struct dkp_gattr dkp_mdnie_mcm_temperature = {
-	.attr = { .name = "mcm_temperature", .mode = 0666 },
+	.attr = { .name = "mcm_temperature", .mode = 0644 },
 	.show = dkp_generic_show, .store = dkp_generic_store,
 	.min = -20, .max = 20, .cnt = 1,
-	.set = mcm_temp_set, .get = mcm_temp_get,
+	.ptr = &panel_shift_coeff,
+	.cb = mipi_bump_gamma
 };
 
 #ifdef READ_REGISTER_ESD
@@ -1593,7 +1567,7 @@ static int __devinit mipi_samsung_disp_probe(struct platform_device *pdev)
 	}
 
 	ret = sysfs_create_file(&lcd_device->dev.kobj,
-					&dev_attr_panel_colors.attr);
+					&dkp_attr(panel_colors));
 
 #if defined(CONFIG_BACKLIGHT_CLASS_DEVICE)
 	bd = backlight_device_register("panel", &lcd_device->dev,
