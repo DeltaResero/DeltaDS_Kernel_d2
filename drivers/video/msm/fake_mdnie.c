@@ -24,14 +24,12 @@
 #include <linux/sysfs.h>
 #include <linux/dkp.h>
 
+extern struct dkp_gattr dkp_mdnie_mcm;
 extern struct dkp_gattr dkp_mdnie_mcm_temperature;
 
-static int s_MCM;
-static __DKP(s_MCM, -1, 2048, NULL);
-
 static struct attribute *hook_control_attrs[] = {
+	&dkp_attr(mdnie_mcm),
 	&dkp_attr(mdnie_mcm_temperature),
-	&dkp_attr(s_MCM),
 	NULL
 };
 

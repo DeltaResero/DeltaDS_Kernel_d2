@@ -77,6 +77,7 @@ static char V255_300CD_G_LSB;
 static char V255_300CD_B_MSB;
 static char V255_300CD_B_LSB;
 
+int enable_panel_shift = 1;
 int panel_shift_coeff = 0;
 static int trinity_coeffs[21] = {
 	0,	0,	5,
@@ -88,7 +89,7 @@ static int trinity_coeffs[21] = {
 	0,	0,	3
 };
 #define calc_panel_shift(n) \
-	(trinity_coeffs[n] * panel_shift_coeff / 20)
+	(enable_panel_shift ? trinity_coeffs[n] * panel_shift_coeff / 20 : 0)
 
 static struct SMART_DIM *gpsmart;
 void smart_mtp_bump_coeffs(void)

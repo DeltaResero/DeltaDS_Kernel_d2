@@ -31,6 +31,7 @@
 #include "mdp4_video_enhance.h"
 #endif
 
+extern int enable_panel_shift;
 extern int panel_shift_coeff;
 extern void mipi_bump_gamma(void);
 
@@ -1365,7 +1366,7 @@ static int panel_colors_get(void *ptr) {
 static void panel_colors_set(void *ptr, int val) {
 	panel_shift_coeff = 20 - val * 10;
 }
-struct dkp_gattr dkp_panel_colors = {
+static struct dkp_gattr dkp_panel_colors = {
 	.attr = { .name = "panel_colors", .mode = 0644 },
 	.show = dkp_generic_show, .store = dkp_generic_store,
 	.min = 0, .max = 4, .cnt = 1,
@@ -1377,6 +1378,13 @@ struct dkp_gattr dkp_mdnie_mcm_temperature = {
 	.show = dkp_generic_show, .store = dkp_generic_store,
 	.min = -20, .max = 20, .cnt = 1,
 	.ptr = &panel_shift_coeff,
+	.cb = mipi_bump_gamma
+};
+struct dkp_gattr dkp_mdnie_mcm = {
+	.attr = { .name = "s_MCM", .mode = 0644 },
+	.show = dkp_generic_show, .store = dkp_generic_store,
+	.min = 0, .max = 1, .cnt = 1,
+	.ptr = &enable_panel_shift,
 	.cb = mipi_bump_gamma
 };
 
