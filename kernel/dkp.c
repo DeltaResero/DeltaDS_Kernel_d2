@@ -16,6 +16,7 @@ void _dkp_register(struct dkp_gattr *gattr) {
         if (sysfs_create_file(dkp_global_kobject, (struct attribute *)gattr))
                 printk(KERN_ERR "Couldn't register dkp entry: %s\n", gattr->attr.name);
 }
+EXPORT_SYMBOL(_dkp_register);
 
 /* Pro tip: don't touch kobj.  It's probably not a kobject. */
 ssize_t dkp_generic_store(struct kobject *kobj, struct attribute *attr,
@@ -24,6 +25,8 @@ ssize_t dkp_generic_store(struct kobject *kobj, struct attribute *attr,
 	int *v;
 	void *p;
 	struct dkp_gattr *gattr = (struct dkp_gattr *)attr;
+	if (gattr->store && gattr->store != dkp_generic_store)
+		return gattr->store(kobj, attr, buf, count);
 	v = kmalloc(gattr->cnt * sizeof(int), GFP_KERNEL);
 	if (!v)
 		return -ENOMEM;
@@ -51,12 +54,15 @@ out:
 	kfree(v);
 	return count;
 }
+EXPORT_SYMBOL(dkp_generic_store);
 
 ssize_t dkp_generic_show(struct kobject *kobj, struct attribute *attr, char *buf) {
 	char *fmt;
 	int i, l, v;
 	void *p;
 	struct dkp_gattr *gattr = (struct dkp_gattr *)attr;
+	if (gattr->show && gattr->show != dkp_generic_show)
+		return gattr->show(kobj, attr, buf);
 	fmt = gattr->fmt ? : "%i ";
 	p = gattr->ptr;
 	for (i = 0, l = 0; i < gattr->cnt; i++) {
@@ -70,6 +76,7 @@ ssize_t dkp_generic_show(struct kobject *kobj, struct attribute *attr, char *buf
 	buf[l-1] = '\n';
 	return l;
 }
+EXPORT_SYMBOL(dkp_generic_show);
 
 static struct sysfs_ops sysfs_ops = {
 	.show = dkp_generic_show,
