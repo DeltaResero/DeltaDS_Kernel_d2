@@ -22,6 +22,7 @@
 #include <linux/cpufreq.h>
 #include <linux/cpu.h>
 #include <linux/regulator/consumer.h>
+#include <linux/gen_attr.h>
 #include <linux/dkp.h>
 
 #include <asm/mach-types.h>
@@ -1478,7 +1479,7 @@ int __init acpuclk_krait_init(struct device *dev,
 		pr_err("Unable to create dkp group!\n");
 	if (sysfs_create_group(cpufreq_global_kobject, &vdd_attr_group))
 		pr_err("Unable to create vdd_table group!\n");
-	_dkp_register(dkp_gattr(vmin_attr));
+	_dkp_register(gen_gattr(vmin_attr));
 
 	return 0;
 }

@@ -22,14 +22,14 @@
 #include <linux/device.h>
 #include <linux/miscdevice.h>
 #include <linux/sysfs.h>
-#include <linux/dkp.h>
+#include <linux/gen_attr.h>
 
-extern struct dkp_gattr dkp_mdnie_mcm;
-extern struct dkp_gattr dkp_mdnie_mcm_temperature;
+extern struct gen_attr gattr_mdnie_mcm;
+extern struct gen_attr gattr_mdnie_mcm_temperature;
 
 static struct attribute *hook_control_attrs[] = {
-	&dkp_attr(mdnie_mcm),
-	&dkp_attr(mdnie_mcm_temperature),
+	&gen_attr(mdnie_mcm),
+	&gen_attr(mdnie_mcm_temperature),
 	NULL
 };
 

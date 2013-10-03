@@ -13,7 +13,7 @@
 #include <linux/lcd.h>
 #include <linux/wakelock.h>
 #include <linux/pm_qos.h>
-#include <linux/dkp.h>
+#include <linux/gen_attr.h>
 #include <mach/cpuidle.h>
 #include "mipi_samsung_oled.h"
 #include "mdp4.h"
@@ -1366,23 +1366,23 @@ static int panel_colors_get(void *ptr) {
 static void panel_colors_set(void *ptr, int val) {
 	panel_shift_coeff = 20 - val * 10;
 }
-static struct dkp_gattr dkp_panel_colors = {
+static struct gen_attr gattr_panel_colors = {
 	.attr = { .name = "panel_colors", .mode = 0644 },
-	.show = dkp_generic_show, .store = dkp_generic_store,
+	.show = gattr_generic_show, .store = gattr_generic_store,
 	.min = 0, .max = 4, .cnt = 1,
 	.set = panel_colors_set, .get = panel_colors_get,
 	.cb = mipi_bump_gamma
 };
-struct dkp_gattr dkp_mdnie_mcm_temperature = {
+struct gen_attr gattr_mdnie_mcm_temperature = {
 	.attr = { .name = "mcm_temperature", .mode = 0644 },
-	.show = dkp_generic_show, .store = dkp_generic_store,
+	.show = gattr_generic_show, .store = gattr_generic_store,
 	.min = -20, .max = 20, .cnt = 1,
 	.ptr = &panel_shift_coeff,
 	.cb = mipi_bump_gamma
 };
-struct dkp_gattr dkp_mdnie_mcm = {
+struct gen_attr gattr_mdnie_mcm = {
 	.attr = { .name = "s_MCM", .mode = 0644 },
-	.show = dkp_generic_show, .store = dkp_generic_store,
+	.show = gattr_generic_show, .store = gattr_generic_store,
 	.min = 0, .max = 1, .cnt = 1,
 	.ptr = &enable_panel_shift,
 	.cb = mipi_bump_gamma
@@ -1575,7 +1575,7 @@ static int __devinit mipi_samsung_disp_probe(struct platform_device *pdev)
 	}
 
 	ret = sysfs_create_file(&lcd_device->dev.kobj,
-					&dkp_attr(panel_colors));
+					&gen_attr(panel_colors));
 
 #if defined(CONFIG_BACKLIGHT_CLASS_DEVICE)
 	bd = backlight_device_register("panel", &lcd_device->dev,

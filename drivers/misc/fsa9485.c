@@ -38,6 +38,7 @@
 #include <linux/sii9234.h>
 #include <linux/kobject.h>
 #include <linux/sysfs.h>
+#include <linux/gen_attr.h>
 #include <linux/dkp.h>
 
 /* FSA9480 I2C registers */
@@ -1362,9 +1363,9 @@ static inline void ffc_migrate(void) {
 		}
 	}
 }
-static __DKP_NAME(fast_charge_setting, force_fast_charge, 0, 1, ffc_migrate);
+static __GATTR_NAME(fast_charge_setting, force_fast_charge, 0, 1, ffc_migrate);
 static struct attribute *ffc_attrs[] = {
-	&dkp_attr(force_fast_charge), NULL };
+	&gen_attr(force_fast_charge), NULL };
 static struct attribute_group ffc_attr_group ={
 	.attrs = ffc_attrs,
 	.name = "fast_charge"

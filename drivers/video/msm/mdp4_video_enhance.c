@@ -34,6 +34,7 @@
 #include <linux/fb.h>
 #include <linux/msm_mdp.h>
 #include <linux/ioctl.h>
+#include <linux/gen_attr.h>
 #include <linux/dkp.h>
 
 #include "mdp4_video_enhance.h"
@@ -829,7 +830,7 @@ static DEVICE_ATTR(playspeed, 0664,
 
 /* For brightness scaling */
 static void bump_mdnie(void) { mDNIe_Set_Mode(current_mDNIe_Mode); }
-static __DKP_ARR(scaling_factors, 0, 256, bump_mdnie);
+static __GATTR_ARR(scaling_factors, 0, 256, bump_mdnie);
 
 void init_mdnie_class(void)
 {
@@ -888,9 +889,9 @@ void init_mdnie_class(void)
 			dev_attr_playspeed.attr.name);
 
 	if (device_create_file
-		(tune_mdnie_dev, dkp_attrp(device, scaling_factors)) < 0)
+		(tune_mdnie_dev, gen_tattr(device, scaling_factors)) < 0)
 		pr_err("Failed to create device file(%s)!=n",
-			dkp_attr(scaling_factors).name);
+			gen_attr(scaling_factors).name);
 	dkp_register(scaling_factors);
 
 #ifdef MDP4_VIDEO_ENHANCE_TUNING

@@ -29,6 +29,7 @@
 #include <linux/completion.h>
 #include <linux/mutex.h>
 #include <linux/syscore_ops.h>
+#include <linux/gen_attr.h>
 #include <linux/dkp.h>
 #include <linux/sched.h>
 
@@ -586,19 +587,19 @@ int hotplug_sampling_rate = 2000 / HZ;
 int __used hotplug_enable_all_threshold = 1000;
 int hotplug_enable_one_threshold = 250;
 int hotplug_disable_one_threshold = 125;
-static __DKP(hotplug_intpulse, 0, 1, NULL);
-static __DKP(hotplug_sampling_periods, 2, 15, NULL);
-static __DKP(hotplug_sampling_rate, 1, 10, NULL);
-//static __DKP(hotplug_enable_all_threshold, 100, 1000, NULL);
-static __DKP(hotplug_enable_one_threshold, 100, 1000, NULL);
-static __DKP(hotplug_disable_one_threshold, 0, 1000, NULL);
+static __GATTR(hotplug_intpulse, 0, 1, NULL);
+static __GATTR(hotplug_sampling_periods, 2, 15, NULL);
+static __GATTR(hotplug_sampling_rate, 1, 10, NULL);
+//static __GATTR(hotplug_enable_all_threshold, 100, 1000, NULL);
+static __GATTR(hotplug_enable_one_threshold, 100, 1000, NULL);
+static __GATTR(hotplug_disable_one_threshold, 0, 1000, NULL);
 static struct attribute *hotplug_attrs[] = {
-	&dkp_attr(hotplug_intpulse),
-	&dkp_attr(hotplug_sampling_periods),
-	&dkp_attr(hotplug_sampling_rate),
-	//&dkp_attr(hotplug_enable_all_threshold),
-	&dkp_attr(hotplug_enable_one_threshold),
-	&dkp_attr(hotplug_disable_one_threshold),
+	&gen_attr(hotplug_intpulse),
+	&gen_attr(hotplug_sampling_periods),
+	&gen_attr(hotplug_sampling_rate),
+	//&gen_attr(hotplug_enable_all_threshold),
+	&gen_attr(hotplug_enable_one_threshold),
+	&gen_attr(hotplug_disable_one_threshold),
 	NULL
 };
 static struct attribute_group hotplug_attr_grp = {
@@ -694,7 +695,7 @@ static ssize_t show_override_vmin(struct cpufreq_policy *policy, char *buf) {
 
 /* Control gov/min/max linking across cores */
 static int link_core_settings = 1;
-static __DKP(link_core_settings, 0, 1, NULL);
+static __GATTR(link_core_settings, 0, 1, NULL);
 
 /**
  * show_scaling_driver - show the cpufreq driver currently loaded
