@@ -106,10 +106,12 @@
 
 static struct device *cfg80211_parent_dev = NULL;
 struct wl_priv *wlcfg_drv_priv = NULL;
+#ifdef DEBUGFS_CFG80211
 #ifdef CUSTOMER_HW4
 u32 wl_dbg_level = WL_DBG_ERR | WL_DBG_P2P_ACTION;
 #else
 u32 wl_dbg_level = WL_DBG_ERR;
+#endif
 #endif
 
 #define MAX_WAIT_TIME 1500
@@ -394,7 +396,7 @@ static void wl_ch_to_chanspec(int ch,
  * information element utilities
  */
 static void wl_rst_ie(struct wl_priv *wl);
-static __used s32 wl_add_ie(struct wl_priv *wl, u8 t, u8 l, u8 *v);
+static s32 wl_add_ie(struct wl_priv *wl, u8 t, u8 l, u8 *v);
 static s32 wl_mrg_ie(struct wl_priv *wl, u8 *ie_stream, u16 ie_size);
 static s32 wl_cp_ie(struct wl_priv *wl, u8 *dst, u16 dst_size);
 static u32 wl_get_ielen(struct wl_priv *wl);
@@ -437,7 +439,7 @@ static void wl_delay(u32 ms);
  * ibss mode utilities
  */
 static bool wl_is_ibssmode(struct wl_priv *wl, struct net_device *ndev);
-static __used bool wl_is_ibssstarter(struct wl_priv *wl);
+static bool wl_is_ibssstarter(struct wl_priv *wl);
 
 /*
  * link up/down , default configuration utilities
@@ -476,7 +478,7 @@ static s32 wl_iscan_aborted(struct wl_priv *wl);
 /*
  * find most significant bit set
  */
-static __used u32 wl_find_msb(u16 bit16);
+static u32 wl_find_msb(u16 bit16);
 
 /*
  * rfkill support
@@ -4208,7 +4210,7 @@ wl_cfg80211_set_power_mgmt(struct wiphy *wiphy, struct net_device *dev,
 	return err;
 }
 
-static __used u32 wl_find_msb(u16 bit16)
+static u32 wl_find_msb(u16 bit16)
 {
 	u32 ret = 0;
 
@@ -10611,7 +10613,7 @@ static bool wl_is_ibssmode(struct wl_priv *wl, struct net_device *ndev)
 	return wl_get_mode_by_netdev(wl, ndev) == WL_MODE_IBSS;
 }
 
-static __used bool wl_is_ibssstarter(struct wl_priv *wl)
+static bool wl_is_ibssstarter(struct wl_priv *wl)
 {
 	return wl->ibss_starter;
 }
@@ -10623,7 +10625,7 @@ static void wl_rst_ie(struct wl_priv *wl)
 	ie->offset = 0;
 }
 
-static __used s32 wl_add_ie(struct wl_priv *wl, u8 t, u8 l, u8 *v)
+static s32 wl_add_ie(struct wl_priv *wl, u8 t, u8 l, u8 *v)
 {
 	struct wl_ie *ie = wl_to_ie(wl);
 	s32 err = 0;
@@ -11078,6 +11080,14 @@ static s32 wl_free_debugfs(struct wl_priv *wl)
 	wl->debugfs = NULL;
 	return 0;
 }
+
+void wl_cfg80211_enable_trace(bool set, u32 level)
+{
+	if (set)
+		wl_dbg_level = level & WL_DBG_LEVEL;
+	else
+		wl_dbg_level |= (WL_DBG_LEVEL & level);
+}
 #endif /* DEBUGFS_CFG80211 */
 struct device *wl_cfg80211_get_parent_dev(void)
 {
@@ -11114,13 +11124,6 @@ int wl_cfg80211_do_driver_init(struct net_device *net)
 	return 0;
 }
 
-void wl_cfg80211_enable_trace(bool set, u32 level)
-{
-	if (set)
-		wl_dbg_level = level & WL_DBG_LEVEL;
-	else
-		wl_dbg_level |= (WL_DBG_LEVEL & level);
-}
 #if defined(WL_SUPPORT_BACKPORTED_KPATCHES) || (LINUX_VERSION_CODE >= KERNEL_VERSION(3, \
 	2, 0))
 static s32

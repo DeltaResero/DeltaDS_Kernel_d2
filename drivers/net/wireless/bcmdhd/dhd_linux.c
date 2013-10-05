@@ -381,8 +381,10 @@ typedef struct dhd_info {
 #endif /* CUSTOMER_HW4 */
 } dhd_info_t;
 
+#ifdef ENABLE_CRAP
 /* Flag to indicate if we should download firmware on driver load */
 uint dhd_download_fw_on_driverload = TRUE;
+#endif
 
 /* Definitions to provide path to the firmware and nvram
  * example nvram_path[MOD_PARAM_PATHLEN]="/projects/wlan/nvram.txt"
@@ -406,8 +408,10 @@ int dhd_registration_check = FALSE;
 uint dhd_sysioc = TRUE;
 module_param(dhd_sysioc, uint, 0);
 
+#ifdef DEBUGFS_CFG80211
 /* Error bits */
 module_param(dhd_msg_level, int, 0);
+#endif
 
 #ifdef ARP_OFFLOAD_SUPPORT
 /* ARP offload enable */

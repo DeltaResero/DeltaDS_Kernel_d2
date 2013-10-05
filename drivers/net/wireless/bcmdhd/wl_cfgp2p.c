@@ -182,6 +182,7 @@ bool wl_cfgp2p_is_gas_action(void *frame, u32 frame_len)
 		return false;
 #endif /* WL11U */
 }
+#ifdef ENABLE_CRAP
 void wl_cfgp2p_print_actframe(bool tx, void *frame, u32 frame_len, u32 channel)
 {
 	wifi_p2p_pub_act_frame_t *pact_frm;
@@ -286,6 +287,7 @@ void wl_cfgp2p_print_actframe(bool tx, void *frame, u32 frame_len, u32 channel)
 
 	}
 }
+#endif
 
 /*
  *  Initialize variables related to P2P
