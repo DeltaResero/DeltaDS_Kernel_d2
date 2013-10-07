@@ -763,13 +763,6 @@ recovery_end:
 	enable_irq(dev->err_irq);
 }
 
-void qup_i2c_bwreset(struct i2c_adapter *adap) {
-	struct qup_i2c_dev *dev = i2c_get_adapdata(adap);
-	mutex_lock(&dev->mlock);
-	dev->clk_ctl = 0;
-	mutex_unlock(&dev->mlock);
-}
-
 static int
 qup_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 {
