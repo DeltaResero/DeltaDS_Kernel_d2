@@ -1022,7 +1022,7 @@ timeout_err:
 					if (i % 2 == 0) {
 						if ((rd_status &
 							QUP_IN_NOT_EMPTY) == 0)
-							break;
+							goto retry_msg;
 						dval = readl_relaxed(dev->base +
 							QUP_IN_FIFO_BASE);
 						dev->msg->buf[dev->pos] =
@@ -1053,6 +1053,7 @@ timeout_err:
 				goto out_err;
 			}
 		}
+retry_msg:
 		/* Wait for I2C bus to be idle */
 		ret = qup_i2c_poll_writeready(dev, rem);
 		if (ret) {
@@ -1071,11 +1072,7 @@ timeout_err:
 	}
 	dev->complete = NULL;
 	dev->msg = NULL;
-	/* No need.
 	dev->pos = 0;
-	dev->err = 0;
-	dev->cnt = 0;
-	*/
 	mutex_unlock(&dev->mlock);
 	pm_runtime_mark_last_busy(dev->dev);
 	pm_runtime_put_autosuspend(dev->dev);
