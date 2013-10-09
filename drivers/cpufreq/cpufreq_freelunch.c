@@ -27,7 +27,7 @@
 #include <linux/err.h>
 #include <linux/slab.h>
 
-//#define DEFER_STATS
+//#define FL_STATS
 
 enum interaction_flags {
 	IFLAG_PRESSED = 1,
@@ -61,7 +61,7 @@ struct cpu_dbs_info_s {
 	/* Interaction hack stuff */
 	int is_interactive;
 	unsigned int defer_cycles;
-#ifdef DEFER_STATS
+#ifdef FL_STATS
 	unsigned int deferred_return;
 #endif
 	unsigned int max_freq;
@@ -167,6 +167,23 @@ i_am_lazy(interaction_return_cycles, 0, 100)
 i_am_lazy(interaction_hispeed, 0, 4000000)
 i_am_lazy(interaction_panic, 0, 1)
 
+#ifdef FL_STATS
+static ssize_t show_hispeeds(struct kobject *obj, struct attribute *attr, char *buf)
+{
+	int i;
+	size_t l = 0;
+	for_each_possible_cpu(i) {
+		struct cpu_dbs_info_s *info;
+		info = &per_cpu(cs_cpu_dbs_info, i);
+		if (info->enable) {
+			l += sprintf(buf + l, "cpu %i: %u\n", i, info->max_freq);
+		}
+	}
+	return l;
+}
+define_one_global_ro(hispeeds);
+#endif
+
 static ssize_t store_sampling_rate(struct kobject *a, struct attribute *b,
 				   const char *buf, size_t count)
 {
@@ -201,6 +218,9 @@ static struct attribute *dbs_attributes[] = {
 	&interaction_return_cycles.attr,
 	&interaction_hispeed.attr,
 	&interaction_panic.attr,
+#ifdef FL_STATS
+	&hispeeds.attr,
+#endif
 	NULL
 };
 
@@ -276,13 +296,13 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 	/* Return from interaction? */
 	if (IGF(ENABLED)) {
 		if (!IGF(PRESSED)) {
-#ifdef DEFER_STATS
+#ifdef FL_STATS
 			this_dbs_info->deferred_return++;
 #endif
 			if (load < dbs_tuners_ins.interaction_return_usage) {
 				if (this_dbs_info->defer_cycles++ >= dbs_tuners_ins.interaction_return_cycles) {
 					IUF(ENABLED);
-#ifdef DEFER_STATS
+#ifdef FL_STATS
 					printk(KERN_DEBUG "freelunch: deferred noninteractive %u cycles.\n",
 						this_dbs_info->deferred_return);
 #endif
@@ -297,12 +317,13 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 	/* Update max_freq: will always be >= load */
 	if (unlikely(!dbs_tuners_ins.hispeed_decrease)) {
 		this_dbs_info->max_freq = load + overestimate;
-	} else if (likely(dbs_tuners_ins.hispeed_divisor)) {
-		if (load + overestimate > this_dbs_info->max_freq + dbs_tuners_ins.hispeed_decrease)
+	} else if (dbs_tuners_ins.hispeed_divisor) {
+		if (load + overestimate > this_dbs_info->max_freq + dbs_tuners_ins.hispeed_decrease) {
 			this_dbs_info->max_freq = (this_dbs_info->max_freq * (dbs_tuners_ins.hispeed_divisor - 1) +
 				load + overestimate) / dbs_tuners_ins.hispeed_divisor;
-		else
-			this_dbs_info->max_freq -= dbs_tuners_ins.hispeed_decrease;
+		} else
+			this_dbs_info->max_freq -= min(this_dbs_info->max_freq,
+				dbs_tuners_ins.hispeed_decrease);
 	} else {
 		bool inc;
 		this_dbs_info->max_freq -= min(this_dbs_info->max_freq,
@@ -410,7 +431,7 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		this_dbs_info->requested_freq = policy->cur;
 		this_dbs_info->hotplug_cycle = 0;
 		this_dbs_info->defer_cycles = 0;
-#ifdef DEFER_STATS
+#ifdef FL_STATS
 		this_dbs_info->deferred_return = 0;
 #endif
 		/* Dirty hack */
@@ -470,6 +491,9 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		break;
 
 	case CPUFREQ_GOV_INTERACT:
+#ifdef FL_STATS
+		printk(KERN_DEBUG "freelunch: going interactive on cpu %i\n", this_dbs_info->cpu);
+#endif
 		mutex_lock(&this_dbs_info->timer_mutex);
 		if (!IGF(ENABLED)) {
 			ISF(ENABLED);
@@ -489,7 +513,7 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		if (IGF(PRESSED)) {
 			IUF(PRESSED);
 			this_dbs_info->defer_cycles = 0;
-#ifdef DEFER_STATS
+#ifdef FL_STATS
 			this_dbs_info->deferred_return = 0;
 #endif
 		}

@@ -2183,7 +2183,7 @@ void cpufreq_set_interactivity(int on, int idbit) {
 "       strex   %2, %0, [%4]\n"
 "       teq     %2, #0\n"
 "       bne     1b"
-        : "=r" (new), "=r" (old), "=&r" (tmp), "+Qo" (interactivity_state.counter)
+        : "=&r" (new), "=&r" (old), "=&r" (tmp), "+Qo" (interactivity_state.counter)
         : "r" (&interactivity_state.counter), "lr" (on), "lr" (mask)
         : "cc");
         }
