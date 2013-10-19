@@ -87,6 +87,7 @@
 #define KGSL_CMD_FLAGS_PMODE		0x00000001
 #define KGSL_CMD_FLAGS_INTERNAL_ISSUE	0x00000002
 #define KGSL_CMD_FLAGS_GET_INT		0x00000004
+#define KGSL_CMD_FLAGS_PWRON_FIXUP      0x00000008
 #define KGSL_CMD_FLAGS_EOF	        0x00000100
 
 /* Command identifiers */
@@ -97,6 +98,7 @@
 #define KGSL_END_OF_IB_IDENTIFIER	0x2ABEDEAD
 #define KGSL_END_OF_FRAME_IDENTIFIER	0x2E0F2E0F
 #define KGSL_NOP_IB_IDENTIFIER	        0x20F20F20
+#define KGSL_PWRON_FIXUP_IDENTIFIER	0x2AFAFAFA
 
 #ifdef CONFIG_MSM_SCM
 #define ADRENO_DEFAULT_PWRSCALE_POLICY  (&kgsl_pwrscale_policy_tz)
@@ -104,13 +106,6 @@
 #define ADRENO_DEFAULT_PWRSCALE_POLICY  (&kgsl_pwrscale_policy_idlestats)
 #else
 #define ADRENO_DEFAULT_PWRSCALE_POLICY  NULL
-#endif
-
-#ifdef CONFIG_DEBUG_FS
-void adreno_debugfs_init(struct kgsl_device *device);
-#else
-static inline void adreno_debugfs_init(struct kgsl_device *device)
-{ return; }
 #endif
 
 #define ADRENO_ISTORE_START 0x5000 /* Istore offset */
@@ -139,6 +134,7 @@ struct adreno_gpudev;
 
 struct adreno_device {
 	struct kgsl_device dev;    /* Must be first field in this struct */
+	unsigned long priv;
 	unsigned int chip_id;
 	enum adreno_gpurev gpurev;
 	unsigned long gmem_base;
@@ -171,9 +167,8 @@ struct adreno_device {
 	struct ocmem_buf *ocmem_hdl;
 	unsigned int ocmem_base;
 	unsigned int gpu_cycles;
-	struct kgsl_memdesc on_resume_cmd;
-	unsigned int on_resume_ib[3];
-	bool on_resume_issueib;
+	struct kgsl_memdesc pwron_fixup;
+	unsigned int pwron_fixup_dwords;
 };
 
 #define PERFCOUNTER_FLAG_NONE 0x0
@@ -212,6 +207,17 @@ struct adreno_perfcount_group {
 struct adreno_perfcounters {
 	struct adreno_perfcount_group *groups;
 	unsigned int group_count;
+};
+
+/**
+ * enum adreno_device_flags - Private flags for the adreno_device
+ * @ADRENO_DEVICE_PWRON - Set during init after a power collapse
+ * @ADRENO_DEVICE_PWRON_FIXUP - Set if the target requires the shader fixup
+ * after power collapse
+ */
+enum adreno_device_flags {
+	ADRENO_DEVICE_PWRON = 0,
+	ADRENO_DEVICE_PWRON_FIXUP = 1,
 };
 
 struct adreno_gpudev {
@@ -383,6 +389,8 @@ int adreno_perfcounter_put(struct adreno_device *adreno_dev,
 
 int adreno_ft_init_sysfs(struct kgsl_device *device);
 void adreno_ft_uninit_sysfs(struct kgsl_device *device);
+
+int adreno_a3xx_pwron_fixup_init(struct adreno_device *adreno_dev);
 
 #if !CONFIG_AXXX_REV
 static inline int adreno_is_a200(struct adreno_device *adreno_dev)
@@ -582,5 +590,11 @@ static inline int adreno_add_idle_cmds(struct adreno_device *adreno_dev,
 
 	return cmds - start;
 }
+
+#ifdef CONFIG_DEBUG_FS
+void adreno_debugfs_init(struct kgsl_device *device);
+#else
+static inline void adreno_debugfs_init(struct kgsl_device *device) { }
+#endif
 
 #endif /*__ADRENO_H */
