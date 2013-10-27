@@ -223,6 +223,7 @@ struct scalable {
 	struct vreg vreg[NUM_VREG];
 	bool initialized;
 	bool avs_enabled;
+	unsigned int nom_min_vdd;
 };
 
 /**
