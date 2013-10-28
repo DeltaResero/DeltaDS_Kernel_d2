@@ -101,7 +101,7 @@ static struct dbs_tuners {
 	unsigned int interaction_hispeed;
 	unsigned int interaction_panic;
 } dbs_tuners_ins = {
-	.sampling_rate = 35000, /* 2 vsyncs */
+	.sampling_rate = 35000,
 	.hotplug_up_cycles = 2,
 	.hotplug_down_cycles = 4,
 	.hotplug_up_load = 2,
@@ -109,13 +109,13 @@ static struct dbs_tuners {
 	.hotplug_down_usage = 125000,
 	.overestimate_khz = 35000,
 	.hispeed_thresh = 75000,
-	.hispeed_decrease = 75000,
+	.hispeed_decrease = 60000,
 	.hispeed_divisor = 6,
 	.interaction_sampling_rate = 10000,
-	.interaction_overestimate_khz = 175000,
-	.interaction_return_usage = 125000, /* crazy low, but XDA sucks otherwise */
-	.interaction_return_cycles = 4, /* 3 vsyncs */
-	.interaction_hispeed = 1242000,
+	.interaction_overestimate_khz = 225000,
+	.interaction_return_usage = 175000,
+	.interaction_return_cycles = 6,
+	.interaction_hispeed = 1080000,
 	.interaction_panic = 1,
 };
 // }}}
@@ -341,7 +341,8 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 	}
 
 	/* Set frequency */
-	this_dbs_info->requested_freq += (load + dbs_tuners_ins.hispeed_thresh > policy->cur) ?
+	this_dbs_info->requested_freq += (load + dbs_tuners_ins.hispeed_thresh > policy->cur &&
+			load > policy->cur >> 1) ?
 		max(load + overestimate, this_dbs_info->max_freq) : load + overestimate;
 	/* Bound request just outside available range
 	 * Ideally, this helps stabilize idle @ min, load @ max
@@ -411,6 +412,32 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 	int rc;
 
 	this_dbs_info = &per_cpu(cs_cpu_dbs_info, cpu);
+
+	if (likely(event & CPUFREQ_GOV_NOINTERACT)) {
+		mutex_lock(&this_dbs_info->timer_mutex);
+		if (event & 1) {
+			if (!IGF(ENABLED)) {
+				ISF(ENABLED);
+				if (cancel_delayed_work_sync(&this_dbs_info->work)) {
+					this_dbs_info->prev_cpu_idle = get_idle_ktime(cpu);
+					this_dbs_info->prev_cpu_wall = ktime_get();
+					schedule_delayed_work_on(this_dbs_info->cpu, &this_dbs_info->work,
+						usecs_to_jiffies(dbs_tuners_ins.interaction_sampling_rate));
+				}
+			}
+		} else {
+			if (IGF(PRESSED)) {
+				IUF(PRESSED);
+				this_dbs_info->defer_cycles = 0;
+#ifdef FL_STATS
+				this_dbs_info->deferred_return = 0;
+#endif
+			}
+		}
+		mutex_unlock(&this_dbs_info->timer_mutex);
+
+		return 0;
+	}
 
 	switch (event) {
 	case CPUFREQ_GOV_START:
@@ -486,37 +513,6 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 			__cpufreq_driver_target(
 					this_dbs_info->cur_policy,
 					policy->min, CPUFREQ_RELATION_L);
-		mutex_unlock(&this_dbs_info->timer_mutex);
-
-		break;
-
-	case CPUFREQ_GOV_INTERACT:
-#ifdef FL_STATS
-		printk(KERN_DEBUG "freelunch: going interactive on cpu %i\n", this_dbs_info->cpu);
-#endif
-		mutex_lock(&this_dbs_info->timer_mutex);
-		if (!IGF(ENABLED)) {
-			ISF(ENABLED);
-			if (cancel_delayed_work_sync(&this_dbs_info->work)) {
-				this_dbs_info->prev_cpu_idle = get_idle_ktime(cpu);
-				this_dbs_info->prev_cpu_wall = ktime_get();
-				schedule_delayed_work_on(this_dbs_info->cpu, &this_dbs_info->work,
-					usecs_to_jiffies(dbs_tuners_ins.interaction_sampling_rate));
-			}
-		}
-		mutex_unlock(&this_dbs_info->timer_mutex);
-
-		break;
-
-	case CPUFREQ_GOV_NOINTERACT:
-		mutex_lock(&this_dbs_info->timer_mutex);
-		if (IGF(PRESSED)) {
-			IUF(PRESSED);
-			this_dbs_info->defer_cycles = 0;
-#ifdef FL_STATS
-			this_dbs_info->deferred_return = 0;
-#endif
-		}
 		mutex_unlock(&this_dbs_info->timer_mutex);
 
 		break;
