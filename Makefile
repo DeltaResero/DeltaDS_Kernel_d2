@@ -591,7 +591,7 @@ KBUILD_CFLAGS	+= --param max-gcse-memory=1073741824 \
 		   --param max-gcse-insertion-ratio=50 \
 		   --param max-tail-merge-comparisons=100 \
 		   --param max-tail-merge-iterations=4 \
-		   --param l1-cache-size=40 \
+		   --param l1-cache-size=32 \
 		   --param l2-cache-size=1024 \
 		   --param max-vartrack-size=0
 else
@@ -602,7 +602,8 @@ KBUILD_CFLAGS	+= -marm -mtune=cortex-a15 -march=armv7-a -mfpu=neon -mfloat-abi=s
 		   -mvectorize-with-neon-quad
 # Loop optimizations
 KBUILD_CFLAGS	+= -fgraphite-identity -ftree-loop-distribution -floop-block -ftree-loop-linear \
-		   -ftree-loop-im -fivopts -funswitch-loops -funroll-loops -floop-strip-mine
+		   -ftree-loop-im -fivopts -funswitch-loops -funroll-loops -floop-strip-mine \
+		   -ftree-loop-ivcanon
 # Modulo scheduling
 KBUILD_CFLAGS	+= -fmodulo-sched -fmodulo-sched-allow-regmoves
 # GCC extras
@@ -614,7 +615,7 @@ KBUILD_CFLAGS	+= --param max-gcse-memory=1073741824 \
 		   --param max-gcse-insertion-ratio=50 \
 		   --param max-tail-merge-comparisons=100 \
 		   --param max-tail-merge-iterations=4 \
-		   --param l1-cache-size=40 \
+		   --param l1-cache-size=32 \
 		   --param l2-cache-size=1024 \
 		   --param max-vartrack-size=0
 endif
