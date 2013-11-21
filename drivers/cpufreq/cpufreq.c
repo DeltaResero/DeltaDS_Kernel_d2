@@ -678,21 +678,6 @@ static ssize_t show_UV_mV_table(struct cpufreq_policy *policy,
 	return acpuclk_show_vdd_table(buf, "%umhz: %u mV\n", -1, 1000, 1000);
 }
 
-/* Per-core vmin interface */
-void acpuclk_set_override_vmin(int enable);
-int acpuclk_get_override_vmin(void);
-static ssize_t store_override_vmin(struct cpufreq_policy *policy,
-					const char *buf, size_t count) {
-	int val;
-	if (sscanf(buf, "%i", &val) != 1)
-		return -EINVAL;
-	acpuclk_set_override_vmin(val);
-	return count;
-}
-static ssize_t show_override_vmin(struct cpufreq_policy *policy, char *buf) {
-	return sprintf(buf, "%u\n", acpuclk_get_override_vmin());
-}
-
 /* Control gov/min/max linking across cores */
 static int link_core_settings = 1;
 static __GATTR(link_core_settings, 0, 1, NULL);
@@ -822,7 +807,6 @@ cpufreq_freq_attr_rw(scaling_max_freq);
 cpufreq_freq_attr_rw(scaling_governor);
 cpufreq_freq_attr_rw(scaling_setspeed);
 cpufreq_freq_attr_rw(UV_mV_table);
-cpufreq_freq_attr_rw(override_vmin);
 
 static struct attribute *default_attrs[] = {
 	&cpuinfo_min_freq.attr,
@@ -838,7 +822,6 @@ static struct attribute *default_attrs[] = {
 	&scaling_available_governors.attr,
 	&scaling_setspeed.attr,
 	&UV_mV_table.attr,
-	&override_vmin.attr,
 	NULL
 };
 
@@ -1108,6 +1091,7 @@ static int cpufreq_add_dev_symlink(unsigned int cpu,
 	return ret;
 }
 
+void acpuclk_maybe_add_override_vmin(struct kobject *kobj);
 static int cpufreq_add_dev_interface(unsigned int cpu,
 				     struct cpufreq_policy *policy,
 				     struct device *dev)
@@ -1123,6 +1107,8 @@ static int cpufreq_add_dev_interface(unsigned int cpu,
 				   &dev->kobj, "cpufreq");
 	if (ret)
 		return ret;
+
+	acpuclk_maybe_add_override_vmin(&policy->kobj);
 
 	/* set up files for this cpu device */
 	drv_attr = cpufreq_driver->attr;
