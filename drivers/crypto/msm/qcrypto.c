@@ -1062,8 +1062,20 @@ static int _qcrypto_process_aead(struct crypto_priv *cp,
 
 			rctx->orig_src = req->src;
 			rctx->orig_dst = req->dst;
+
+			if ((MAX_ALIGN_SIZE * 2 > ULONG_MAX - req->assoclen) ||
+				((MAX_ALIGN_SIZE * 2 + req->assoclen) >
+						ULONG_MAX - qreq.authsize) ||
+				((MAX_ALIGN_SIZE * 2 + req->assoclen +
+						qreq.authsize) >
+						ULONG_MAX - req->cryptlen)) {
+				pr_err("Integer overflow on aead req length.\n");
+				return -EINVAL;
+			}
+
 			rctx->data = kzalloc((req->cryptlen + qreq.assoclen +
-					qreq.authsize + 64*2), GFP_KERNEL);
+					qreq.authsize + MAX_ALIGN_SIZE * 2),
+					GFP_ATOMIC);
 			if (rctx->data == NULL) {
 				pr_err("Mem Alloc fail rctx->data, err %ld\n",
 							PTR_ERR(rctx->data));
@@ -1819,7 +1831,7 @@ static int qcrypto_count_sg(struct scatterlist *sg, int nbytes)
 {
 	int i;
 
-	for (i = 0; nbytes > 0; i++, sg = sg_next(sg))
+	for (i = 0; nbytes > 0 && sg != NULL; i++, sg = sg_next(sg))
 		nbytes -= sg->length;
 
 	return i;
