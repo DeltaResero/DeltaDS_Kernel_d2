@@ -44,6 +44,11 @@
 
 #define MAX_CRYPTO_DEVICE 3
 
+/*
+ * For crypto 5.0 which has burst size alignment requirement.
+ */
+#define MAX_ALIGN_SIZE  0x40
+
 struct crypto_priv {
 	/* CE features supported by target device*/
 	struct msm_ce_hw_support platform_support;
@@ -1853,7 +1858,6 @@ static int _sha_init(struct qcrypto_sha_ctx *ctx)
 static int _sha1_init(struct ahash_request *req)
 {
 	struct qcrypto_sha_ctx *sha_ctx = crypto_tfm_ctx(req->base.tfm);
-	struct crypto_priv *cp = sha_ctx->cp;
 
 	_sha_init(sha_ctx);
 	sha_ctx->alg = QCE_HASH_SHA1;
@@ -1870,7 +1874,6 @@ static int _sha1_init(struct ahash_request *req)
 static int _sha256_init(struct ahash_request *req)
 {
 	struct qcrypto_sha_ctx *sha_ctx = crypto_tfm_ctx(req->base.tfm);
-	struct crypto_priv *cp = sha_ctx->cp;
 
 	_sha_init(sha_ctx);
 	sha_ctx->alg = QCE_HASH_SHA256;
@@ -2482,7 +2485,6 @@ static int _sha256_hmac_final(struct ahash_request *req)
 static int _sha1_hmac_digest(struct ahash_request *req)
 {
 	struct qcrypto_sha_ctx *sha_ctx = crypto_tfm_ctx(req->base.tfm);
-	struct crypto_priv *cp = sha_ctx->cp;
 
 	_sha_init(sha_ctx);
 	memcpy(&sha_ctx->digest[0], &_std_init_vector_sha1_uint8[0],
@@ -2496,7 +2498,6 @@ static int _sha1_hmac_digest(struct ahash_request *req)
 static int _sha256_hmac_digest(struct ahash_request *req)
 {
 	struct qcrypto_sha_ctx *sha_ctx = crypto_tfm_ctx(req->base.tfm);
-	struct crypto_priv *cp = sha_ctx->cp;
 
 	_sha_init(sha_ctx);
 	memcpy(&sha_ctx->digest[0], &_std_init_vector_sha256_uint8[0],
