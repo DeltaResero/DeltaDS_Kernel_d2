@@ -577,7 +577,7 @@ ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
 # Optimize for size
 KBUILD_CFLAGS	+= -Os
 # Generic ARM flags
-KBUILD_CFLAGS	+= -marm -mtune=cortex-a15 -march=armv7-a -mfpu=neon -mfloat-abi=softfp
+KBUILD_CFLAGS	+= -marm -mtune=cortex-a15 -mfpu=neon -mfloat-abi=softfp
 # Loop optimizations
 KBUILD_CFLAGS	+= -fgraphite-identity -ftree-loop-distribution -floop-block -ftree-loop-linear \
 		   -ftree-loop-im -fivopts
@@ -598,7 +598,7 @@ else
 # Optimize for getting stuff done
 KBUILD_CFLAGS	+= -O3
 # Generic ARM flags
-KBUILD_CFLAGS	+= -marm -mtune=cortex-a15 -march=armv7-a -mfpu=neon -mfloat-abi=softfp \
+KBUILD_CFLAGS	+= -marm -mtune=cortex-a15 -mfpu=neon -mfloat-abi=softfp \
 		   -mvectorize-with-neon-quad
 # Loop optimizations
 KBUILD_CFLAGS	+= -fgraphite-identity -ftree-loop-distribution -floop-block -ftree-loop-linear \
