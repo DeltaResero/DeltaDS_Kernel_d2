@@ -6,6 +6,14 @@ config ALUCARD_HOTPLUG
 	help
 	  Generic Alucard-hotplug cpu hotplug driver for ARM SOCs
 
+config BRICKED_HOTPLUG
+	bool "Enable kernel based mpdecision"
+	depends on MSM_SMP && MSM_DCVS
+	default n
+	help
+	  This enables kernel based multi core control.
+	  (up/down hotplug based on load)
+
 config ASMP
 	bool "Multi-core automatic hotplug support"
         depends on SMP && HOTPLUG_CPU
