@@ -577,7 +577,7 @@ ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
 # Optimize for size
 KBUILD_CFLAGS	+= -Os
 # Generic ARM flags
-KBUILD_CFLAGS	+= -marm -mtune=cortex-a15 -mfpu=neon -mfloat-abi=softfp
+KBUILD_CFLAGS	+= -mcpu=cortex-a15
 # Loop optimizations
 KBUILD_CFLAGS	+= -fgraphite-identity -ftree-loop-distribution -floop-block -ftree-loop-linear \
 		   -ftree-loop-im -fivopts
@@ -585,21 +585,19 @@ KBUILD_CFLAGS	+= -fgraphite-identity -ftree-loop-distribution -floop-block -ftre
 KBUILD_CFLAGS	+= -fmodulo-sched -fmodulo-sched-allow-regmoves
 # GCC extras
 KBUILD_CFLAGS	+= -fgcse-sm -fgcse-las -fsched-spec-load -fsched-pressure \
-		   -fsched-stalled-insns=0 -fsched-stalled-insns-dep=0 -fipa-pta
+		   -fsched-stalled-insns=0 -fipa-pta
 # GCC params
-KBUILD_CFLAGS	+= --param max-gcse-memory=1073741824 \
+KBUILD_CFLAGS	+= --param max-gcse-memory=0 \
 		   --param max-gcse-insertion-ratio=50 \
 		   --param max-tail-merge-comparisons=100 \
 		   --param max-tail-merge-iterations=4 \
 		   --param l1-cache-size=32 \
-		   --param l2-cache-size=1024 \
-		   --param max-vartrack-size=0
+		   --param l2-cache-size=1024
 else
 # Optimize for getting stuff done
 KBUILD_CFLAGS	+= -O3
 # Generic ARM flags
-KBUILD_CFLAGS	+= -marm -mtune=cortex-a15 -mfpu=neon -mfloat-abi=softfp \
-		   -mvectorize-with-neon-quad
+KBUILD_CFLAGS	+= -mcpu=cortex-a15
 # Loop optimizations
 KBUILD_CFLAGS	+= -fgraphite-identity -ftree-loop-distribution -floop-block -ftree-loop-linear \
 		   -ftree-loop-im -fivopts -funswitch-loops -funroll-loops -floop-strip-mine \
@@ -608,16 +606,14 @@ KBUILD_CFLAGS	+= -fgraphite-identity -ftree-loop-distribution -floop-block -ftre
 KBUILD_CFLAGS	+= -fmodulo-sched -fmodulo-sched-allow-regmoves
 # GCC extras
 KBUILD_CFLAGS	+= -fgcse-sm -fgcse-las -fsched-spec-load -fsched-pressure \
-		   -fsched-stalled-insns=0 -fsched-stalled-insns-dep=0 -fipa-pta \
-		   -fipa-matrix-reorg
+		   -fsched-stalled-insns=0 -fipa-pta -fipa-matrix-reorg
 # GCC params
-KBUILD_CFLAGS	+= --param max-gcse-memory=1073741824 \
+KBUILD_CFLAGS	+= --param max-gcse-memory=0 \
 		   --param max-gcse-insertion-ratio=50 \
 		   --param max-tail-merge-comparisons=100 \
 		   --param max-tail-merge-iterations=4 \
 		   --param l1-cache-size=32 \
-		   --param l2-cache-size=1024 \
-		   --param max-vartrack-size=0
+		   --param l2-cache-size=1024
 endif
 
 include $(srctree)/arch/$(SRCARCH)/Makefile
