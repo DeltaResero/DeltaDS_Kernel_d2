@@ -13,9 +13,9 @@
 struct kobject *dkp_global_kobject;
 EXPORT_SYMBOL(dkp_global_kobject);
 
-void _dkp_register(struct gen_attr *gattr) {
-        if (sysfs_create_file(dkp_global_kobject, (struct attribute *)gattr))
-                printk(KERN_ERR "Couldn't register dkp entry: %s\n", gattr->attr.name);
+void _dkp_register(struct attribute *gattr) {
+        if (sysfs_create_file(dkp_global_kobject, gattr))
+                printk(KERN_ERR "Couldn't register dkp entry: %s\n", gattr->name);
 }
 EXPORT_SYMBOL(_dkp_register);
 

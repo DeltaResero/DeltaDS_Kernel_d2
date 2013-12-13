@@ -16,7 +16,7 @@
 
 extern struct kobject *dkp_global_kobject;
 
-extern void _dkp_register(struct dkp_gattr *gattr);
+extern void _dkp_register(struct attribute *gattr);
 #define dkp_register(attr) \
 	_dkp_register(&gen_attr(attr))
 

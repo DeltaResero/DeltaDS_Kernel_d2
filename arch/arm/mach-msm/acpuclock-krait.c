@@ -1517,7 +1517,7 @@ int __init acpuclk_krait_init(struct device *dev,
 		pr_err("Unable to create dkp group!\n");
 	if (sysfs_create_group(cpufreq_global_kobject, &vdd_attr_group))
 		pr_err("Unable to create vdd_table group!\n");
-	_dkp_register(gen_gattr(vmin_attr));
+	_dkp_register(&vmin_attr.attr);
 
 	return 0;
 }
