@@ -4219,6 +4219,7 @@ static int msm_fb_ioctl(struct fb_info *info, unsigned int cmd,
 		if (ret == 1)
 			ret = copy_to_user(argp, &mdp_pp, sizeof(mdp_pp));
 		break;
+
 	case MSMFB_BUFFER_SYNC:
 		ret = copy_from_user(&buf_sync, argp, sizeof(buf_sync));
 		if (ret)
