@@ -26,6 +26,7 @@
 #include <linux/mfd/pm8xxx/pwm.h>
 #include <linux/leds-pm8xxx.h>
 #include <linux/sched.h>
+#include <linux/dkp.h>
 
 #define SSBI_REG_ADDR_DRV_KEYPAD	0x48
 #define PM8XXX_DRV_KEYPAD_BL_MASK	0xf0
@@ -91,7 +92,6 @@ struct pm8xxx_led_data {
 	u32			pwm_period_us;
 	struct pm8xxx_pwm_duty_cycles *pwm_duty_cycles;
 };
-
 
 static void led_kp_set(struct pm8xxx_led_data *led, enum led_brightness value)
 {
@@ -935,149 +935,128 @@ static ssize_t led_blink_show(struct device *dev,
 	return size;
 }
 
-static unsigned int hex_to_dec(char c1, char c2)
-{
-	unsigned int ret_val = 0;
-	if (c1 >= '0' && c1 <= '9')
-		ret_val = (c1 - '0');
-	else if (c1 >= 'A' && c1 <= 'F')
-		ret_val = (c1 - 'A') + 10;
-	else if (c1 >= 'a' && c1 <= 'f')
-		ret_val = (c1 - 'a') + 10;
-
-	ret_val = ret_val * 16;
-
-	if (c2 >= '0' && c2 <= '9')
-		ret_val += (c2 - '0');
-	else if (c2 >= 'A' && c2 <= 'F')
-		ret_val += (c2 - 'A') + 10;
-	else if (c2 >= 'a' && c2 <= 'f')
-		ret_val += (c2 - 'a') + 10;
-
-	return ret_val;
-
+/* 20-point sine curve.  All 3 channels must fit into the 64-point LUT.
+ */
+static u8 breathe_duty_pcts[] = {
+	0, 1, 2, 5, 10, 15, 21, 27, 35, 42,
+	50, 58, 65, 73, 79, 85, 90, 95, 98, 100
+};
+static u8 blink_duty_pcts[] = {
+        0, 100
+};
+static u8 *active_pattern = breathe_duty_pcts;
+static int led_breathe = 1;
+static void breathe_cb(void) {
+	active_pattern = led_breathe ?
+		breathe_duty_pcts : blink_duty_pcts;
 }
+__GATTR(led_breathe, 0, 1, breathe_cb);
+
+static int calc_active_table(int *target, int scale) {
+	int i;
+	for (i = 0; i < 20; i++) {
+		target[i] = scale * active_pattern[i] / 255;
+		if (active_pattern[i] == 100) {
+			i++;
+			break;
+		}
+	}
+	printk(KERN_DEBUG "%s: returning %i\n", __func__, i);
+	return i;
+}
+static int calc_steady_table(int *target, int scale) {
+	target[0] = 0;
+	target[1] = scale * 100 / 255;
+	return 2;
+}
+
 static ssize_t led_blink_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t size)
 {
 	struct leds_dev_data *info = dev_get_drvdata(dev);
 	struct pm8xxx_led_config *led_cfg;
-	unsigned int brightness_r = 0;
-	unsigned int brightness_g = 0;
-	unsigned int brightness_b = 0;
-	unsigned int loop_cnt = 0;
+	unsigned int brightness = 0;
 	unsigned int delayon = 0;
 	unsigned int delayoff = 0;
-	unsigned int argb_count = 0;
+	unsigned int cycle_time = 0;
+	int (*calc_table)(int*, int);
+	struct pwm_device *pwms[4] = { };
+	int i, pwm = 0, c;
 	bool is_blinking;
 
 	printk(KERN_ALERT "[LED_blink_store] is \"%s\" (pid %i)\n",
-	current->comm, current->pid);
+		current->comm, current->pid);
 	printk(KERN_ALERT "led_blink input =%s, size=%d\n", buf, size);
 
-	if (size < 7) {
+	if (size < 10)
+		return -EINVAL;
+	if (buf[0] == '0' && buf[1] == 'x')
+		buf += 2;
+	if (sscanf(buf, "%x %u %u\n", &brightness, &delayon, &delayoff) < 3) {
 		printk(KERN_DEBUG "led_blink: Invlid input\n");
-		return size;
-	}
-	if (buf[8] == ' ') { /*case of RGB delay_on delay_off*/
-		for (loop_cnt = 9; loop_cnt < size-1; loop_cnt++) {
-			delayon = delayon*10 + (buf[loop_cnt] - '0');
-			if (buf[loop_cnt+1] == ' ') {
-				loop_cnt += 2;
-				break;
-			}
-		}
-		for (; loop_cnt < size-1; loop_cnt++)
-			delayoff = delayoff*10 + (buf[loop_cnt] - '0');
-	}
-	 else if (buf[10] == ' ') { /*case of ARGB delay_on delay_off*/
-		argb_count = 1;
-		for (loop_cnt = 11; loop_cnt < size-1; loop_cnt++) {
-				delayon = delayon*10 + (buf[loop_cnt] - '0');
-				if (buf[loop_cnt+1] == ' ') {
-					loop_cnt += 2;
-					break;
-				}
-			}
-		for (; loop_cnt < size-1; loop_cnt++)
-			delayoff = delayoff*10 + (buf[loop_cnt] - '0');
-		}
-	 else if (size > 9) {  /*case of ARGB*/
-		argb_count = 1;
-	}
-	atomic_set(&info->op_flag , 0);
-	/*buf[0], buf[1] contains 0x, so ignore it. case of RGB*/
-	if (!argb_count) {
-		brightness_r = hex_to_dec(buf[2], buf[3]);
-		brightness_g = hex_to_dec(buf[4], buf[5]);
-		brightness_b = hex_to_dec(buf[6], buf[7]);
-	}
-	/*buf[0], buf[1] contains 0x, so ignore it.
-	buf[2], buf[3] contains A (alpha value), ignore it.case of ARGB*/
-	 else {
-		brightness_r = hex_to_dec(buf[4], buf[5]);
-		brightness_g = hex_to_dec(buf[6], buf[7]);
-		brightness_b = hex_to_dec(buf[8], buf[9]);
+		return -EINVAL;
 	}
 
 	is_blinking = delayon > 0 || delayoff > 0;
+	calc_table = is_blinking ? calc_active_table : calc_steady_table;
+	if (led_breathe && is_blinking) {
+		// "Breathing" means the LED is on half as much.  Compensate.
+		cycle_time = delayon = delayon / 2;
+		if (delayoff > delayon) {
+			delayoff -= delayon;
+		} else {
+			delayon -= delayoff;
+			delayoff = 0;
+		}
+	}
 
 	pm8xxx_led_work_pat_led_off(info);
+
 	mutex_lock(&info->led_work_lock);
 
-	led_cfg = &info->pdata->configs[PM8XXX_LED_PAT8_BLUE];
-	brightness_b = brightness_b * 100 / 255;
-	led_cfg->pwm_duty_cycles->duty_pcts[0] = is_blinking ? 0 : brightness_b;
-	led_cfg->pwm_duty_cycles->duty_pcts[1] = brightness_b;
-	pm8xxx_set_led_mode_and_max_brightness(&info->led[PM8XXX_LED_PAT8_BLUE],
-				led_cfg->mode, led_cfg->max_current);
-	__pm8xxx_led_work(&info->led[PM8XXX_LED_PAT8_BLUE],
-			led_cfg->max_current);
-	if (led_cfg->mode != PM8XXX_LED_MODE_MANUAL)
-		pm8xxx_led_pwm_configure(&info->led[PM8XXX_LED_PAT8_BLUE],
-				delayoff, delayon);
+	for (i = 2; i >= 0; i--) {
+		u8 chan_scale = brightness & 0xff;
+		brightness >>= 8;
 
-	led_cfg = &info->pdata->configs[PM8XXX_LED_PAT8_GREEN];
-	brightness_g = brightness_g * 100 / 255;
-	led_cfg->pwm_duty_cycles->duty_pcts[0] = is_blinking ? 0 : brightness_g;
-	led_cfg->pwm_duty_cycles->duty_pcts[1] = brightness_g;
-	pm8xxx_set_led_mode_and_max_brightness(
-			&info->led[PM8XXX_LED_PAT8_GREEN],
+		c = PM8XXX_LED_PAT8_RED + i;
+		led_cfg = &info->pdata->configs[c];
+
+		led_cfg->pwm_duty_cycles->num_duty_pcts = calc_table(
+			led_cfg->pwm_duty_cycles->duty_pcts, chan_scale);
+		if (cycle_time)
+			led_cfg->pwm_duty_cycles->duty_ms =
+				DIV_ROUND_UP(cycle_time,
+				led_cfg->pwm_duty_cycles->num_duty_pcts);
+		else
+			led_cfg->pwm_duty_cycles->duty_ms = 1;
+
+		pm8xxx_set_led_mode_and_max_brightness(&info->led[c],
 			led_cfg->mode, led_cfg->max_current);
-	__pm8xxx_led_work(&info->led[PM8XXX_LED_PAT8_GREEN],
-			led_cfg->max_current);
-	if (led_cfg->mode != PM8XXX_LED_MODE_MANUAL)
-		pm8xxx_led_pwm_configure(&info->led[PM8XXX_LED_PAT8_GREEN],
+
+		__pm8xxx_led_work(&info->led[c], led_cfg->max_current);
+
+		if (likely(led_cfg->mode != PM8XXX_LED_MODE_MANUAL))
+			pm8xxx_led_pwm_configure(&info->led[c],
 				delayoff, delayon);
+		if (chan_scale)
+			pwms[pwm++] = info->led[c].pwm_dev;
+		else
+			pwm_disable(info->led[c].pwm_dev);
+	}
 
-	led_cfg = &info->pdata->configs[PM8XXX_LED_PAT8_RED];
-	brightness_r = brightness_r * 100 / 255;
-	led_cfg->pwm_duty_cycles->duty_pcts[0] = is_blinking ? 0 : brightness_r;
-	led_cfg->pwm_duty_cycles->duty_pcts[1] = brightness_r;
-	pm8xxx_set_led_mode_and_max_brightness(&info->led[PM8XXX_LED_PAT8_RED],
-				led_cfg->mode, led_cfg->max_current);
-	__pm8xxx_led_work(&info->led[PM8XXX_LED_PAT8_RED],
-			led_cfg->max_current);
-	if (led_cfg->mode != PM8XXX_LED_MODE_MANUAL)
-		pm8xxx_led_pwm_configure(&info->led[PM8XXX_LED_PAT8_RED],
-		delayoff, delayon);
-
-	if ((brightness_r || brightness_g || brightness_b) &&
-	(info->pdata->led_power_on))
-		info->pdata->led_power_on(1);
-	printk(KERN_DEBUG "[LED] USER : R:%d,G:%d,B:%d\n",
-		brightness_r, brightness_g, brightness_b);
-	pm8xxx_led_set(&info->led[PM8XXX_LED_PAT8_RED].cdev,
-		led_cfg->max_current);
-	pm8xxx_led_set(&info->led[PM8XXX_LED_PAT8_GREEN].cdev,
-		led_cfg->max_current);
-	pm8xxx_led_set(&info->led[PM8XXX_LED_PAT8_BLUE].cdev,
-		led_cfg->max_current);
+	if (pwm) {
+		if (info->pdata->led_power_on)
+			info->pdata->led_power_on(1);
+		/* This hack is needed to keep the PWMs roughly in sync.  The
+		 * existing code adds enough delay that the PWMs are visibly
+		 * out of sync, causing horrible color-shifting flicker.
+		 */
+		pm8xxx_pwm_lut_enable_all(pwms);
+	}
 
 	mutex_unlock(&info->led_work_lock);
 
 	return size;
-
 }
 
 static DEVICE_ATTR(led_blink, S_IRUGO | S_IWUSR | S_IWGRP,
@@ -1269,6 +1248,7 @@ static struct platform_driver pm8xxx_led_driver = {
 
 static int __init pm8xxx_led_init(void)
 {
+	dkp_register(led_breathe);
 	return platform_driver_register(&pm8xxx_led_driver);
 }
 subsys_initcall(pm8xxx_led_init);
