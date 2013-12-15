@@ -1064,10 +1064,10 @@ static void __init msm8960_allocate_memory_regions(void)
 	msm8960_allocate_fb_region();
 }
 #ifdef CONFIG_KEYBOARD_CYPRESS_TOUCH_236
+static struct regulator *reg_l29, *reg_l10;
 static void cypress_power_onoff(int onoff)
 {
 	int ret, rc;
-	static struct regulator *reg_l29, *reg_l10;
 
 	pr_debug("power on entry\n");
 
@@ -1118,6 +1118,10 @@ static void cypress_power_onoff(int onoff)
 		}
 		pr_info("cypress_power_off is finished.\n");
 	}
+}
+
+void cypress_led_voltage_set(int uv) {
+	regulator_set_voltage(reg_l10, uv, 3000000);
 }
 
 static u8 touchkey_keycode[] = {KEY_BACK, KEY_MENU};
