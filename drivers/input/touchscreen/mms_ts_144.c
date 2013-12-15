@@ -24,6 +24,7 @@
 #include <linux/mutex.h>
 #include <linux/slab.h>
 #include <linux/cpufreq.h>
+#include <linux/workqueue.h>
 
 #include <linux/platform_data/mms_ts.h>
 
@@ -53,12 +54,14 @@ struct mms_ts_info {
 	struct mms_ts_platform_data *pdata;
 	struct early_suspend early_suspend;
 	struct tsp_callbacks callbacks;
+	struct delayed_work finish_resume;
 	char phys[32];
 };
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static void mms_ts_early_suspend(struct early_suspend *h);
 static void mms_ts_late_resume(struct early_suspend *h);
+static void mms_ts_finish_resume(struct work_struct *work);
 #endif
 
 static void release_all_fingers(struct mms_ts_info *info)
@@ -327,9 +330,9 @@ static int __devinit mms_ts_probe(struct i2c_client *client,
 	info->enabled = true;
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
-	info->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
 	info->early_suspend.suspend = mms_ts_early_suspend;
 	info->early_suspend.resume = mms_ts_late_resume;
+	INIT_DELAYED_WORK(&info->finish_resume, mms_ts_finish_resume);
 	register_early_suspend(&info->early_suspend);
 #endif
 
@@ -361,6 +364,8 @@ static int mms_ts_suspend(struct device *dev)
 	struct i2c_client *client = to_i2c_client(dev);
 	struct mms_ts_info *info = i2c_get_clientdata(client);
 
+	cancel_delayed_work(&info->finish_resume);
+
 	dev_notice(&info->client->dev, "%s: users=%d\n", __func__,
 			info->input_dev->users);
 	mutex_lock(&info->input_dev->mutex);
@@ -373,7 +378,6 @@ static int mms_ts_suspend(struct device *dev)
 	}
 	release_all_fingers(info);
 	info->pdata->vdd_on(0);
-	msleep(50);
 
 out:
 	mutex_unlock(&info->input_dev->mutex);
@@ -388,8 +392,14 @@ static int mms_ts_resume(struct device *dev)
 	dev_notice(&info->client->dev, "%s: users=%d\n", __func__,
 			info->input_dev->users);
 	info->pdata->vdd_on(1);
-	msleep(120);
+	schedule_delayed_work(&info->finish_resume, msecs_to_jiffies(120));
 
+	return 0;
+}
+
+static void mms_ts_finish_resume(struct work_struct *work) {
+	struct mms_ts_info *info =
+		container_of(work, struct mms_ts_info, finish_resume.work);
 	mms_set_noise_mode(info);
 	mutex_lock(&info->input_dev->mutex);
 	if (info->input_dev->users) {
@@ -397,8 +407,6 @@ static int mms_ts_resume(struct device *dev)
 		enable_irq(info->irq);
 	}
 	mutex_unlock(&info->input_dev->mutex);
-
-	return 0;
 }
 #endif
 
