@@ -257,7 +257,9 @@ static void mdp_dma2_update_lcd(struct msm_fb_data_type *mfd)
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 }
 
+#ifdef MSM_FB_ENABLE_DBGFS
 static ktime_t vt = { 0 };
+#endif
 int mdp_usec_diff_threshold = 100;
 
 enum hrtimer_restart mdp_dma2_vsync_hrtimer_handler(struct hrtimer *ht)

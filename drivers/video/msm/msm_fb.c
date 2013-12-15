@@ -129,7 +129,6 @@ static int mdp_bl_scale_config(struct msm_fb_data_type *mfd,
 						struct mdp_bl_scale_data *data);
 static int msm_fb_commit_thread(void *data);
 static void msm_fb_scale_bl(__u32 bl_max, __u32 *bl_lvl);
-static void msm_fb_commit_wq_handler(struct work_struct *work);
 static int msm_fb_pan_idle(struct msm_fb_data_type *mfd);
 
 #define MAX_BACKLIGHT_BRIGHTNESS 255
@@ -1157,7 +1156,7 @@ static int msm_fb_blank(int blank_mode, struct fb_info *info)
 			wait for the system to resume */
 			while (mfd->suspend.op_suspend) {
 				pr_debug("waiting for system to resume\n");
-				msleep(20);
+				schedule_timeout_uninterruptible(1);
 			}
 		}
 		else

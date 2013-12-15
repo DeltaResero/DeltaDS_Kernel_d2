@@ -344,7 +344,7 @@ int mdp4_overlay_iommu_map_buf(int mem_id,
 	return 0;
 }
 
-static struct mdp4_iommu_pipe_info mdp_iommu[MDP4_MIXER_MAX][OVERLAY_PIPE_MAX];
+static struct mdp4_iommu_pipe_info mdp_iommu[MDP4_MIXER_MAX][MDP4_MIXER_STAGE_MAX];
 
 void mdp4_iommu_unmap(struct mdp4_overlay_pipe *pipe)
 {
@@ -354,7 +354,7 @@ void mdp4_iommu_unmap(struct mdp4_overlay_pipe *pipe)
 	if (!display_iclient)
 		return;
 
-	for (j = 0; j < OVERLAY_PIPE_MAX; j++) {
+	for (j = 0; j < MDP4_MIXER_STAGE_MAX; j++) {
 		iom_pipe_info = &mdp_iommu[pipe->mixer_num][j];
 		for (i = 0; i < MDP4_MAX_PLANE; i++) {
 			if (iom_pipe_info->prev_ihdl[i]) {
@@ -3633,7 +3633,7 @@ void mdp4_overlay_dma_commit(int mixer)
 	struct mdp4_overlay_pipe *pipe;
 	char *vg_base;
 	int i, pnum;
-	for (i = 0; i < OVERLAY_PIPE_MAX; i++, pipe++) {
+	for (i = 0; i < MDP4_MIXER_STAGE_MAX; i++) {
 		pipe = ctrl->stage[mixer][i];
 		if (pipe) {
 			if (pipe->pipe_type == OVERLAY_TYPE_VIDEO &&
