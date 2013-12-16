@@ -1135,8 +1135,9 @@ void pm8xxx_pwm_lut_enable_all(struct pwm_device **pwms)
 
 	mutex_lock(&pwms[0]->chip->pwm_mutex);
 
-	for (i = 0; pwms[i]; i++) {
+	for (i = 0; pwms[i]; i++)
 		pm8xxx_pwm_bank_enable(pwms[i], 1);
+	for (i = 0; pwms[i]; i++) {
 		pm8xxx_pwm_bank_sel(pwms[i]);
 		pm8xxx_pwm_start(pwms[i], 1, 1);
 	}
