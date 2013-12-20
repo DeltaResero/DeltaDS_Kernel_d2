@@ -156,7 +156,7 @@ static void led_pwm_config(struct pm8xxx_led_data *led, int time1, int time2) {
 	if (led->pwm_duty_cycles->start_idx +
 	    led->pwm_duty_cycles->num_duty_pcts > PM_PWM_LUT_SIZE) {
 		pr_err("lut too large\n");
-	    	pwm_free(led->pwm_dev);
+		pwm_free(led->pwm_dev);
 		led->pwm_dev = NULL;
 		return;
 	}

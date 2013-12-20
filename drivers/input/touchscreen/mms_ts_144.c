@@ -364,7 +364,7 @@ static int mms_ts_suspend(struct device *dev)
 	struct i2c_client *client = to_i2c_client(dev);
 	struct mms_ts_info *info = i2c_get_clientdata(client);
 
-	cancel_delayed_work(&info->finish_resume);
+	cancel_delayed_work_sync(&info->finish_resume);
 
 	dev_notice(&info->client->dev, "%s: users=%d\n", __func__,
 			info->input_dev->users);
