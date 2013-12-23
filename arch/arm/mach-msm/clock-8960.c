@@ -394,6 +394,7 @@ static int set_vdd_dig_8960(struct clk_vdd_class *vdd_class, int level)
 
 static DEFINE_VDD_CLASS(vdd_dig, set_vdd_dig_8960, VDD_DIG_NUM);
 
+#if 0
 static int rpm_vreg_dig_8930 = RPM_VREG_ID_PM8038_VDD_DIG_CORNER;
 static int set_vdd_dig_8930(struct clk_vdd_class *vdd_class, int level)
 {
@@ -408,6 +409,7 @@ static int set_vdd_dig_8930(struct clk_vdd_class *vdd_class, int level)
 					vdd_corner[level],
 					RPM_VREG_CORNER_HIGH, 1);
 }
+#endif
 
 #define VDD_DIG_FMAX_MAP1(l1, f1) \
 	.vdd_class = &vdd_dig,			\
@@ -480,6 +482,7 @@ static int set_vdd_sr2_hdmi_pll_8064(struct clk_vdd_class *vdd_class, int level)
 				    sr2_lreg_uv[level], sr2_lreg_uv[level], 1);
 }
 
+#if 0
 static int set_vdd_sr2_hdmi_pll_8930_pm8917(struct clk_vdd_class *vdd_class,
 	int level)
 {
@@ -515,6 +518,7 @@ static int set_vdd_sr2_hdmi_pll_8930(struct clk_vdd_class *vdd_class, int level)
 	return rpm_vreg_set_voltage(RPM_VREG_ID_PM8038_L23, RPM_VREG_VOTER3,
 				    sr2_lreg_uv[level], sr2_lreg_uv[level], 1);
 }
+#endif
 
 /*
  * Clock Descriptions
@@ -5232,6 +5236,7 @@ static struct measure_clk measure_clk = {
 	.multiplier = 1,
 };
 
+#if 0
 static struct clk_lookup msm_clocks_8064[] = {
 	CLK_LOOKUP("xo",		cxo_a_clk.c,	""),
 	CLK_LOOKUP("xo",		pxo_a_clk.c,	""),
@@ -5609,6 +5614,7 @@ static struct clk_lookup msm_clocks_8064[] = {
 	CLK_LOOKUP("vcodec_iommu1_clk", vcodec_axi_b_clk.c, "mdp.0"),
 	CLK_LOOKUP("smmu_iface_clk", smmu_p_clk.c,	"mdp.0"),
 };
+#endif
 
 static struct clk_lookup msm_clocks_8960_common[] __initdata = {
 	CLK_LOOKUP("xo",		cxo_a_clk.c,	""),
@@ -5994,6 +6000,7 @@ static struct clk_lookup msm_clocks_8960[ARRAY_SIZE(msm_clocks_8960_common)
 	+ ARRAY_SIZE(msm_clocks_8960_only)
 	+ ARRAY_SIZE(msm_clocks_8960ab_only)];
 
+#if 0
 static struct clk_lookup msm_clocks_8930[] = {
 	CLK_LOOKUP("xo",		cxo_clk.c,	"msm_xo"),
 	CLK_LOOKUP("cxo",		cxo_clk.c,	"wcnss_wlan.0"),
@@ -6321,6 +6328,7 @@ static struct clk_lookup msm_clocks_8930[] = {
 	CLK_LOOKUP("vcodec_iommu1_clk", vcodec_axi_b_clk.c, "mdp.0"),
 	CLK_LOOKUP("smmu_iface_clk", smmu_p_clk.c,	"mdp.0"),
 };
+#endif
 /*
  * Miscellaneous clock register initializations
  */
@@ -6725,6 +6733,7 @@ static void __init msm8960_clock_pre_init(void)
 	clk_ops_local_pll.enable = sr_pll_clk_enable;
 }
 
+#if 0
 static void __init msm8930_pm8917_clock_pre_init(void)
 {
 	/* detect pmic8917 from board file, and call this init function */
@@ -6743,6 +6752,7 @@ static void __init msm8930_clock_pre_init(void)
 
 	msm8960_clock_pre_init();
 }
+#endif
 
 static void __init msm8960_clock_post_init(void)
 {

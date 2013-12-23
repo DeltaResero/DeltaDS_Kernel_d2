@@ -65,7 +65,7 @@ static int vdd_mask;
 
 #define MSM_RPMRS_MAX_RS_REGISTER_COUNT 2
 
-#define RPMRS_ATTR(_name) (NULL)
+#define RPMRS_ATTR(_name) { }
 
 struct msm_rpmrs_resource {
 	struct msm_rpm_iv_pair rs[MSM_RPMRS_MAX_RS_REGISTER_COUNT];
