@@ -134,7 +134,7 @@ static inline int atomic_cmpxchg(atomic_t *ptr, int old, int new)
 	return oldval;
 }
 
-static inline void atomic_clear_mask(unsigned long mask, unsigned long *addr)
+static inline void atomic_clear_mask(unsigned long mask, atomic_t *v)
 {
 	unsigned long tmp, tmp2;
 
@@ -144,8 +144,23 @@ static inline void atomic_clear_mask(unsigned long mask, unsigned long *addr)
 "	strex	%1, %0, [%3]\n"
 "	teq	%1, #0\n"
 "	bne	1b"
-	: "=&r" (tmp), "=&r" (tmp2), "+Qo" (*addr)
-	: "r" (addr), "Ir" (mask)
+	: "=&r" (tmp), "=&r" (tmp2), "+Qo" (v->counter)
+	: "r" (&v->counter), "Ir" (mask)
+	: "cc");
+}
+
+static inline void atomic_set_mask(unsigned int mask, atomic_t *v)
+{
+	unsigned long tmp, tmp2;
+
+	__asm__ __volatile__("@ atomic_set_mask\n"
+"1:	ldrex	%0, [%3]\n"
+"	orr	%0, %0, %4\n"
+"	strex	%1, %0, [%3]\n"
+"	teq	%1, %0\n"
+"	bne	1b"
+	: "=&r" (tmp), "=&r" (tmp2), "+Qo" (v->counter)
+	: "r" (&v->counter), "Ir" (mask)
 	: "cc");
 }
 

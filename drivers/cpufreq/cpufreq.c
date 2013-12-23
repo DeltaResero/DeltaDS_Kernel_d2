@@ -453,7 +453,7 @@ static int __cpufreq_set_policy(struct cpufreq_policy *data,
 /* cpufreq holds a lock when calling store_xxx(), so we need to schedule the
  * frequency table update to avoid a deadlock.
  */
-static struct freq_work_struct {
+struct freq_work_struct {
 	struct work_struct work;
 	unsigned int freq;
 	struct cpufreq_policy *policy;
@@ -2166,8 +2166,8 @@ void cpufreq_set_interactivity(int on, int idbit) {
 "1:     ldrex   %0, [%4]\n"
 "       mov     %1, %0\n"
 "       teq     %5, #0\n"
-"       orrne   %0, %6\n"
-"       biceq   %0, %6\n"
+"       orrne   %0, %0, %6\n"
+"       biceq   %0, %0, %6\n"
 "       strex   %2, %0, [%4]\n"
 "       teq     %2, #0\n"
 "       bne     1b"
