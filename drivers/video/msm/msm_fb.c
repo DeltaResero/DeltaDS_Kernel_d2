@@ -33,6 +33,8 @@
 #include <linux/uaccess.h>
 #include <mach/iommu_domains.h>
 
+#define CONFIG_DEBUG_FS
+
 #include <linux/workqueue.h>
 #include <linux/string.h>
 #include <linux/version.h>
@@ -97,7 +99,7 @@ static u32 msm_fb_pseudo_palette[16] = {
 
 static struct ion_client *iclient;
 
-#ifdef MSM_FB_ENABLE_DEBUGFS
+#ifdef MSM_FB_ENABLE_DBGFS
 u32 msm_fb_debug_enabled;
 /* Setting msm_fb_msg_level to 8 prints out ALL messages */
 u32 msm_fb_msg_level = 7;
@@ -151,8 +153,6 @@ void msmfb_no_update_notify_timer_cb(unsigned long data)
 
 static int bl_scale, bl_min_lvl;
 
-#ifdef MSM_FB_ENABLE_DBGFS
-
 #define MSM_FB_MAX_DBGFS 1024
 int msm_fb_debugfs_file_index;
 struct dentry *msm_fb_debugfs_root;
@@ -175,7 +175,6 @@ void msm_fb_debugfs_file_create(struct dentry *root, const char *name,
 	msm_fb_debugfs_file[msm_fb_debugfs_file_index++] =
 	    debugfs_create_u32(name, S_IRUGO | S_IWUSR, root, var);
 }
-#endif
 
 int msm_fb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 {
@@ -556,10 +555,8 @@ static int msm_fb_remove(struct platform_device *pdev)
 	}
 #endif
 
-#ifdef MSM_FB_ENABLE_DBGFS
 	if (mfd->sub_dir)
 		debugfs_remove(mfd->sub_dir);
-#endif
 
 	return 0;
 }
@@ -1660,7 +1657,6 @@ static int msm_fb_register(struct msm_fb_data_type *mfd)
 	}
 #endif
 
-#ifdef MSM_FB_ENABLE_DBGFS
 	{
 		struct dentry *root;
 		struct dentry *sub_dir;
@@ -1785,7 +1781,6 @@ static int msm_fb_register(struct msm_fb_data_type *mfd)
 			}
 		}
 	}
-#endif /* MSM_FB_ENABLE_DBGFS */
 
 	return ret;
 }
