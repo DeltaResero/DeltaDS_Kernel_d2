@@ -99,7 +99,7 @@ struct cypress_touchkey_info {
 	struct mutex		touchkey_led_mutex;
 	struct delayed_work	power_work;
 	struct completion	anim_done;
-	int			anim_idx;
+	int			anim_idx, anim_delay, anim_step;
 	enum touchkey_status	status;
 };
 
@@ -143,60 +143,39 @@ static void cypress_touchkey_animate_brightness(struct work_struct *work) {
 	struct cypress_touchkey_info *info =
 		container_of(work, struct cypress_touchkey_info,
 			power_work.work);
-	int total, delay, step, voltage;
+	int voltage;
 
 	mutex_lock(&info->touchkey_led_mutex);
 
-	if (info->brightness == LED_OFF) {
-		total = msecs_to_jiffies(TIME_OFF_MS);
-		delay = DIV_ROUND_UP(total, ARRAY_SIZE(anim_scale));
-		step = DIV_ROUND_UP(ARRAY_SIZE(anim_scale), total / delay);
+	voltage = VOLTAGE_ON - VOLTAGE_OFF;
+	voltage = voltage * info->leds.max_brightness / LED_FULL;
 
-		info->anim_idx -= step;
-		if (info->anim_idx <= 0) {
-			info->anim_idx = 0;
-			cypress_touchkey_do_power(info->client, 0);
-			complete(&info->anim_done);
-			goto anim_done;
-		}
-
-		voltage = VOLTAGE_ON - VOLTAGE_OFF;
-		voltage = voltage * info->leds.max_brightness / LED_FULL;
-		voltage = voltage * anim_scale[info->anim_idx] / LED_FULL;
-		cypress_led_voltage_set(VOLTAGE_OFF + voltage);
-	} else {
-		total = msecs_to_jiffies(TIME_ON_MS);
-		delay = DIV_ROUND_UP(total, ARRAY_SIZE(anim_scale));
-		step = DIV_ROUND_UP(ARRAY_SIZE(anim_scale), total / delay);
-
-		voltage = VOLTAGE_ON - VOLTAGE_OFF;
-		voltage = voltage * info->leds.max_brightness / LED_FULL;
-
-		if (info->anim_idx == ARRAY_SIZE(anim_scale) - 1) {
-			cypress_led_voltage_set(VOLTAGE_OFF + voltage);
-			complete(&info->anim_done);
-			goto anim_done;
-		}
-
-		info->anim_idx += step;
-		if (info->anim_idx >= ARRAY_SIZE(anim_scale))
-			info->anim_idx = ARRAY_SIZE(anim_scale) - 1;
-
-		voltage = voltage * anim_scale[info->anim_idx] / LED_FULL;
-
-		cypress_led_voltage_set(VOLTAGE_OFF + voltage);
-
-		if (info->anim_idx == step) {
-			cypress_touchkey_do_power(info->client, 1);
-		}
+	if (!info->anim_idx) {
+		cypress_touchkey_do_power(info->client, 1);
 	}
 
-	schedule_delayed_work(&info->power_work, delay);
+	info->anim_idx += info->anim_step;
+
+	if (info->anim_idx <= 0) {
+		info->anim_idx = 0;
+		cypress_led_voltage_set(VOLTAGE_OFF);
+		cypress_touchkey_do_power(info->client, 0);
+		complete(&info->anim_done);
+		goto anim_done;
+	} else if (info->anim_idx >= ARRAY_SIZE(anim_scale)) {
+		info->anim_idx = ARRAY_SIZE(anim_scale);
+		cypress_led_voltage_set(VOLTAGE_OFF + voltage);
+		complete(&info->anim_done);
+		goto anim_done;
+	}
+
+	voltage = voltage * anim_scale[info->anim_idx] / LED_FULL;
+	cypress_led_voltage_set(VOLTAGE_OFF + voltage);
+
+	schedule_delayed_work(&info->power_work, info->anim_delay);
 
 anim_done:
 	mutex_unlock(&info->touchkey_led_mutex);
-
-	return;
 }
 
 
@@ -206,18 +185,35 @@ static void cypress_touchkey_brightness_set(struct led_classdev *led_cdev,
 	/* Must not sleep, use a workqueue if needed */
 	struct cypress_touchkey_info *info =
 		container_of(led_cdev, struct cypress_touchkey_info, leds);
+	int anim_total;
+
+	mutex_lock(&info->touchkey_led_mutex);
+
+	info->brightness = brightness;
 
 	/* If we're suspending, don't turn the lights back on.  Userspace is
 	 * massively brain-damaged, and relies on this behavior.
 	 */
 	if (info->status != TOUCHKEY_INPUT && brightness)
-		return;
+		goto out;
 
 	cancel_delayed_work_sync(&info->power_work);
 
-	mutex_lock(&info->touchkey_led_mutex);
-	info->brightness = brightness;
+	if (info->brightness == LED_OFF)
+		anim_total = msecs_to_jiffies(TIME_OFF_MS);
+	else
+		anim_total = msecs_to_jiffies(TIME_ON_MS);
+
+	info->anim_delay = DIV_ROUND_UP(anim_total, ARRAY_SIZE(anim_scale));
+	info->anim_step = DIV_ROUND_UP(ARRAY_SIZE(anim_scale),
+			anim_total / info->anim_delay);
+
+	if (info->brightness == LED_OFF)
+		info->anim_step = -info->anim_step;
+
 	schedule_work(&info->power_work.work);
+
+out:
 	mutex_unlock(&info->touchkey_led_mutex);
 }
 
@@ -492,8 +488,7 @@ static ssize_t touch_led_control(struct device *dev,
 	int data;
 
 	if (sscanf(buf, "%u", &data))
-		cypress_touchkey_brightness_set(&info->leds,
-			data ? LED_FULL : LED_OFF);
+		cypress_touchkey_brightness_set(&info->leds, data);
 
 	return size;
 }
@@ -1246,11 +1241,13 @@ static void cypress_touchkey_early_suspend(struct early_suspend *h) {
 		return;
 #endif
 
+	/* If the lights aren't already off, reset the completion to avoid
+	 * cutting the animation off.  Userspace starts the animation.
+	 */
 	mutex_lock(&info->touchkey_led_mutex);
-	INIT_COMPLETION(info->anim_done);
+	if (info->anim_idx)
+		INIT_COMPLETION(info->anim_done);
 	mutex_unlock(&info->touchkey_led_mutex);
-
-	cypress_touchkey_brightness_set(&info->leds, LED_OFF);
 
 }
 
@@ -1266,7 +1263,8 @@ static void cypress_touchkey_fb_suspend(struct early_suspend *h) {
 	wait_for_completion_timeout(&info->anim_done,
 		msecs_to_jiffies(TIME_OFF_MS));
 
-	if (info->status == TOUCHKEY_POWER) {
+	// If userspace turned the lights back on, we shouldn't disable them.
+	if (info->anim_idx == 0 && info->status == TOUCHKEY_POWER) {
 		info->status = TOUCHKEY_DISABLE;
 
 		if (info->pdata->gpio_led_en)
@@ -1306,7 +1304,7 @@ static void cypress_touchkey_finish_resume(struct work_struct *work) {
 	if (info->status == TOUCHKEY_POWER) {
 		info->status = TOUCHKEY_INPUT;
 		cypress_touchkey_auto_cal(info);
-		cypress_touchkey_brightness_set(&info->leds, LED_FULL);
+		cypress_touchkey_brightness_set(&info->leds, info->leds.brightness);
 		enable_irq(info->irq);
 	}
 }
