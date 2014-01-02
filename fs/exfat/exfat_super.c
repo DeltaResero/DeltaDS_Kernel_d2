@@ -2136,6 +2136,16 @@ static int __init init_exfat_fs(void)
 
 	printk(KERN_INFO "exFAT: FS Version %s\n", EXFAT_VERSION);
 
+#ifndef CONFIG_EXFAT_FS_MODULE
+	err = FsInit();
+	if (err) {
+		if (err == FFS_MEMORYERR)
+			return -ENOMEM;
+		else
+			return -EIO;
+	}
+#endif
+
 	err = exfat_init_inodecache();
 	if (err) return err;
 
@@ -2146,6 +2156,9 @@ static void __exit exit_exfat_fs(void)
 {
 	exfat_destroy_inodecache();
 	unregister_filesystem(&exfat_fs_type);
+#ifndef CONFIG_EXFAT_FS_MODULE
+	FsShutdown();
+#endif
 }
 
 module_init(init_exfat_fs);
