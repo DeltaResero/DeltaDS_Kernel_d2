@@ -19,21 +19,11 @@ void _dkp_register(struct attribute *gattr) {
 }
 EXPORT_SYMBOL(_dkp_register);
 
-static struct sysfs_ops sysfs_ops = {
-        .show = gattr_generic_show,
-        .store = gattr_generic_store,
-};
-
-static struct kobj_type ktype_gattr = {
-        .sysfs_ops = &sysfs_ops,
-};
-
 static int __init register_dkp_kobject(void) {
         dkp_global_kobject = kobject_create();
         if (!dkp_global_kobject)
                 return -ENOMEM;
-        if (kobject_init_and_add(dkp_global_kobject,
-                &ktype_gattr, kernel_kobj, "dkp"))
+        if (kobject_add(dkp_global_kobject, kernel_kobj, "dkp"))
                 return -ENOMEM;
 
         return 0;
