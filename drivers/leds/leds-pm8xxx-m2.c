@@ -72,10 +72,7 @@ struct leds_dev_data {
 	u8 pattern;
 };
 
-/* 20-point sine curve.  All 3 channels must fit into the 64-point LUT.
- *
- * TODO: partition the LUT for the number of active channels; use larger array
- */
+// 20-point sine curve.  All 3 channels must fit into the 64-point LUT.
 static u8 breathe_duty_pcts[20] = {
 	0, 2, 7, 15, 27, 41, 58, 76, 96, 117,
 	138, 159, 179, 197, 214, 228, 240, 248, 253, 255,
@@ -95,8 +92,8 @@ static int generate_duty_table(int *target,
 		return 0;
 	/* Non-animated; either steady or plain blinking */
 	if (!(anim && time)) {
-		target[0] = color1 * lpm_mult / 255;
-		target[1] = color2 * lpm_mult / 255;
+		target[0] = DIV_ROUND_UP(color1 * lpm_mult, 255);
+		target[1] = DIV_ROUND_UP(color2 * lpm_mult, 255);
 		return 2;
 	}
 	/* Animate between two colors (color1 likely black) */
@@ -104,7 +101,7 @@ static int generate_duty_table(int *target,
 		if (unlikely(color1))
 			c = color1 * (255 - breathe_duty_pcts[i]);
 		target[i] = (color2 * breathe_duty_pcts[i] + c) *
-			lpm_mult / 255 / 255;
+			lpm_mult / (255 * 255);
 		if (breathe_duty_pcts[i] == 255) {
 			i++;
 			break;
@@ -126,7 +123,6 @@ static void led_set(struct pm8xxx_led_data *led, int brightness) {
 		led->reg);
 }
 
-// Use a fixed shift: pm8xxx uses brightness 0..2; these accept 0..255.
 static void pm8xxx_led_set(struct led_classdev *led_cdev,
 		enum led_brightness value) {
 	struct pm8xxx_led_data *led =
@@ -147,14 +143,14 @@ static void led_pwm_config(struct pm8xxx_led_data *led, int time1, int time2) {
 
 	led->pwm_dev = pwm_request(led->pwm_channel, led->cdev.name);
 
-	if (IS_ERR_OR_NULL(led->pwm_dev)) {
+	if (unlikely(IS_ERR_OR_NULL(led->pwm_dev))) {
 		pr_err("can't get led\n");
 		led->pwm_dev = NULL;
 		return;
 	}
 
-	if (led->pwm_duty_cycles->start_idx +
-	    led->pwm_duty_cycles->num_duty_pcts > PM_PWM_LUT_SIZE) {
+	if (unlikely(led->pwm_duty_cycles->start_idx +
+	    led->pwm_duty_cycles->num_duty_pcts > PM_PWM_LUT_SIZE)) {
 		pr_err("lut too large\n");
 		pwm_free(led->pwm_dev);
 		led->pwm_dev = NULL;
@@ -378,9 +374,7 @@ static ssize_t led_blink_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t size) {
 	struct leds_dev_data *info = dev_get_drvdata(dev);
 	u32 color = 0;
-	unsigned int delayon = 0;
-	unsigned int delayoff = 0;
-	unsigned int cycle_time = 0;
+	unsigned int delayon, delayoff, animtime;
 
 	printk(KERN_ALERT "[LED_blink_store] is \"%s\" (pid %i)\n",
 		current->comm, current->pid);
@@ -396,14 +390,23 @@ static ssize_t led_blink_store(struct device *dev,
 
 	/* TODO: adjustablize this? */
 	if (delayon || delayoff) {
-		// "Breathing" means the LED is on less.  Compensate.
-		cycle_time = delayon = delayon / 2;
-		if (delayoff > delayon) {
-			delayoff -= delayon;
+		animtime = 500;
+
+		if (delayon && (animtime > delayon / 2))
+			animtime = delayon / 2;
+		if (delayoff && (animtime > delayoff / 2))
+			animtime = delayoff / 2;
+
+		if (animtime < 40) {
+			animtime = 0;
 		} else {
-			delayon -= delayoff;
-			delayoff = 0;
+			if (delayon)
+				delayon -= animtime;
+			if (delayoff)
+				delayoff -= animtime;
 		}
+	} else {
+		animtime = 0;
 	}
 
 	mutex_lock(&info->led_work_lock);
@@ -412,7 +415,7 @@ static ssize_t led_blink_store(struct device *dev,
 	info->color2 = color;
 	info->time1 = delayoff;
 	info->time2 = delayon;
-	info->timetrans = cycle_time;
+	info->timetrans = animtime;
 	info->pattern = 0;
 	if (!work_busy(&info->pattern_work))
 		schedule_work(&info->pattern_work);
