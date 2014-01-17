@@ -387,7 +387,7 @@ static void wl_ch_to_chanspec(int ch,
  * information element utilities
  */
 static void wl_rst_ie(struct wl_priv *wl);
-static s32 wl_add_ie(struct wl_priv *wl, u8 t, u8 l, u8 *v);
+static s32 __maybe_unused wl_add_ie(struct wl_priv *wl, u8 t, u8 l, u8 *v);
 static s32 wl_mrg_ie(struct wl_priv *wl, u8 *ie_stream, u16 ie_size);
 static s32 wl_cp_ie(struct wl_priv *wl, u8 *dst, u16 dst_size);
 static u32 wl_get_ielen(struct wl_priv *wl);
@@ -429,7 +429,7 @@ static void wl_delay(u32 ms);
  * ibss mode utilities
  */
 static bool wl_is_ibssmode(struct wl_priv *wl, struct net_device *ndev);
-static bool wl_is_ibssstarter(struct wl_priv *wl);
+static bool __maybe_unused wl_is_ibssstarter(struct wl_priv *wl);
 
 /*
  * link up/down , default configuration utilities
@@ -468,7 +468,7 @@ static s32 wl_iscan_aborted(struct wl_priv *wl);
 /*
  * find most significant bit set
  */
-static u32 wl_find_msb(u16 bit16);
+static u32 __maybe_unused wl_find_msb(u16 bit16);
 
 /*
  * rfkill support
@@ -3965,7 +3965,7 @@ wl_cfg80211_set_power_mgmt(struct wiphy *wiphy, struct net_device *dev,
 	return err;
 }
 
-static u32 wl_find_msb(u16 bit16)
+static u32 __maybe_unused wl_find_msb(u16 bit16)
 {
 	u32 ret = 0;
 
@@ -10284,7 +10284,7 @@ static bool wl_is_ibssmode(struct wl_priv *wl, struct net_device *ndev)
 	return wl_get_mode_by_netdev(wl, ndev) == WL_MODE_IBSS;
 }
 
-static bool wl_is_ibssstarter(struct wl_priv *wl)
+static bool __maybe_unused wl_is_ibssstarter(struct wl_priv *wl)
 {
 	return wl->ibss_starter;
 }
@@ -10296,7 +10296,7 @@ static void wl_rst_ie(struct wl_priv *wl)
 	ie->offset = 0;
 }
 
-static s32 wl_add_ie(struct wl_priv *wl, u8 t, u8 l, u8 *v)
+static s32 __maybe_unused wl_add_ie(struct wl_priv *wl, u8 t, u8 l, u8 *v)
 {
 	struct wl_ie *ie = wl_to_ie(wl);
 	s32 err = 0;

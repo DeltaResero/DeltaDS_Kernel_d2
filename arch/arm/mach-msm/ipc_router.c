@@ -50,11 +50,11 @@ enum {
 
 #define msm_ipc_router_debug_mask (0)
 
-static void *ipc_rtr_log_ctxt;
 #define IPC_RTR_LOG_PAGES 5
 #define DIAG(x...) pr_info("[RR] ERROR " x)
 
 #if defined(DEBUG)
+static void *ipc_rtr_log_ctxt;
 #define D(x...) do { \
 if (ipc_rtr_log_ctxt) \
 	ipc_log_string(ipc_rtr_log_ctxt, x); \

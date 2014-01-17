@@ -69,8 +69,7 @@ typedef enum ewlfc_mac_entry_action {
 typedef struct wlfc_hanger_item {
 	uint8	state;
 	uint8   gen;
-	uint8	pad[2];
-	uint32	identifier;
+	uint16	identifier;
 	void*	pkt;
 #ifdef PROP_TXSTATUS_DEBUG
 	uint32	push_time;
