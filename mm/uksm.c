@@ -514,7 +514,7 @@ static unsigned int uksm_sleep_jiffies;
 /* Base CPU limit that ratios are scaled against */
 static unsigned int uksm_max_cpu_percentage;
 
-static int uksm_cpu_governor = 1;
+static int uksm_cpu_governor = 2;
 
 static char *uksm_cpu_governor_str[4] = { "full", "medium", "low", "quiet" };
 
@@ -535,7 +535,7 @@ struct uksm_cpu_preset_s {
 struct uksm_cpu_preset_s uksm_cpu_preset[4] = {
 	{ {-5000, -7500, -9000, -10000}, {90000, 500, 200, 100}, 75},
 	{ {-5000, -6000, -7500, -10000}, {120000, 1000, 500, 250}, 20},
-	{ {-4000, -5000, -7500, -10000}, {180000, 2500, 1000, 500}, 15},
+	{ {-5000, -6000, -7500, -10000}, {180000, 2500, 1000, 500}, 10},
 	{ {-2500, -3500, -5000, -10000}, {300000, 4000, 2500, 1500}, 5},
 };
 
@@ -4560,7 +4560,7 @@ rm_slot:
 		delta_exec = ktime_to_us(ktime_sub(end_wall, start_wall));
 		if (likely(delta_exec)) {
 			cost = (vpages * 1000) / ((unsigned long)delta_exec);
-			uksm_ema_wall_pages = ema(cost, uksm_ema_wall_pages, 25);
+			uksm_ema_wall_pages = ema(cost, uksm_ema_wall_pages, 30);
 		}
 	}
 
@@ -4895,10 +4895,10 @@ static ssize_t max_cpu_percentage_store(struct kobject *kobj,
 	if (err || max_cpu_percentage > 100)
 		return -EINVAL;
 
-	if (max_cpu_percentage == 100)
-		max_cpu_percentage = 99;
-	else if (max_cpu_percentage < 10)
-		max_cpu_percentage = 10;
+	if (max_cpu_percentage > 75)
+		max_cpu_percentage = 75;
+	else if (!max_cpu_percentage)
+		max_cpu_percentage = 1;
 
 	uksm_max_cpu_percentage = max_cpu_percentage;
 
