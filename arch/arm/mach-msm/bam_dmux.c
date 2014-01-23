@@ -1342,6 +1342,7 @@ static int debug_stats(char *buf, int max)
 {
 	int i = 0;
 
+#if 0
 	i += scnprintf(buf + i, max - i,
 			"skb read cnt:    %u\n"
 			"skb write cnt:   %u\n"
@@ -1364,6 +1365,7 @@ static int debug_stats(char *buf, int max)
 			atomic_read(&bam_dmux_ack_in_cnt),
 			atomic_read(&bam_dmux_a2_pwr_cntl_in_cnt)
 			);
+#endif
 
 	return i;
 }
