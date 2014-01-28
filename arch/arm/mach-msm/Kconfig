@@ -2409,6 +2409,9 @@ config MSM_ULTRASOUND
 	help
 	  Enable support for qdsp6/ultrasound.
 
+config MSM_QDSP6_DEBUG
+	bool "Crash debug for QDSP"
+
 config MSM_RPC_VIBRATOR
 	bool "RPC based MSM Vibrator Support"
 	depends on MSM_ONCRPCROUTER

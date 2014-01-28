@@ -247,6 +247,7 @@ struct platform_device msm8960ab_device_acpuclk = {
 	.id		= -1,
 };
 
+#ifdef CONFIG_MSM_TZ_LOG
 #define SHARED_IMEM_TZ_BASE 0x2a03f720
 static struct resource tzlog_resources[] = {
 	{
@@ -262,6 +263,7 @@ struct platform_device msm_device_tz_log = {
 	.num_resources	= ARRAY_SIZE(tzlog_resources),
 	.resource	= tzlog_resources,
 };
+#endif
 
 static struct resource resources_uart_gsbi2[] = {
 	{
@@ -2274,6 +2276,7 @@ struct platform_device msm8960_device_vpe = {
 };
 #endif
 
+#ifdef CONFIG_TSIF
 #define MSM_TSIF0_PHYS       (0x18200000)
 #define MSM_TSIF1_PHYS       (0x18201000)
 #define MSM_TSIF_SIZE        (0x200)
@@ -2378,6 +2381,7 @@ struct platform_device msm_device_tsif[2] = {
 		},
 	}
 };
+#endif
 
 static struct resource resources_ssbi_pmic[] = {
 	{
@@ -4100,6 +4104,7 @@ struct platform_device msm8960_rpm_device = {
 	.id     = -1,
 };
 
+#ifdef CONFIG_MSM_RPM_LOG
 static struct msm_rpm_log_platform_data msm_rpm_log_pdata = {
 	.phys_addr_base = 0x0010C000,
 	.reg_offsets = {
@@ -4118,7 +4123,9 @@ struct platform_device msm8960_rpm_log_device = {
 		.platform_data = &msm_rpm_log_pdata,
 	},
 };
+#endif
 
+#ifdef CONFIG_MSM_RPM_STATS_LOG
 static struct msm_rpmstats_platform_data msm_rpm_stat_pdata = {
 	.phys_addr_base = 0x0010DD04,
 	.phys_size = SZ_256,
@@ -4162,6 +4169,7 @@ struct platform_device msm8960_rpm_master_stat_device = {
 		.platform_data = &msm_rpm_master_stat_pdata,
 	},
 };
+#endif
 
 struct platform_device msm_bus_sys_fabric = {
 	.name  = "msm_bus_fabric",
@@ -4665,6 +4673,7 @@ struct platform_device msm8960_iommu_domain_device = {
 	}
 };
 
+#ifdef CONFIG_MSM_RTB
 struct msm_rtb_platform_data msm8960_rtb_pdata = {
 	.size = SZ_1M,
 };
@@ -4687,7 +4696,9 @@ struct platform_device msm8960_rtb_device = {
 		.platform_data = &msm8960_rtb_pdata,
 	},
 };
+#endif
 
+#ifdef CONFIG_MSM_CACHE_DUMP
 #define MSM_8960_L1_SIZE  SZ_1M
 /*
  * The actual L2 size is smaller but we need a larger buffer
@@ -4707,6 +4718,7 @@ struct platform_device msm8960_cache_dump_device = {
 		.platform_data = &msm8960_cache_dump_pdata,
 	},
 };
+#endif
 
 struct dev_avtimer_data dev_avtimer_pdata = {
 	.avtimer_msw_phy_addr = AVTIMER_MSW_PHYSICAL_ADDRESS,

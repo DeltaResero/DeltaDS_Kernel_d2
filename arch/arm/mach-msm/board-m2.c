@@ -186,10 +186,12 @@ extern unsigned int system_rev;
 struct tsp_callbacks *charger_callbacks;
 #endif
 
+#ifdef CONFIG_RADIO_IRIS
 static struct platform_device msm_fm_platform_init = {
 	.name = "iris_fm",
 	.id   = -1,
 };
+#endif
 
 #ifdef CONFIG_SEC_DEBUG
 #include <mach/sec_debug.h>
@@ -459,6 +461,7 @@ static struct platform_device android_pmem_audio_device = {
 struct fmem_platform_data msm8960_fmem_pdata = {
 };
 
+#ifdef CONFIG_QDSP6_DEBUG
 #define DSP_RAM_BASE_8960 0x8da00000
 #define DSP_RAM_SIZE_8960 0x1800000
 static int dspcrashd_pdata_8960 = 0xDEADDEAD;
@@ -478,6 +481,7 @@ static struct platform_device msm_device_dspcrashd_8960 = {
 	.resource       = resources_dspcrashd_8960,
 	.dev = { .platform_data = &dspcrashd_pdata_8960 },
 };
+#endif
 
 static struct memtype_reserve msm8960_reserve_table[] __initdata = {
 	[MEMTYPE_SMI] = {
@@ -512,14 +516,14 @@ static struct platform_device msm_rtb_device = {
 		.platform_data = &msm_rtb_pdata,
 	},
 };
-#endif
 
 static void __init reserve_rtb_memory(void)
 {
-#if defined(CONFIG_MSM_RTB)
 	msm8960_reserve_table[MEMTYPE_EBI1].size += msm_rtb_pdata.size;
-#endif
 }
+#else
+static inline void reserve_rtb_memory(void) { }
+#endif
 
 static int msm8960_paddr_to_memtype(unsigned int paddr)
 {
@@ -972,7 +976,7 @@ static void __init reserve_mdp_memory(void)
 	msm8960_mdp_writeback(msm8960_reserve_table);
 }
 
-#if defined(CONFIG_MSM_CACHE_DUMP)
+#ifdef CONFIG_MSM_CACHE_DUMP
 static struct msm_cache_dump_platform_data msm_cache_dump_pdata = {
 	.l2_size = L2_BUFFER_SIZE,
 };
@@ -985,11 +989,8 @@ static struct platform_device msm_cache_dump_device = {
 	},
 };
 
-#endif
-
 static void reserve_cache_dump_memory(void)
 {
-#ifdef CONFIG_MSM_CACHE_DUMP
 	unsigned int spare;
 	unsigned int l1_size;
 	unsigned int total;
@@ -1006,8 +1007,10 @@ static void reserve_cache_dump_memory(void)
 
 	msm8960_reserve_table[MEMTYPE_EBI1].size += total;
 	msm_cache_dump_pdata.l1_size = l1_size;
-#endif
 }
+#else
+static inline void reserve_cache_dump_memory(void) { }
+#endif
 
 static void __init msm8960_calculate_reserve_sizes(void)
 {
@@ -3103,6 +3106,7 @@ static struct platform_device qcedev_device = {
 };
 #endif
 
+#ifdef CONFIG_MACH_MSM8960_CDP
 #define MDM2AP_ERRFATAL			70
 #define AP2MDM_ERRFATAL			95
 #define MDM2AP_STATUS			69
@@ -3166,6 +3170,7 @@ static struct platform_device mdm_device = {
 static struct platform_device *mdm_devices[] __initdata = {
 	&mdm_device,
 };
+#endif
 
 #define MSM_SHARED_RAM_PHYS 0x80000000
 
@@ -3668,6 +3673,7 @@ static struct msm_spm_platform_data msm_spm_l2_data[] __initdata = {
 	},
 };
 
+#ifdef CONFIG_HAPTIC_ISA1200
 #define PM_HAP_EN_GPIO		PM8921_GPIO_PM_TO_SYS(33)
 #define PM_HAP_LEN_GPIO		PM8921_GPIO_PM_TO_SYS(20)
 
@@ -3793,6 +3799,7 @@ static struct i2c_board_info msm_isa1200_board_info[] __initdata = {
 		.platform_data = &isa1200_1_pdata,
 	},
 };
+#endif
 
 #ifdef CONFIG_NFC_PN544
 static struct i2c_gpio_platform_data pn544_i2c_gpio_data = {
@@ -4203,6 +4210,7 @@ static struct platform_device msm8960_device_rpm_regulator __devinitdata = {
 	},
 };
 
+#ifdef CONFIG_MSM_RPM_LOG
 static struct msm_rpm_log_platform_data msm_rpm_log_pdata = {
 	.phys_addr_base = 0x0010C000,
 	.reg_offsets = {
@@ -4221,6 +4229,7 @@ static struct platform_device msm_rpm_log_device = {
 		.platform_data = &msm_rpm_log_pdata,
 	},
 };
+#endif
 
 #ifdef CONFIG_SAMSUNG_JACK
 #define PMIC_GPIO_EAR_DET		36
@@ -4411,7 +4420,9 @@ static struct platform_device *common_devices[] __initdata = {
 #endif
 	&msm_device_vidc,
 	&msm_device_bam_dmux,
+#ifdef CONFIG_RADIO_IRIS
 	&msm_fm_platform_init,
+#endif
 
 #if defined(CONFIG_TSIF) || defined(CONFIG_TSIF_MODULE)
 #ifdef CONFIG_MSM_USE_TSIF1
@@ -4428,9 +4439,15 @@ static struct platform_device *common_devices[] __initdata = {
 	&msm8960_ion_dev,
 #endif
 	&msm8960_rpm_device,
+#ifdef CONFIG_MSM_RPM_LOG
 	&msm_rpm_log_device,
+#endif
+#ifdef CONFIG_MSM_RPM_STATS_LOG
 	&msm8960_rpm_stat_device,
+#endif
+#ifdef CONFIG_MSM_TZ_LOG
 	&msm_device_tz_log,
+#endif
 #if 0
 #ifdef CONFIG_MSM_QDSS
 	&msm_etb_device,
@@ -4439,7 +4456,9 @@ static struct platform_device *common_devices[] __initdata = {
 	&msm_etm_device,
 #endif
 #endif
+#ifdef CONFIG_QDSP6_DEBUG
 	&msm_device_dspcrashd_8960,
+#endif
 	&msm8960_device_watchdog,
 #ifdef CONFIG_MSM_RTB
 	&msm_rtb_device,
@@ -4805,6 +4824,7 @@ static void __init msm8960_init_dsps(void)
 #endif /* CONFIG_MSM_DSPS */
 }
 
+#ifdef CONFIG_USB_EHCI_MSM_HSIC
 static int hsic_peripheral_status = 1;
 static DEFINE_MUTEX(hsic_status_lock);
 
@@ -4834,7 +4854,6 @@ EXPORT_SYMBOL(peripheral_disconnect);
 
 static void __init msm8960_init_hsic(void)
 {
-#ifdef CONFIG_USB_EHCI_MSM_HSIC
 	uint32_t version = socinfo_get_version();
 
 	if (SOCINFO_VERSION_MAJOR(version) == 1)
@@ -4842,8 +4861,8 @@ static void __init msm8960_init_hsic(void)
 
 	if (PLATFORM_IS_CHARM25() || machine_is_msm8960_liquid())
 		platform_device_register(&msm_device_hsic_host);
-#endif
 }
+#endif
 
 #ifdef CONFIG_ISL9519_CHARGER
 static struct isl_platform_data isl_data __initdata = {
@@ -5321,8 +5340,8 @@ static void __init samsung_m2_init(void)
 		if (SOCINFO_VERSION_MAJOR(socinfo_get_version()) >= 2)
 			msm_hsic_pdata.hub_reset = HSIC_HUB_RESET_GPIO;
 	}
-#endif
 	msm_device_hsic_host.dev.platform_data = &msm_hsic_pdata;
+#endif
 	msm8960_init_gpiomux();
 
 #ifndef CONFIG_S5C73M3
@@ -5366,7 +5385,9 @@ static void __init samsung_m2_init(void)
 	platform_add_devices(common_devices, ARRAY_SIZE(common_devices));
 	msm8960_pm8921_gpio_mpp_init();
 	platform_add_devices(m2_devices, ARRAY_SIZE(m2_devices));
+#ifdef CONFIG_USB_EHCI_MSM_HSIC
 	msm8960_init_hsic();
+#endif
 	msm8960_init_cam();
 	msm8960_init_mmc();
 	if (machine_is_msm8960_liquid())
@@ -5426,8 +5447,10 @@ static void __init samsung_m2_init(void)
 #endif
 	msm_pm_set_tz_retention_flag(1);
 
+#ifdef CONFIG_MACH_MSM8960_CDP
 	if (PLATFORM_IS_CHARM25())
 		platform_add_devices(mdm_devices, ARRAY_SIZE(mdm_devices));
+#endif
 	ion_adjust_secure_allocation();
 }
 

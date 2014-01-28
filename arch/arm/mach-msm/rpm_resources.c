@@ -375,7 +375,7 @@ static bool msm_rpmrs_use_mpm(struct msm_rpmrs_limits *limits)
 
 static void msm_rpmrs_update_levels(void)
 {
-	int i, k;
+	int i;
 
 	for (i = 0; i < msm_rpmrs_level_count; i++) {
 		struct msm_rpmrs_level *level = &msm_rpmrs_levels[i];

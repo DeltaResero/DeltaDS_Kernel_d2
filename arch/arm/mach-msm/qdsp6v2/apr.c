@@ -689,7 +689,9 @@ static int __init apr_init(void)
 		}
 	apr_set_subsys_state();
 	mutex_init(&q6.lock);
+#ifdef CONFIG_MSM_QDSP6_DEBUG
 	dsp_debug_register(adsp_state);
+#endif
 	apr_reset_workqueue = create_singlethread_workqueue("apr_driver");
 	if (!apr_reset_workqueue)
 		return -ENOMEM;
