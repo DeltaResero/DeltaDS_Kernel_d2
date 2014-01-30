@@ -4976,6 +4976,7 @@ static struct i2c_registry msm8960_i2c_devices[] __initdata = {
 		ARRAY_SIZE(cmc624_i2c_borad_info),
 	},
 #endif
+#ifdef CONFIG_MSM8960_LIQUID
 	{
 		I2C_LIQUID,
 		MSM_8960_GSBI10_QUP_I2C_BUS_ID,
@@ -4988,6 +4989,7 @@ static struct i2c_registry msm8960_i2c_devices[] __initdata = {
 		msm_isa1200_board_info,
 		ARRAY_SIZE(msm_isa1200_board_info),
 	},
+#endif
 #ifndef CONFIG_SLIMBUS_MSM_CTRL
 	{
 		I2C_SURF | I2C_FFA | I2C_FLUID,
