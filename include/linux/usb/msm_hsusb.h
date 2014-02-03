@@ -205,7 +205,7 @@ enum usb_vdd_value {
  */
 struct msm_otg_platform_data {
 	int *phy_init_seq;
-	int (*vbus_power)(bool on);
+	void (*vbus_power)(bool on);
 	unsigned power_budget;
 	enum usb_mode_type mode;
 	enum otg_control_type otg_control;

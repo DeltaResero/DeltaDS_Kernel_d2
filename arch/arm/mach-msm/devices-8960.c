@@ -121,6 +121,7 @@
 #define AVTIMER_MSW_PHYSICAL_ADDRESS 0x2800900C
 #define AVTIMER_LSW_PHYSICAL_ADDRESS 0x28009008
 
+#if 0
 static struct resource msm8960_resources_pccntr[] = {
 	{
 		.start	= MSM8960_PC_CNTR_PHYS,
@@ -135,6 +136,7 @@ struct platform_device msm8960_pc_cntr = {
 	.num_resources	= ARRAY_SIZE(msm8960_resources_pccntr),
 	.resource	= msm8960_resources_pccntr,
 };
+#endif
 
 static struct resource resources_otg[] = {
 	{
@@ -207,6 +209,7 @@ struct platform_device msm_device_hsusb_host = {
 	},
 };
 
+#ifdef CONFIG_USB_EHCI_MSM_HSIC
 static struct resource resources_hsic_host[] = {
 	{
 		.start	= 0x12520000,
@@ -236,6 +239,7 @@ struct platform_device msm_device_hsic_host = {
 		.coherent_dma_mask	= DMA_BIT_MASK(32),
 	},
 };
+#endif
 
 struct platform_device msm8960_device_acpuclk = {
 	.name		= "acpuclk-8960",
@@ -265,6 +269,7 @@ struct platform_device msm_device_tz_log = {
 };
 #endif
 
+#if 0
 static struct resource resources_uart_gsbi2[] = {
 	{
 		.start	= MSM8960_GSBI2_UARTDM_IRQ,
@@ -291,6 +296,8 @@ struct platform_device msm8960_device_uart_gsbi2 = {
 	.num_resources	= ARRAY_SIZE(resources_uart_gsbi2),
 	.resource	= resources_uart_gsbi2,
 };
+#endif
+
 /* GSBI 6 used into UARTDM Mode */
 static struct resource msm_uart_dm6_resources[] = {
 	{
@@ -335,6 +342,7 @@ struct platform_device msm_device_uart_dm6 = {
 	},
 };
 
+#if 0
 /* GSBI 8 used into UARTDM Mode */
 static struct resource msm_uart_dm8_resources[] = {
 	{
@@ -426,6 +434,7 @@ struct platform_device msm_device_uart_dm9 = {
 		.coherent_dma_mask	= DMA_BIT_MASK(32),
 	},
 };
+#endif
 
 /* GSBI10 used for serial console on 8930 SGLTE*/
 static struct msm_serial_hslite_platform_data uart_gsbi10_pdata;
@@ -4263,6 +4272,7 @@ struct platform_device msm_dsps_device = {
 
 #endif /* CONFIG_MSM_DSPS */
 
+#ifdef CONFIG_CORESIGHT_ETM
 #define CORESIGHT_PHYS_BASE		0x01A00000
 #define CORESIGHT_TPIU_PHYS_BASE	(CORESIGHT_PHYS_BASE + 0x3000)
 #define CORESIGHT_ETB_PHYS_BASE		(CORESIGHT_PHYS_BASE + 0x1000)
@@ -4456,6 +4466,7 @@ struct platform_device coresight_etm1_device = {
 		.platform_data = &coresight_etm1_pdata,
 	},
 };
+#endif
 
 static struct resource msm_ebi1_ch0_erp_resources[] = {
 	{

@@ -1370,24 +1370,19 @@ out:
 
 static void msm_hsusb_vbus_power(struct msm_otg *motg, bool on)
 {
-	int ret;
+	//int ret;
 	static bool vbus_is_on;
 
 	if (vbus_is_on == on)
 		return;
 
 	if (motg->pdata->vbus_power) {
-		ret = motg->pdata->vbus_power(on);
-		if (!ret)
-			vbus_is_on = on;
-#ifdef CONFIG_USB_HOST_NOTIFY
-		else
-			schedule_delayed_work(&motg->late_power_work,
-						(1000 * HZ/1000));
-#endif
+		motg->pdata->vbus_power(on);
+		vbus_is_on = on;
 		return;
 	}
 
+#if 0
 	if (!vbus_otg) {
 		pr_err("vbus_otg is NULL.");
 		return;
@@ -1416,6 +1411,7 @@ static void msm_hsusb_vbus_power(struct msm_otg *motg, bool on)
 		msm_otg_notify_host_mode(motg, on);
 		vbus_is_on = false;
 	}
+#endif
 }
 
 #ifdef CONFIG_USB_HOST_NOTIFY
