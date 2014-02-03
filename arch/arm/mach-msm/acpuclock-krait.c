@@ -1446,11 +1446,11 @@ static ssize_t store_override_vmin(struct cpufreq_policy *policy,
         int val;
         if (sscanf(buf, "%i", &val) != 1)
                 return -EINVAL;
-        final_vmin = val ? 1150000 : 700000;
+        final_vmin = val ? VMIN_VDD : MIN_VDD;
         return count;
 }
 static ssize_t show_override_vmin(struct cpufreq_policy *policy, char *buf) {
-        return sprintf(buf, "%u\n", final_vmin >= 1150000);
+        return sprintf(buf, "%u\n", final_vmin >= VMIN_VDD);
 }
 cpufreq_freq_attr_rw(override_vmin);
 
@@ -1463,7 +1463,7 @@ static ssize_t store_vmin(struct kobject *kobj, struct attribute *attr,
 		const char *buf, size_t count) {
 	unsigned int temp;
 	if (sscanf(buf, "%u", &temp) == 1) {
-		if (temp >= 700 && temp <= 1400) {
+		if (temp >= MIN_VDD / 1000 && temp <= VMIN_VDD / 1000) {
 			final_vmin = temp * 1000;
 			return count;
 		}
