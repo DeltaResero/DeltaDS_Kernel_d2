@@ -26,6 +26,7 @@ struct gen_attr {
 	// Generic function information
 	int min, max;			// min < val < max
 	int cnt, stride;		// nr elements, bytes until next element
+	int divisor;			// scale displayed/read value
 	void *ptr;			// ptr to first element or target for get/set
 	int (*get)(void *);		// NULL or called to get *ptr
 	void (*set)(void *, int);	// NULL or called to set *ptr = int
@@ -46,24 +47,25 @@ extern ssize_t gattr_generic_show(struct kobject *kobj, struct attribute *attr,
 // A panic waiting to happen
 #define gen_gattr(attr) ((struct gen_attr *)&attr)
 
-#define __GENATTR(_name,_mode,_min,_max,_cnt,_stride,_ptr,_set,_get,_cb,_fmt) { \
+#define __GENATTR(_name,_mode,_min,_max,_cnt,_stride,_div,_ptr,_set,_get,_cb,_fmt) { \
 	.attr = {.name = __stringify(_name), .mode = _mode}, \
 	.store = gattr_generic_store, .show = gattr_generic_show, \
 	.min = _min, .max = _max, .cnt = _cnt, .stride = _stride, \
-	.ptr = (void *) _ptr, .set = _set, .get = _get, .cb = _cb, .fmt = _fmt, \
+	.divisor = _div, .ptr = (void *) _ptr, .set = _set, .get = _get, \
+	.cb = _cb, .fmt = _fmt, \
 }
 
 // single-int attr
 #define __GATTR_NAME(var,name,min,max,cb) \
 struct gen_attr gattr_##name = __GENATTR( \
-	name, 0666, min, max, 1, 0, &var, NULL, NULL, cb, NULL)
+	name, 0644, min, max, 1, 0, 0, &var, NULL, NULL, cb, NULL)
 
 #define __GATTR(name,min,max,cb) __GATTR_NAME(name,name,min,max,cb)
 
 // int-array attr
 #define __GATTR_ARR_NAME(var,name,min,max,cb) \
 struct gen_attr gattr_##name = __GENATTR( \
-	name, 0666, min, max, (sizeof(name)/sizeof(int)), sizeof(int), \
+	name, 0644, min, max, (sizeof(name)/sizeof(int)), sizeof(int), 0, \
 	var, NULL, NULL, cb, NULL)
 
 #define __GATTR_ARR(name,min,max,cb) __GATTR_ARR_NAME(name,name,min,max,cb)
@@ -73,14 +75,14 @@ struct gen_attr gattr_##name = __GENATTR( \
 // single-struct attr
 #define __GATTR_STR_NAME(name,elm,str,min,max,cb) \
 struct gen_attr gattr_##name = __GENATTR( \
-	name, 0666, min, max, 1, 0, &str.elm, NULL, NULL, cb, NULL)
+	name, 0644, min, max, 1, 0, 0, &str.elm, NULL, NULL, cb, NULL)
 
 #define __GATTR_STR(name,str,min,max,cb) __GATTR_STR_NAME(name,name,str,min,max,cb)
 
 // struct-array attr
 #define __GATTR_STR_ARR_NAME(name,elm,str,min,max,cb) \
 struct gen_attr gattr_##name = __GENATTR( \
-	name, 0666, min, max, (sizeof(str)/sizeof(str[0])), sizeof(str[0]), \
+	name, 0644, min, max, (sizeof(str)/sizeof(str[0])), sizeof(str[0]), 0, \
 	&str.elm, NULL, NULL, cb, NULL)
 
 #define __GATTR_STR_ARR(name,str,min,max,cb) __GATTR_STR_NAME(name,name,str,min,max,cb)

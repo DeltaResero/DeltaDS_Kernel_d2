@@ -24,6 +24,8 @@ ssize_t gattr_generic_store(struct kobject *kobj, struct attribute *attr,
 	for (i = 0, t = 0; i < gattr->cnt; i++) {
 		r = sscanf(buf + t, " %i%n", &v[i], &l);
 		if (!r || v[i] < gattr->min || v[i] > gattr->max) break;
+		if (gattr->divisor > 1)
+			v[i] *= gattr->divisor;
 		t += l;
 	}
 	while (buf[t] == ' ' && t < count) t++;
@@ -61,6 +63,8 @@ ssize_t gattr_generic_show(struct kobject *kobj, struct attribute *attr, char *b
 			v = gattr->get(p);
 		else
 			v = *((int *)p);
+		if (gattr->divisor > 1)
+			v /= gattr->divisor;
 		l += sprintf(buf + l, fmt, v);
 		p += gattr->stride;
 	}
