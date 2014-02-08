@@ -1456,28 +1456,15 @@ cpufreq_freq_attr_rw(override_vmin);
 
 void acpuclk_maybe_add_override_vmin(struct kobject *kobj) {
 	if (kobj && krait_needs_vmin())
-		sysfs_create_file(kobj, &override_vmin.attr);
+		if (sysfs_create_file(kobj, &override_vmin.attr))
+			pr_err("%s: create_file failed\n", __func__);
 }
 
-static ssize_t store_vmin(struct kobject *kobj, struct attribute *attr,
-		const char *buf, size_t count) {
-	unsigned int temp;
-	if (sscanf(buf, "%u", &temp) == 1) {
-		if (temp >= MIN_VDD / 1000 && temp <= VMIN_VDD / 1000) {
-			final_vmin = temp * 1000;
-			return count;
-		}
-	}
-	return -EINVAL;
-}
-static ssize_t show_vmin(struct kobject *kobj,
-		struct attribute *attr, char *buf) {
-	return sprintf(buf, "%u\n", final_vmin / 1000);
-}
-static struct global_attr vmin_attr = __ATTR(vmin, 0666,
-		show_vmin, store_vmin);
+static struct gen_attr gattr_vmin = __GENATTR(vmin, 0644,
+	MIN_VDD, VMIN_VDD, 1, 0, 1000, &final_vmin,
+	NULL, NULL, NULL, NULL);
 static struct attribute *dkp_attributes[] = {
-	&vmin_attr.attr,
+	&gen_attr(vmin),
 	NULL
 };
 static struct attribute_group dkp_attr_group = {
@@ -1527,7 +1514,7 @@ int __init acpuclk_krait_init(struct device *dev,
 		pr_err("Unable to create dkp group!\n");
 	if (sysfs_create_group(cpufreq_global_kobject, &vdd_attr_group))
 		pr_err("Unable to create vdd_table group!\n");
-	_dkp_register(&vmin_attr.attr);
+	dkp_register(vmin);
 
 	return 0;
 }
