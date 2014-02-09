@@ -1461,7 +1461,7 @@ void acpuclk_maybe_add_override_vmin(struct kobject *kobj) {
 }
 
 static struct gen_attr gattr_vmin = __GENATTR(vmin, 0644,
-	MIN_VDD, VMIN_VDD, 1, 0, 1000, &final_vmin,
+	MIN_VDD / 1000, VMIN_VDD / 1000, 1, 0, 1000, &final_vmin,
 	NULL, NULL, NULL, NULL);
 static struct attribute *dkp_attributes[] = {
 	&gen_attr(vmin),
