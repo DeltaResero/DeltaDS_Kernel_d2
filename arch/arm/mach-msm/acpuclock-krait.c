@@ -1272,10 +1272,7 @@ static int acpuclk_update_vdd_table(int num, unsigned int table[]) {
 	for (tgt = drv.acpu_freq_tbl; tgt->vdd_core; tgt++) {
 		if (i < 0 || i > num)
 			return 1;
-		if (tgt->vdd_core <= final_vmin)
-			tgt->vdd_core += table[i] - final_vmin;
-		else
-			tgt->vdd_core = table[i];
+                tgt->vdd_core = table[i];
                 i += dir;
         }
 	return 0;
@@ -1284,10 +1281,7 @@ static int acpuclk_update_one_vdd(unsigned int freq, unsigned int uv) {
 	struct acpu_level *tgt = drv.acpu_freq_tbl;
 	for (; tgt->speed.khz; tgt++) {
 		if (tgt->speed.khz == freq) {
-			if (tgt->vdd_core <= final_vmin)
-				tgt->vdd_core += uv - final_vmin;
-			else
-				tgt->vdd_core = uv;
+			tgt->vdd_core = uv;
 			return 0;
 		}
 	}
@@ -1326,10 +1320,9 @@ static ssize_t _acpuclk_store_vdd_table(const char *buf, size_t count) {
 			adjust *= 1000;
 	}
 	if (ret == 1) {
-		if (!acpuclk_update_all_vdd(adjust)) {
-			acpuclk_update_nom_min();
+		if (!acpuclk_update_all_vdd(adjust))
 			return count;
-		} else
+		else
 			return -EINVAL;
 	}
 
@@ -1350,11 +1343,9 @@ static ssize_t _acpuclk_store_vdd_table(const char *buf, size_t count) {
 	if (thislen == count - 1) {
 		while (freq < 10000) freq *= 1000;
 		sanity_check(volt);
-		if (!acpuclk_update_one_vdd(freq, volt)) {
-			if (freq == 384000)
-				acpuclk_update_nom_min();
+		if (!acpuclk_update_one_vdd(freq, volt))
 			return count;
-		} else
+		else
 			return -EINVAL;
 	}
 
@@ -1368,10 +1359,9 @@ static ssize_t _acpuclk_store_vdd_table(const char *buf, size_t count) {
 	// skip trailing whitespace for voltage control
 	while (buf[len] == ' ') len++;
 	if (idx == (FREQ_TABLE_SIZE - 1) && len == (count - 1)) {
-		if (!acpuclk_update_vdd_table(idx, table)) {
-			acpuclk_update_nom_min();
+		if (!acpuclk_update_vdd_table(idx, table))
 			return count;
-		} else
+		else
 			return -EINVAL;
 	}
 
@@ -1381,6 +1371,7 @@ static ssize_t _acpuclk_store_vdd_table(const char *buf, size_t count) {
 }
 ssize_t acpuclk_store_vdd_table(const char *buf, size_t count) {
 	ssize_t ret = _acpuclk_store_vdd_table(buf, count);
+	acpuclk_update_nom_min();
 	return ret;
 }
 ssize_t acpuclk_show_vdd_table(char *buf, char *fmt, int dir, int fdiv, int vdiv) {
@@ -1397,8 +1388,7 @@ ssize_t acpuclk_show_vdd_table(char *buf, char *fmt, int dir, int fdiv, int vdiv
 	while (i >= 0 && i < FREQ_TABLE_SIZE - 1) {
 		struct acpu_level tgt = drv.acpu_freq_tbl[i];
 		len += sprintf(buf + len, fmt,
-			tgt.speed.khz / fdiv,
-			max(tgt.vdd_core, final_vmin) / vdiv);
+			tgt.speed.khz / fdiv, tgt.vdd_core / vdiv);
 		i += dir;
 	}
 	return len;
