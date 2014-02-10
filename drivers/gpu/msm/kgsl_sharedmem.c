@@ -297,7 +297,6 @@ _kgsl_sharedmem_page_alloc(struct kgsl_memdesc *memdesc,
 
 	sglen_alloc = PAGE_ALIGN(size) >> PAGE_SHIFT;
 
-	memdesc->size = size;
 	memdesc->pagetable = pagetable;
 	memdesc->ops = &kgsl_page_alloc_ops;
 
@@ -360,6 +359,14 @@ _kgsl_sharedmem_page_alloc(struct kgsl_memdesc *memdesc,
 				continue;
 			}
 
+			/*
+			 * Update sglen and memdesc size,as requested allocation
+			 * not served fully. So that they can be correctly freed
+			 * in kgsl_sharedmem_free().
+			 */
+			memdesc->sglen = sglen;
+			memdesc->size = (size - len);
+
 			KGSL_CORE_ERR(
 				"Out of memory: only allocated %dKB of %dKB requested\n",
 				(size - len) >> 10, size >> 10);
@@ -376,6 +383,7 @@ _kgsl_sharedmem_page_alloc(struct kgsl_memdesc *memdesc,
 	}
 
 	memdesc->sglen = sglen;
+	memdesc->size = size;
 
 	/*
 	 * All memory that goes to the user has to be zeroed out before it gets
@@ -419,6 +427,9 @@ _kgsl_sharedmem_page_alloc(struct kgsl_memdesc *memdesc,
 	order = get_order(size);
 
 done:
+	KGSL_STATS_ADD(memdesc->size, kgsl_driver.stats.page_alloc,
+		kgsl_driver.stats.page_alloc_max);
+
 	if ((memdesc->sglen_alloc * sizeof(struct page *)) > PAGE_SIZE)
 		vfree(pages);
 	else
