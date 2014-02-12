@@ -5984,6 +5984,7 @@ static void _dhd_release_wakelock(unsigned long data)
 		dhd->wl_timer.expires = dhd->wl_timeout;
 		add_timer(&dhd->wl_timer);
 	}
+
 	spin_unlock_irqrestore(&dhd->wakelock_spinlock, flags);
 }
 /* wake_lock_timeout: no-op; wake_unlock() will kick off the timer later */
@@ -5992,9 +5993,15 @@ void dhd_int_wake_lock_timeout(dhd_info_t *dhd) { return; }
 /* timeout_enable: update wakelock expiry */
 void dhd_int_wake_timeout_enable(dhd_info_t *dhd, int val)
 {
+	if (!val)
+		return;
+
 	if (likely(dhd)) {
 		unsigned long flags;
 		long delta;
+
+		val = msecs_to_jiffies(val);
+
 		spin_lock_irqsave(&dhd->wakelock_spinlock, flags);
 
 		delta = dhd->wl_timeout - jiffies;
@@ -6029,7 +6036,10 @@ void dhd_int_wake_unlock(dhd_info_t *dhd)
 		unsigned long flags;
 		spin_lock_irqsave(&dhd->wakelock_spinlock, flags);
 
-		dhd->wakelock_counter--;
+		if (likely(dhd->wakelock_counter > 0))
+			dhd->wakelock_counter--;
+		else
+			goto skip_timer;
 
 		if (!dhd->wakelock_counter) {
 			long delta = dhd->wl_timeout - jiffies;
@@ -6043,6 +6053,7 @@ void dhd_int_wake_unlock(dhd_info_t *dhd)
 			}
 		}
 
+skip_timer:
 		spin_unlock_irqrestore(&dhd->wakelock_spinlock, flags);
 	}
 }
