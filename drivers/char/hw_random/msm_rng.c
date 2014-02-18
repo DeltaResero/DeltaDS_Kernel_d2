@@ -23,6 +23,10 @@
 #include <linux/err.h>
 #include <linux/types.h>
 #include <linux/workqueue.h>
+#include <linux/delay.h>
+#include <linux/atomic.h>
+#include <linux/sched.h>
+#include <linux/random.h>
 #include <mach/msm_iomap.h>
 #include <mach/socinfo.h>
 
@@ -55,9 +59,7 @@ static int msm_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
 	struct msm_rng_device *msm_rng_dev;
 	struct platform_device *pdev;
 	void __iomem *base;
-	size_t maxsize;
 	size_t currsize = 0;
-	unsigned long val;
 	unsigned long *retdata = data;
 	int ret;
 
@@ -66,10 +68,11 @@ static int msm_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
 	base = msm_rng_dev->base;
 
 	/* calculate max size bytes to transfer back to caller */
-	maxsize = min_t(size_t, MAX_HW_FIFO_SIZE, max);
+	max = min_t(size_t, MAX_HW_FIFO_SIZE, max);
 
 	/* no room for word data */
-	if (maxsize < 4)
+	max &= ~3;
+	if (!max)
 		return 0;
 
 	/* enable PRNG clock */
@@ -82,22 +85,13 @@ static int msm_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
 	/* read random data from h/w */
 	do {
 		/* check status bit if data is available */
-		if (!(readl_relaxed(base + PRNG_STATUS_OFFSET) & 0x00000001))
+		if (!(readl_relaxed(base + PRNG_STATUS_OFFSET) & 1))
 			break;	/* no data to read so just bail */
 
 		/* read FIFO */
-		val = readl_relaxed(base + PRNG_DATA_OUT_OFFSET);
-		if (!val)
-			break;	/* no data to read so just bail */
-
-		/* write data back to callers pointer */
-		*(retdata++) = val;
+		*(retdata++) = readl_relaxed(base + PRNG_DATA_OUT_OFFSET);
 		currsize += 4;
-
-		/* make sure we stay on 32bit boundary */
-		if ((maxsize - currsize) < 4)
-			break;
-	} while (currsize < maxsize);
+	} while (currsize < max);
 
 	/* vote to turn off clock */
 	clk_disable_unprepare(msm_rng_dev->prng_clk);
@@ -115,46 +109,61 @@ static struct hwrng msm_rng = {
  */
 static int dummy_random(void *data, size_t size) { return 0; }
 static int (*random_func)(void *, size_t) = dummy_random;
-#define RANDBUF_SIZE 512
-static void *randbuf;
-static int randbuf_bytes;
-static DEFINE_SPINLOCK(randbuf_lock);
-static struct work_struct randbuf_work;
+#define RANDBUF_CNT (256)
+#define RANDBUF_SIZE (RANDBUF_CNT * sizeof(unsigned long))
+static unsigned long *randbuf;
+static int randbuf_head;
+static atomic_t randbuf_tail;
+static atomic_t bufwork_running;
 static void do_randbuf_fill(struct work_struct *work) {
-	unsigned long flags;
-	int bytes = RANDBUF_SIZE - randbuf_bytes;
-	int read;
-	void *buf = kmalloc(bytes, GFP_KERNEL);
-	if (!buf) return;
+	int words, read;
 
-	read = msm_rng_read(&msm_rng, buf, bytes, 0);
+again:
+	words = atomic_read(&randbuf_tail) - randbuf_head - 1;
+	if (words <= 0)
+		words += RANDBUF_CNT;
+	if (randbuf_head + words >= RANDBUF_CNT)
+		words = RANDBUF_CNT - randbuf_head;
+	if (words > 16)
+		words = 16;
 
-	if (likely(read >= randbuf_bytes)) {
-		memmove(randbuf + read, randbuf, randbuf_bytes);
-		spin_lock_irqsave(&randbuf_lock, flags);
-	} else {
-		spin_lock_irqsave(&randbuf_lock, flags);
-		memmove(randbuf + read, randbuf, randbuf_bytes);
+	read = msm_rng_read(&msm_rng, randbuf + randbuf_head,
+		words * sizeof(unsigned long), 0);
+	mb();
+	randbuf_head = (randbuf_head + read / sizeof(unsigned long))
+		% RANDBUF_CNT;
+
+	if (read && atomic_read(&randbuf_tail) !=
+		(randbuf_head + 1) % RANDBUF_CNT) {
+		if (!schedule_timeout_interruptible(msecs_to_jiffies(20)))
+			goto again;
 	}
-	memcpy(randbuf, buf, read);
-	randbuf_bytes += read;
-	spin_unlock_irqrestore(&randbuf_lock, flags);
 
-	kfree(buf);
+	atomic_set(&bufwork_running, 0);
 }
-static int msm_get_random_bytes(void *data, size_t size) {
-	unsigned long flags;
-	spin_lock_irqsave(&randbuf_lock, flags);
-	if (randbuf_bytes < RANDBUF_SIZE / 4 && !work_pending(&randbuf_work))
-		schedule_work(&randbuf_work);
-	if (randbuf_bytes < size) {
-		spin_unlock_irqrestore(&randbuf_lock, flags);
-		return 0;
+static DECLARE_WORK(randbuf_work, do_randbuf_fill);
+static int msm_get_random_words(void *data, size_t size) {
+	int idx, new, cnt = 0;
+	unsigned long *retdata = data;
+
+	while (size >= sizeof(unsigned long)) {
+retry:
+		idx = atomic_read(&randbuf_tail);
+		if (idx == randbuf_head)
+			break;
+		new = (idx + 1) % RANDBUF_CNT;
+		*retdata = randbuf[idx];
+		if (idx != atomic_cmpxchg(&randbuf_tail, idx, new))
+			goto retry;
+
+		retdata++;
+		size -= sizeof(unsigned long);
+		cnt += sizeof(unsigned long);
 	}
-	randbuf_bytes -= size;
-	memcpy(data, randbuf + randbuf_bytes, size);
-	spin_unlock_irqrestore(&randbuf_lock, flags);
-	return size;
+
+	if (!atomic_xchg(&bufwork_running, 1))
+		schedule_work(&randbuf_work);
+	return cnt;
 }
 int arch_get_random_long(unsigned long *v) {
 	return random_func((void *)v, sizeof(unsigned long));
@@ -165,44 +174,65 @@ int arch_get_random_int(unsigned int *v) {
 }
 EXPORT_SYMBOL(arch_get_random_int);
 
-static int __devinit msm_rng_enable_hw(struct msm_rng_device *msm_rng_dev)
+/* Initialize the RNG: if the hw is already running, try to read some entropy
+ * for the random core.  If not (or if reading fails), reset the hw.
+ */
+static int __devinit msm_rng_enable_hw(struct msm_rng_device *rng)
 {
-	unsigned long val = 0;
 	unsigned long reg_val = 0;
-	int ret = 0;
+	int ret = 0, cnt = 0;
+	unsigned long buf[16];
 
 	/* Enable the PRNG CLK */
-	ret = clk_prepare_enable(msm_rng_dev->prng_clk);
+	ret = clk_prepare_enable(rng->prng_clk);
 	if (ret) {
-		dev_err(&(msm_rng_dev->pdev)->dev,
+		dev_err(&(rng->pdev)->dev,
 				"failed to enable clock in probe\n");
 		return -EPERM;
 	}
-	/* Enable PRNG h/w only if it is NOT ON */
-	val = readl_relaxed(msm_rng_dev->base + PRNG_CONFIG_OFFSET) &
-					PRNG_HW_ENABLE;
-	/* PRNG H/W is not ON */
-	if (val != PRNG_HW_ENABLE) {
-		val = readl_relaxed(msm_rng_dev->base + PRNG_LFSR_CFG_OFFSET);
-		val &= PRNG_LFSR_CFG_MASK;
-		val |= PRNG_LFSR_CFG_CLOCKS;
-		writel_relaxed(val, msm_rng_dev->base + PRNG_LFSR_CFG_OFFSET);
 
-		/* The PRNG CONFIG register should be first written */
+	reg_val = readl_relaxed(rng->base + PRNG_CONFIG_OFFSET);
+	if (reg_val & PRNG_HW_ENABLE) {
+		for (cnt = 0; cnt < 16; cnt++) {
+			if (!(readl_relaxed(rng->base + PRNG_STATUS_OFFSET) & 1))
+				break;
+			buf[cnt] = readl_relaxed(rng->base + PRNG_DATA_OUT_OFFSET);
+		}
+	}
+
+	if (cnt == 16) {
+		printk(KERN_DEBUG "%s: adding hwrng randomness\n", __func__);
+		add_device_randomness(buf, sizeof(buf));
+	} else {
+		printk(KERN_DEBUG "%s: starting hwrng\n", __func__);
+		reg_val = readl_relaxed(rng->base + PRNG_CONFIG_OFFSET);
+		if (reg_val & PRNG_HW_ENABLE) {
+			reg_val &= ~PRNG_HW_ENABLE;
+			writel_relaxed(reg_val,
+				rng->base + PRNG_CONFIG_OFFSET);
+			mb();
+		}
+		reg_val = readl_relaxed(rng->base + PRNG_LFSR_CFG_OFFSET);
+		if (reg_val & PRNG_LFSR_CFG_CLOCKS) {
+			reg_val &= PRNG_LFSR_CFG_MASK;
+			writel_relaxed(reg_val,
+				rng->base + PRNG_LFSR_CFG_OFFSET);
+			mb();
+		}
+		msleep(5);
+		reg_val = readl_relaxed(rng->base + PRNG_LFSR_CFG_OFFSET);
+		reg_val &= PRNG_LFSR_CFG_MASK;
+		reg_val |= PRNG_LFSR_CFG_CLOCKS;
+		writel_relaxed(reg_val, rng->base + PRNG_LFSR_CFG_OFFSET);
 		mb();
-
-		reg_val = readl_relaxed(msm_rng_dev->base + PRNG_CONFIG_OFFSET)
+		reg_val = readl_relaxed(rng->base + PRNG_CONFIG_OFFSET)
 						& PRNG_CONFIG_MASK;
 		reg_val |= PRNG_HW_ENABLE;
-		writel_relaxed(reg_val, msm_rng_dev->base + PRNG_CONFIG_OFFSET);
-
-		/* The PRNG clk should be disabled only after we enable the
-		* PRNG h/w by writing to the PRNG CONFIG register.
-		*/
+		writel_relaxed(reg_val, rng->base + PRNG_CONFIG_OFFSET);
 		mb();
 	}
 
-	clk_disable_unprepare(msm_rng_dev->prng_clk);
+	clk_disable_unprepare(rng->prng_clk);
 
 	return 0;
 }
@@ -270,11 +300,10 @@ static int __devinit msm_rng_probe(struct platform_device *pdev)
 	/* Init the arch_random bits */
 	randbuf = kmalloc(RANDBUF_SIZE, GFP_KERNEL);
 	if (randbuf) {
-		randbuf_bytes = msm_rng_read(&msm_rng, randbuf, RANDBUF_SIZE, 0);
-		INIT_WORK(&randbuf_work, do_randbuf_fill);
-		random_func = msm_get_random_bytes;
+		schedule_work(&randbuf_work);
+		random_func = msm_get_random_words;
 	} else {
-		printk(KERN_WARNING "msm_rng: can't allocate buffer\n");
+		printk(KERN_WARNING "%s: can't allocate buffer\n", __func__);
 	}
 
 	init_rand_state();
