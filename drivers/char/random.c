@@ -270,6 +270,8 @@
 #include <linux/fips.h>
 #include <linux/ptrace.h>
 #include <linux/kmemcheck.h>
+#include <linux/freezer.h>
+#include <linux/kthread.h>
 
 #ifdef CONFIG_GENERIC_HARDIRQS
 # include <linux/irq.h>
@@ -298,14 +300,14 @@
  * The minimum number of bits of entropy before we wake up a read on
  * /dev/random.  Should be enough to do a significant reseed.
  */
-static int random_read_wakeup_thresh = 64;
+static int random_read_wakeup_thresh = 256;
 
 /*
  * If the entropy count falls under this number of bits, then we
  * should wake up processes which are selecting or polling on write
  * access to /dev/random.
  */
-static int random_write_wakeup_thresh = 1024;
+static int random_write_wakeup_thresh = 2048;
 
 /*
  * When the input pool goes over trickle_thresh, start dropping most
@@ -322,13 +324,12 @@ static int random_depletions = 0;
 
 /* Erandom stuff */
 void init_rand_state(void);
-static void erandom_get_random_bytes(char *buf, size_t count);
+static void erandom_get_random_bytes(void *buf, int count);
+static int erandom_eviction_thread(void *nil);
 static DEFINE_SPINLOCK(erandom_lock);
-static unsigned int erandom_bytes_read = 0;
-static int erandom_stir_thresh = 4096;
-static u8 erandom_S[256];
-static u8 erandom_i;
-static u8 erandom_j;
+static u8 erS[256];
+static u8 eri;
+static u8 erj;
 
 static DEFINE_PER_CPU(int, trickle_count);
 
@@ -1140,6 +1141,7 @@ static int rand_initialize(void)
 #ifndef CONFIG_ARCH_RANDOM_HWRNG
 	init_rand_state();
 #endif
+	kthread_run(erandom_eviction_thread, NULL, "krngd");
 	return 0;
 }
 core_initcall(rand_initialize);
@@ -1174,22 +1176,22 @@ void init_rand_state(void) {
 	get_random_bytes_arch(seed, 256);
 
 	for (k=0; k<256; k++)
-		erandom_S[k] = k;
+		erS[k] = k;
 
-	for (k = 0, erandom_j = 0; k < 256; k++) {
-		erandom_j = (erandom_j + erandom_S[k] + seed[k]) & 0xff;
-		swap_byte(&erandom_S[k], &erandom_S[erandom_j]);
+	for (k = 0, erj = 0; k < 256; k++) {
+		erj = (erj + erS[k] + seed[k]) & 0xff;
+		swap_byte(&erS[k], &erS[erj]);
 	}
 
 	/* It's considered good practice to discard the first 256 bytes
 	   generated. So we do it:
 	*/
 
-	erandom_i=0; erandom_j=0;
+	eri=0; erj=0;
 	for (k=0; k<256; k++) {
-		erandom_i = (erandom_i + 1) & 0xff;
-		erandom_j = (erandom_j + erandom_S[erandom_i]) & 0xff;
-		swap_byte(&erandom_S[erandom_i], &erandom_S[erandom_j]);
+		eri = (eri + 1) & 0xff;
+		erj = (erj + erS[eri]) & 0xff;
+		swap_byte(&erS[eri], &erS[erj]);
 	}
 
 	/* Actually enable erandom */
@@ -1198,30 +1200,63 @@ void init_rand_state(void) {
 
 static void _erandom_get_random_bytes(u8 *buf, size_t count) {
 	size_t k;
-	long unsigned int v;
 
 	for (k=0; k<count; k++) {
-		erandom_i = (erandom_i + 1) & 0xff;
-		erandom_j = (erandom_j + erandom_S[erandom_i]) & 0xff;
-		swap_byte(&erandom_S[erandom_i], &erandom_S[erandom_j]);
-		buf[k] = erandom_S[(erandom_S[erandom_i] + erandom_S[erandom_j]) & 0xff];
-	}
-
-	/* RC4 is known to be predictable and to occasionally have very short
-	 * periods.  Since we don't need to decode later, we can swap bytes
-	 * periodically to stir the pool.
-	 */
-	erandom_bytes_read += count;
-	if (erandom_stir_thresh > 0 && erandom_bytes_read > erandom_stir_thresh) {
-		if (arch_get_random_long(&v)) {
-			erandom_bytes_read = 0;
-			for (; v; v >>= 16)
-				swap_byte(&erandom_S[v & 0xff], &erandom_S[(v >> 8) & 0xff]);
-		}
+		eri = (eri + 1) & 0xff;
+		erj = (erj + erS[eri]) & 0xff;
+		swap_byte(&erS[eri], &erS[erj]);
+		buf[k] = erS[(erS[eri] + erS[erj]) & 0xff];
 	}
 }
 
-static inline void erandom_get_random_bytes(char *buf, size_t count) {
+static int erandom_eviction_thread(void *nil) {
+	unsigned long flags;
+	unsigned long in;
+	unsigned long out[16];
+	int i, j;
+
+	set_freezable();
+	set_user_nice(current, 5);
+
+	j = 15;
+
+again:
+	if (unlikely(kthread_should_stop()))
+		return 0;
+	if (unlikely(try_to_freeze()))
+		goto again;
+	if (unlikely(-ERESTARTSYS == wait_event_interruptible_timeout(
+		random_write_wait,
+		input_pool.entropy_count < random_write_wakeup_thresh, HZ)))
+		goto again;
+
+more:
+	if (unlikely(!arch_get_random_long(&in))) {
+		schedule_timeout_interruptible(msecs_to_jiffies(20));
+		goto again;
+	}
+
+	spin_lock_irqsave(&erandom_lock, flags);
+	for (i = 4; i; i--) {
+		eri = (eri + 1) & 0xff;
+		erj = (erj + erS[eri]) & 0xff;
+		swap_byte(&erS[eri], &erS[in & 0xff]);
+		out[j] = (out[j] << 8) + erS[(erS[eri] + erS[erj]) & 0xff];
+		in >>= 8;
+	}
+	spin_unlock_irqrestore(&erandom_lock, flags);
+
+	if (!j--) {
+		mix_pool_bytes(&input_pool, &out, sizeof(out), NULL);
+		credit_entropy_bits(&input_pool, 64);
+		j = 15;
+	} else if (input_pool.entropy_count < random_write_wakeup_thresh) {
+		goto more;
+	}
+	goto again;
+}
+
+static inline void erandom_get_random_bytes(void *buf, int count) {
 	unsigned long flags;
 	spin_lock_irqsave(&erandom_lock, flags);
 	_erandom_get_random_bytes((u8 *)buf, count);
@@ -1559,13 +1594,6 @@ ctl_table random_table[] = {
 		.data		= &random_depletions,
 		.maxlen		= sizeof(int),
 		.mode		= 0444,
-		.proc_handler	= proc_dointvec,
-	},
-	{
-		.procname	= "erandom_stir_thresh",
-		.data		= &erandom_stir_thresh,
-		.maxlen		= sizeof(int),
-		.mode		= 0644,
 		.proc_handler	= proc_dointvec,
 	},
 	{ }
