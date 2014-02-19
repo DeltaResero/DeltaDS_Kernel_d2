@@ -321,8 +321,6 @@ static int random_krngd_wakeup_thresh = 1024;
 
 static int trickle_thresh __read_mostly = INPUT_POOL_WORDS * 14;
 
-static DEFINE_PER_CPU(int, trickle_count);
-
 /*
  * Track pool depletions.  Any time insufficient entropy is available for a
  * read, this counter is incremented.
@@ -594,28 +592,6 @@ struct fast_pool {
 };
 
 /*
- * This is a fast mixing routine used by the interrupt randomness
- * collector.  It's hardcoded for an 128 bit pool and assumes that any
- * locks that might be needed are taken by the caller.
- */
-static void fast_mix(struct fast_pool *f, const void *in, int nbytes)
-{
-	const char	*bytes = in;
-	__u32		w;
-	unsigned	i = f->count;
-	unsigned	input_rotate = f->rotate;
-
-	while (nbytes--) {
-		w = rol32(*bytes++, input_rotate & 31) ^ f->pool[i & 3] ^
-			f->pool[(i + 1) & 3];
-		f->pool[i & 3] = (w >> 3) ^ twist_table[w & 7];
-		input_rotate += (i++ & 3) ? 7 : 14;
-	}
-	f->count = i;
-	f->rotate = input_rotate;
-}
-
-/*
  * Credit (or debit) the entropy store with n bits of entropy
  */
 static void credit_entropy_bits(struct entropy_store *r, int nbits)
@@ -684,147 +660,35 @@ void add_device_randomness(const void *buf, unsigned int size)
 }
 EXPORT_SYMBOL(add_device_randomness);
 
-static struct timer_rand_state input_timer_state;
-
-/*
- * This function adds entropy to the entropy "pool" by using timing
- * delays.  It uses the timer_rand_state structure to make an estimate
- * of how many bits of entropy this call has added to the pool.
- *
- * The number "num" is also added to the pool - it should somehow describe
- * the type of event which just happened.  This is currently 0-255 for
- * keyboard scan codes, and 256 upwards for interrupts.
- *
- */
-static void add_timer_randomness(struct timer_rand_state *state, unsigned num)
-{
-	struct {
-		long jiffies;
-		unsigned cycles;
-		unsigned num;
-	} sample;
-	long delta, delta2, delta3;
-
-	preempt_disable();
-	/* if over the trickle threshold, use only 1 in 4096 samples */
-	if (input_pool.entropy_count > trickle_thresh &&
-	    (__this_cpu_inc_return(trickle_count) & 0xfff))
-		goto out;
-
-	sample.jiffies = jiffies;
-	sample.cycles = get_cycles();
-	sample.num = num;
-	mix_pool_bytes(&input_pool, &sample, sizeof(sample), NULL);
-
-	/*
-	 * Calculate number of bits of randomness we probably added.
-	 * We take into account the first, second and third-order deltas
-	 * in order to make our estimate.
-	 */
-
-	if (!state->dont_count_entropy) {
-		delta = sample.jiffies - state->last_time;
-		state->last_time = sample.jiffies;
-
-		delta2 = delta - state->last_delta;
-		state->last_delta = delta;
-
-		delta3 = delta2 - state->last_delta2;
-		state->last_delta2 = delta2;
-
-		if (delta < 0)
-			delta = -delta;
-		if (delta2 < 0)
-			delta2 = -delta2;
-		if (delta3 < 0)
-			delta3 = -delta3;
-		if (delta > delta2)
-			delta = delta2;
-		if (delta > delta3)
-			delta = delta3;
-
-		/*
-		 * delta is now minimum absolute delta.
-		 * Round down by 1 bit on general principles,
-		 * and limit entropy entimate to 12 bits.
-		 */
-		credit_entropy_bits(&input_pool,
-				    min_t(int, fls(delta>>1), 11));
-	}
-out:
-	preempt_enable();
-}
-
 void add_input_randomness(unsigned int type, unsigned int code,
 				 unsigned int value)
 {
-	static unsigned char last_value;
+	static uint8_t buf[16];
+	static short pos = 15;
+	static short trickle;
+	static unsigned char last_value[2];
+	static unsigned long last_jiffies;
 
-	/* ignore autorepeat and the like */
-	if (value == last_value)
+	if (last_value[code & 1] == value >> 2)
 		return;
+	last_value[code & 1] = value >> 2;
 
-	DEBUG_ENT("input event\n");
-	last_value = value;
-	add_timer_randomness(&input_timer_state,
-			     (type << 4) ^ code ^ (code >> 4) ^ value);
+	buf[pos] = ror8(buf[pos], 2) ^ value;
+
+	if (last_jiffies == jiffies)
+		return;
+	last_jiffies = jiffies;
+
+	if (!pos--) {
+		pos = 15;
+		if (input_pool.entropy_count > trickle_thresh &&
+			trickle++ & 0xff)
+			return;
+		mix_pool_bytes(&input_pool, buf, sizeof(buf), NULL);
+		credit_entropy_bits(&input_pool, 8);
+	}
 }
 EXPORT_SYMBOL_GPL(add_input_randomness);
-
-static DEFINE_PER_CPU(struct fast_pool, irq_randomness);
-
-void add_interrupt_randomness(int irq, int irq_flags)
-{
-	struct fast_pool	*fast_pool = &__get_cpu_var(irq_randomness);
-	struct pt_regs		*regs = get_irq_regs();
-	unsigned long		now = jiffies;
-	__u32			input[4], cycles = get_cycles();
-
-	input[0] = cycles ^ jiffies;
-	input[1] = irq;
-	if (regs) {
-		__u64 ip = instruction_pointer(regs);
-		input[2] = ip;
-		input[3] = ip >> 32;
-	}
-
-	fast_mix(fast_pool, input, sizeof(input));
-
-	if ((fast_pool->count & 1023) &&
-	    !time_after(now, fast_pool->last + HZ))
-		return;
-
-	fast_pool->last = now;
-
-	__mix_pool_bytes(&input_pool, &fast_pool->pool, sizeof(fast_pool->pool), NULL);
-	/*
-	 * If we don't have a valid cycle counter, and we see
-	 * back-to-back timer interrupts, then skip giving credit for
-	 * any entropy.
-	 */
-	if (cycles == 0) {
-		if (irq_flags & __IRQF_TIMER) {
-			if (fast_pool->last_timer_intr)
-				return;
-			fast_pool->last_timer_intr = 1;
-		} else
-			fast_pool->last_timer_intr = 0;
-	}
-	credit_entropy_bits(&input_pool, 1);
-}
-
-#ifdef CONFIG_BLOCK
-void add_disk_randomness(struct gendisk *disk)
-{
-	if (!disk || !disk->random)
-		return;
-	/* first major is 1, so we get >= 0x200 here */
-	DEBUG_ENT("disk event %d:%d\n",
-		  MAJOR(disk_devt(disk)), MINOR(disk_devt(disk)));
-
-	add_timer_randomness(disk->random, 0x100 + disk_devt(disk));
-}
-#endif
 
 /*********************************************************************
  *
@@ -1157,21 +1021,6 @@ static int rand_initialize(void)
 }
 core_initcall(rand_initialize);
 
-#ifdef CONFIG_BLOCK
-void rand_initialize_disk(struct gendisk *disk)
-{
-	struct timer_rand_state *state;
-
-	/*
-	 * If kzalloc returns null, we just won't use that entropy
-	 * source.
-	 */
-	state = kzalloc(sizeof(struct timer_rand_state), GFP_KERNEL);
-	if (state)
-		disk->random = state;
-}
-#endif
-
 static inline void swap_byte(u8 *a, u8 *b) {
 	u8 swapByte;
 
@@ -1246,7 +1095,7 @@ again:
 
 more:
 	if (unlikely(!arch_get_random_long(&in))) {
-		schedule_timeout_interruptible(msecs_to_jiffies(20));
+		schedule_timeout_interruptible(msecs_to_jiffies(10));
 		goto again;
 	}
 
@@ -1255,8 +1104,7 @@ more:
 		eri = (eri + 1) & 0xff;
 		erj = (erj + erS[eri] + (in & 0xff)) & 0xff;
 		swap_byte(&erS[eri], &erS[erj]);
-		out[j] = ((out[j] >> 8) | (out[j] << 24)) ^
-			erS[(erS[eri] + erS[erj]) & 0xff];
+		out[j] = ror32(out[j], 8) ^ erS[(erS[eri] + erS[erj]) & 0xff];
 		in >>= 8;
 	}
 	erandom_reads = 0;
