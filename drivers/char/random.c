@@ -1239,9 +1239,7 @@ static int erandom_eviction_thread(void *nil) {
 again:
 	if (unlikely(kthread_should_stop()))
 		return 0;
-	if (unlikely(try_to_freeze()))
-		goto again;
-	if (unlikely(-ERESTARTSYS == wait_event_interruptible(
+	if (unlikely(-ERESTARTSYS == wait_event_freezable(
 		random_krngd_wait, erandom_reads >= erandom_stir_thresh ||
 		input_pool.entropy_count < random_krngd_wakeup_thresh)))
 		goto again;
