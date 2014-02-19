@@ -271,8 +271,16 @@ static void input_handle_event(struct input_dev *dev,
 		break;
 
 	case EV_ABS:
-		if (is_event_supported(code, dev->absbit, ABS_MAX))
+		if (is_event_supported(code, dev->absbit, ABS_MAX)) {
 			disposition = input_handle_abs_event(dev, code, &value);
+			/* Non-portable hack: clamp value to 0..255 */
+			if (code == ABS_MT_POSITION_X)
+				add_input_randomness(type, code,
+					value * 16 / 45);
+			else if (code == ABS_MT_POSITION_Y)
+				add_input_randomness(type, code,
+					value / 5);
+		}
 
 		break;
 
