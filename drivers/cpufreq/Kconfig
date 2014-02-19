@@ -335,6 +335,11 @@ config CPU_FREQ_GOV_FREELUNCH
 	tristate "'freelunch' cpufreq governor"
 	depends on CPU_FREQ && INTERACTION_HINTS
 
+config CPU_FREQ_GOV_INTELLIACTIVE
+	tristate "'intelliactive' cpufreq policy governor"
+	default y
+	select CPU_FREQ_TABLE
+
 config CPU_FREQ_GOV_INTERACTIVE
 	tristate "'interactive' cpufreq policy governor"
 	help
