@@ -129,7 +129,7 @@ again:
 
 	read = msm_rng_read(&msm_rng, randbuf + randbuf_head,
 		words * sizeof(unsigned long), 0);
-	mb();
+	smp_wmb();
 	randbuf_head = (randbuf_head + read / sizeof(unsigned long))
 		% RANDBUF_CNT;
 

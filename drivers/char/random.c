@@ -307,14 +307,21 @@ static int random_read_wakeup_thresh = 256;
  * should wake up processes which are selecting or polling on write
  * access to /dev/random.
  */
-static int random_write_wakeup_thresh = 2048;
+static int random_write_wakeup_thresh = 512;
+
+/*
+ * If the entropy count falls under this number of bits, wake up krngd.
+ */
+static int random_krngd_wakeup_thresh = 1024;
 
 /*
  * When the input pool goes over trickle_thresh, start dropping most
  * samples to avoid wasting CPU time and reduce lock contention.
  */
 
-static int trickle_thresh __read_mostly = INPUT_POOL_WORDS * 28;
+static int trickle_thresh __read_mostly = INPUT_POOL_WORDS * 14;
+
+static DEFINE_PER_CPU(int, trickle_count);
 
 /*
  * Track pool depletions.  Any time insufficient entropy is available for a
@@ -330,8 +337,8 @@ static DEFINE_SPINLOCK(erandom_lock);
 static u8 erS[256];
 static u8 eri;
 static u8 erj;
-
-static DEFINE_PER_CPU(int, trickle_count);
+static unsigned int erandom_reads;
+static int erandom_stir_thresh __read_mostly = 256;
 
 /*
  * A pool of size .poolwords is stirred with a primitive polynomial
@@ -429,6 +436,7 @@ static struct poolinfo {
  */
 static DECLARE_WAIT_QUEUE_HEAD(random_read_wait);
 static DECLARE_WAIT_QUEUE_HEAD(random_write_wait);
+static DECLARE_WAIT_QUEUE_HEAD(random_krngd_wait);
 static struct fasync_struct *fasync;
 
 #if 0
@@ -700,7 +708,7 @@ static void add_timer_randomness(struct timer_rand_state *state, unsigned num)
 	preempt_disable();
 	/* if over the trickle threshold, use only 1 in 4096 samples */
 	if (input_pool.entropy_count > trickle_thresh &&
-	    ((__this_cpu_inc_return(trickle_count) - 1) & 0xfff))
+	    (__this_cpu_inc_return(trickle_count) & 0xfff))
 		goto out;
 
 	sample.jiffies = jiffies;
@@ -896,6 +904,9 @@ static size_t account(struct entropy_store *r, size_t nbytes, int min,
 		else
 			r->entropy_count = reserved;
 
+		if (r->entropy_count < random_krngd_wakeup_thresh) {
+			wake_up_interruptible(&random_krngd_wait);
+		}
 		if (r->entropy_count < random_write_wakeup_thresh) {
 			wake_up_interruptible(&random_write_wait);
 			kill_fasync(&fasync, SIGIO, POLL_OUT);
@@ -1138,10 +1149,10 @@ static int rand_initialize(void)
 {
 	init_std_data(&input_pool);
 	init_std_data(&blocking_pool);
+	/* Called by msm_rng_probe instead */
 #ifndef CONFIG_ARCH_RANDOM_HWRNG
 	init_rand_state();
 #endif
-	kthread_run(erandom_eviction_thread, NULL, "krngd");
 	return 0;
 }
 core_initcall(rand_initialize);
@@ -1183,19 +1194,21 @@ void init_rand_state(void) {
 		swap_byte(&erS[k], &erS[erj]);
 	}
 
-	/* It's considered good practice to discard the first 256 bytes
-	   generated. So we do it:
-	*/
-
+	/* drop1024: we're in no hurry; dummy_random is handling
+	 * get_random_bytes for us.
+	 */
 	eri=0; erj=0;
-	for (k=0; k<256; k++) {
+	for (k=0; k<1024; k++) {
 		eri = (eri + 1) & 0xff;
 		erj = (erj + erS[eri]) & 0xff;
 		swap_byte(&erS[eri], &erS[erj]);
 	}
+	smp_wmb();
 
 	/* Actually enable erandom */
 	get_random_bytes = erandom_get_random_bytes;
+	/* Kick off the eviction thread */
+	kthread_run(erandom_eviction_thread, NULL, "krngd");
 }
 
 static void _erandom_get_random_bytes(u8 *buf, size_t count) {
@@ -1207,6 +1220,9 @@ static void _erandom_get_random_bytes(u8 *buf, size_t count) {
 		swap_byte(&erS[eri], &erS[erj]);
 		buf[k] = erS[(erS[eri] + erS[erj]) & 0xff];
 	}
+	erandom_reads += count;
+	if (erandom_reads >= erandom_stir_thresh)
+		wake_up_interruptible(&random_krngd_wait);
 }
 
 static int erandom_eviction_thread(void *nil) {
@@ -1225,9 +1241,9 @@ again:
 		return 0;
 	if (unlikely(try_to_freeze()))
 		goto again;
-	if (unlikely(-ERESTARTSYS == wait_event_interruptible_timeout(
-		random_write_wait,
-		input_pool.entropy_count < random_write_wakeup_thresh, HZ)))
+	if (unlikely(-ERESTARTSYS == wait_event_interruptible(
+		random_krngd_wait, erandom_reads >= erandom_stir_thresh ||
+		input_pool.entropy_count < random_krngd_wakeup_thresh)))
 		goto again;
 
 more:
@@ -1239,18 +1255,22 @@ more:
 	spin_lock_irqsave(&erandom_lock, flags);
 	for (i = 4; i; i--) {
 		eri = (eri + 1) & 0xff;
-		erj = (erj + erS[eri]) & 0xff;
-		swap_byte(&erS[eri], &erS[in & 0xff]);
-		out[j] = (out[j] << 8) + erS[(erS[eri] + erS[erj]) & 0xff];
+		erj = (erj + erS[eri] + (in & 0xff)) & 0xff;
+		swap_byte(&erS[eri], &erS[erj]);
+		out[j] = ((out[j] >> 8) | (out[j] << 24)) ^
+			erS[(erS[eri] + erS[erj]) & 0xff];
 		in >>= 8;
 	}
+	erandom_reads = 0;
 	spin_unlock_irqrestore(&erandom_lock, flags);
 
 	if (!j--) {
-		mix_pool_bytes(&input_pool, &out, sizeof(out), NULL);
-		credit_entropy_bits(&input_pool, 64);
+		if (input_pool.entropy_count < input_pool.poolinfo->POOLBITS) {
+			mix_pool_bytes(&input_pool, &out, sizeof(out), NULL);
+			credit_entropy_bits(&input_pool, 256);
+		}
 		j = 15;
-	} else if (input_pool.entropy_count < random_write_wakeup_thresh) {
+	} else if (input_pool.entropy_count < random_krngd_wakeup_thresh) {
 		goto more;
 	}
 	goto again;
@@ -1577,6 +1597,15 @@ ctl_table random_table[] = {
 		.extra2		= &max_write_thresh,
 	},
 	{
+		.procname	= "krngd_wakeup_threshold",
+		.data		= &random_krngd_wakeup_thresh,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &min_write_thresh,
+		.extra2		= &max_write_thresh,
+	},
+	{
 		.procname	= "boot_id",
 		.data		= &sysctl_bootid,
 		.maxlen		= 16,
@@ -1594,6 +1623,13 @@ ctl_table random_table[] = {
 		.data		= &random_depletions,
 		.maxlen		= sizeof(int),
 		.mode		= 0444,
+		.proc_handler	= proc_dointvec,
+	},
+	{
+		.procname	= "erandom_stir_thresh",
+		.data		= &erandom_stir_thresh,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
 		.proc_handler	= proc_dointvec,
 	},
 	{ }
