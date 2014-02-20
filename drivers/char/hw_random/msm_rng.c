@@ -47,6 +47,10 @@
 #define MAX_HW_FIFO_DEPTH 16                     /* FIFO is 16 words deep */
 #define MAX_HW_FIFO_SIZE (MAX_HW_FIFO_DEPTH * 4) /* FIFO is 32 bits wide  */
 
+#define FIFO_REFILL_MSECS (10)
+
+#define RANDBUF_SIZE (4096)
+#define RANDBUF_CNT (RANDBUF_SIZE/sizeof(unsigned long))
 
 struct msm_rng_device {
 	struct platform_device *pdev;
@@ -54,31 +58,24 @@ struct msm_rng_device {
 	struct clk *prng_clk;
 };
 
-static int msm_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
+static int __msm_rng_read(struct hwrng *rng, void *data, size_t max)
 {
 	struct msm_rng_device *msm_rng_dev;
-	struct platform_device *pdev;
 	void __iomem *base;
 	size_t currsize = 0;
 	unsigned long *retdata = data;
-	int ret;
 
 	msm_rng_dev = (struct msm_rng_device *)rng->priv;
-	pdev = msm_rng_dev->pdev;
 	base = msm_rng_dev->base;
 
 	/* calculate max size bytes to transfer back to caller */
-	max = min_t(size_t, MAX_HW_FIFO_SIZE, max);
-
-	/* no room for word data */
-	max &= ~3;
-	if (!max)
-		return 0;
+	//max = min_t(size_t, MAX_HW_FIFO_SIZE, max);
+	//max &= ~3;
 
 	/* enable PRNG clock */
-	ret = clk_prepare_enable(msm_rng_dev->prng_clk);
-	if (ret) {
-		dev_err(&pdev->dev, "failed to enable clock in callback\n");
+	if (clk_prepare_enable(msm_rng_dev->prng_clk)) {
+		dev_err(&msm_rng_dev->pdev->dev,
+			"failed to enable clock in callback\n");
 		return 0;
 	}
 
@@ -90,7 +87,7 @@ static int msm_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
 
 		/* read FIFO */
 		*(retdata++) = readl_relaxed(base + PRNG_DATA_OUT_OFFSET);
-		currsize += 4;
+		currsize += sizeof(unsigned long);
 	} while (currsize < max);
 
 	/* vote to turn off clock */
@@ -98,6 +95,8 @@ static int msm_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
 
 	return currsize;
 }
+
+static int msm_rng_read(struct hwrng *rng, void *data, size_t max, bool wait);
 
 static struct hwrng msm_rng = {
 	.name = DRIVER_NAME,
@@ -107,70 +106,84 @@ static struct hwrng msm_rng = {
 /* Implement arch_get_random_TYPE.  Precache data to avoid toggling the hwrng
  * clock every call.
  */
-static int dummy_random(void *data, size_t size) { return 0; }
-static int (*random_func)(void *, size_t) = dummy_random;
-#define RANDBUF_CNT (256)
-#define RANDBUF_SIZE (RANDBUF_CNT * sizeof(unsigned long))
 static unsigned long *randbuf;
 static int randbuf_head;
 static atomic_t randbuf_tail;
-static atomic_t bufwork_running;
+static atomic_t bufwork_running = ATOMIC_INIT(1);
 static void do_randbuf_fill(struct work_struct *work) {
-	int words, read;
+	int cnt;
 
 again:
-	words = atomic_read(&randbuf_tail) - randbuf_head - 1;
-	if (words <= 0)
-		words += RANDBUF_CNT;
-	if (randbuf_head + words >= RANDBUF_CNT)
-		words = RANDBUF_CNT - randbuf_head;
-	if (words > 16)
-		words = 16;
+	cnt = atomic_read(&randbuf_tail) - randbuf_head - 1;
+	if (cnt <= 0)
+		cnt += RANDBUF_CNT;
+	if (randbuf_head + cnt >= RANDBUF_CNT)
+		cnt = RANDBUF_CNT - randbuf_head;
+	if (cnt > 16)
+		cnt = 16;
 
-	read = msm_rng_read(&msm_rng, randbuf + randbuf_head,
-		words * sizeof(unsigned long), 0);
+	cnt = __msm_rng_read(&msm_rng, randbuf + randbuf_head,
+		cnt * sizeof(unsigned long));
 	smp_wmb();
-	randbuf_head = (randbuf_head + read / sizeof(unsigned long))
+	randbuf_head = (randbuf_head + (cnt / sizeof(unsigned long)))
 		% RANDBUF_CNT;
 
-	if (read && atomic_read(&randbuf_tail) !=
+	if (cnt && atomic_read(&randbuf_tail) !=
 		(randbuf_head + 1) % RANDBUF_CNT) {
-		if (!schedule_timeout_interruptible(msecs_to_jiffies(20)))
+		if (!schedule_timeout_interruptible(
+			msecs_to_jiffies(FIFO_REFILL_MSECS)))
 			goto again;
 	}
 
 	atomic_set(&bufwork_running, 0);
 }
 static DECLARE_WORK(randbuf_work, do_randbuf_fill);
-static int msm_get_random_words(void *data, size_t size) {
+
+static int msm_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
+{
 	int idx, new, cnt = 0;
 	unsigned long *retdata = data;
 
-	while (size >= sizeof(unsigned long)) {
+	max &= ~(sizeof(unsigned long)-1);
+	if (unlikely(!max))
+		return 0;
+
+	while (max) {
 retry:
+		smp_rmb();
 		idx = atomic_read(&randbuf_tail);
 		if (idx == randbuf_head)
-			break;
+			goto empty;
 		new = (idx + 1) % RANDBUF_CNT;
 		*retdata = randbuf[idx];
 		if (idx != atomic_cmpxchg(&randbuf_tail, idx, new))
 			goto retry;
 
 		retdata++;
-		size -= sizeof(unsigned long);
+		max -= sizeof(unsigned long);
 		cnt += sizeof(unsigned long);
-	}
+		continue;
 
-	if (!atomic_xchg(&bufwork_running, 1))
+empty:
+		if (!atomic_xchg(&bufwork_running, 1))
+			schedule_work(&randbuf_work);
+		if (!wait || schedule_timeout_interruptible(
+			msecs_to_jiffies(FIFO_REFILL_MSECS)))
+			return cnt;
+	}
+	new = new - randbuf_head - 1;
+	if ((new <= 0 || new > 8) &&
+		!atomic_xchg(&bufwork_running, 1))
 		schedule_work(&randbuf_work);
 	return cnt;
 }
+
 int arch_get_random_long(unsigned long *v) {
-	return random_func((void *)v, sizeof(unsigned long));
+	return msm_rng_read(&msm_rng, (void *)v, sizeof(unsigned long), 0);
 }
 EXPORT_SYMBOL(arch_get_random_long);
 int arch_get_random_int(unsigned int *v) {
-	return random_func((void *)v, sizeof(unsigned int));
+	return msm_rng_read(&msm_rng, (void *)v, sizeof(unsigned int), 0);
 }
 EXPORT_SYMBOL(arch_get_random_int);
 
@@ -200,10 +213,12 @@ static int __devinit msm_rng_enable_hw(struct msm_rng_device *rng)
 		}
 	}
 
-	if (cnt == 16) {
-		printk(KERN_DEBUG "%s: adding hwrng randomness\n", __func__);
-		add_device_randomness(buf, sizeof(buf));
-	} else {
+	if (cnt) {
+		printk(KERN_DEBUG "%s: adding %i words of randomness\n",
+			__func__, cnt);
+		add_device_randomness(buf, cnt * sizeof(unsigned long));
+	}
+	if (cnt < 16) {
 		printk(KERN_DEBUG "%s: starting hwrng\n", __func__);
 		reg_val = readl_relaxed(rng->base + PRNG_CONFIG_OFFSET);
 		if (reg_val & PRNG_HW_ENABLE) {
@@ -301,7 +316,6 @@ static int __devinit msm_rng_probe(struct platform_device *pdev)
 	randbuf = kmalloc(RANDBUF_SIZE, GFP_KERNEL);
 	if (randbuf) {
 		schedule_work(&randbuf_work);
-		random_func = msm_get_random_words;
 	} else {
 		printk(KERN_WARNING "%s: can't allocate buffer\n", __func__);
 	}
