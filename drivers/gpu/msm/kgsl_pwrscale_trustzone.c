@@ -174,7 +174,7 @@ static int simple_governor(struct kgsl_device *device, int idle_stat)
 	else
 	{
 		if ((pwr->active_pwrlevel >= 0) &&
-			(pwr->active_pwrlevel < (pwr->num_pwrlevels - 1)))
+			(pwr->active_pwrlevel < (pwr->num_pwrlevels - 1))) {
 			if (likely(--laziness > 0))
 			{
 				/* don't change anything yet hold off for a while */
@@ -186,9 +186,10 @@ static int simple_governor(struct kgsl_device *device, int idle_stat)
 				laziness = default_laziness;
 				return 1;
 			}
-		else if (pwr->active_pwrlevel == (pwr->num_pwrlevels - 1))
+		} else if (pwr->active_pwrlevel == (pwr->num_pwrlevels - 1)) {
 			/* already @ min, so do nothing */
 			return 0;
+		}
 	}
 
 	return 0;
