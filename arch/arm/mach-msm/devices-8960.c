@@ -4899,6 +4899,12 @@ static struct persistent_ram_descriptor pram_descs[] = {
 		.size = RAM_CONSOLE_SIZE,
 	},
 #endif
+#ifdef CONFIG_PERSIST_ENTROPY
+	{
+		.name = "persist_entropy",
+		.size = SZ_4K,
+	},
+#endif
 };
 
 static struct persistent_ram msm8960_persistent_ram = {
@@ -4926,3 +4932,14 @@ void __init add_ramconsole_devices(void)
 }
 #endif /* CONFIG_ANDROID_RAM_CONSOLE */
 
+#ifdef CONFIG_PERSIST_ENTROPY
+static struct platform_device persistent_entropy_device = {
+	.name = "persist_entropy",
+	.id = -1,
+};
+
+void __init add_persistent_entropy_devices(void)
+{
+	platform_device_register(&persistent_entropy_device);
+}
+#endif
