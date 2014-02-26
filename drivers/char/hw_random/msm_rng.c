@@ -73,7 +73,7 @@ static int __msm_rng_read(struct hwrng *rng, void *data, size_t max)
 	//max &= ~3;
 
 	/* enable PRNG clock */
-	if (clk_prepare_enable(msm_rng_dev->prng_clk)) {
+	if (clk_enable(msm_rng_dev->prng_clk)) {
 		dev_err(&msm_rng_dev->pdev->dev,
 			"failed to enable clock in callback\n");
 		return 0;
@@ -91,7 +91,7 @@ static int __msm_rng_read(struct hwrng *rng, void *data, size_t max)
 	} while (currsize < max);
 
 	/* vote to turn off clock */
-	clk_disable_unprepare(msm_rng_dev->prng_clk);
+	clk_disable(msm_rng_dev->prng_clk);
 
 	return currsize;
 }
@@ -107,11 +107,16 @@ static struct hwrng msm_rng = {
  * clock every call.
  */
 static unsigned long *randbuf;
-static int randbuf_head;
+static volatile int randbuf_head;
 static atomic_t randbuf_tail;
 static atomic_t bufwork_running = ATOMIC_INIT(1);
 static void do_randbuf_fill(struct work_struct *work) {
 	int cnt;
+	struct msm_rng_device *msm_rng_dev;
+	msm_rng_dev = (struct msm_rng_device *)msm_rng.priv;
+
+	if (clk_prepare(msm_rng_dev->prng_clk))
+		goto out;
 
 again:
 	cnt = atomic_read(&randbuf_tail) - randbuf_head - 1;
@@ -135,6 +140,8 @@ again:
 			goto again;
 	}
 
+	clk_unprepare(msm_rng_dev->prng_clk);
+out:
 	atomic_set(&bufwork_running, 0);
 }
 static DECLARE_WORK(randbuf_work, do_randbuf_fill);
@@ -152,9 +159,9 @@ static int msm_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
 retry:
 		smp_rmb();
 		idx = atomic_read(&randbuf_tail);
+		new = (idx + 1) % RANDBUF_CNT;
 		if (idx == randbuf_head)
 			goto empty;
-		new = (idx + 1) % RANDBUF_CNT;
 		*retdata = randbuf[idx];
 		if (idx != atomic_cmpxchg(&randbuf_tail, idx, new))
 			goto retry;
@@ -167,12 +174,12 @@ retry:
 empty:
 		if (!atomic_xchg(&bufwork_running, 1))
 			schedule_work(&randbuf_work);
-		if (!wait || schedule_timeout_interruptible(
+		if (!wait || !randbuf || schedule_timeout_interruptible(
 			msecs_to_jiffies(FIFO_REFILL_MSECS)))
 			return cnt;
 	}
 	new = new - randbuf_head - 1;
-	if ((new <= 0 || new > 8) &&
+	if ((new <= 0 || new >= 128) &&
 		!atomic_xchg(&bufwork_running, 1))
 		schedule_work(&randbuf_work);
 	return cnt;
