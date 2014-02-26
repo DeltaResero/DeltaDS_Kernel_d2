@@ -194,6 +194,16 @@ int arch_get_random_int(unsigned int *v) {
 }
 EXPORT_SYMBOL(arch_get_random_int);
 
+static void msm_rng_read_randomness(struct work_struct *work) {
+	char buf[256];
+	int cnt;
+
+	cnt = msm_rng_read(&msm_rng, buf, 256, 1);
+	if (likely(cnt))
+		add_device_randomness(buf, cnt);
+}
+static DECLARE_DELAYED_WORK(randomness_work, msm_rng_read_randomness);
+
 /* Initialize the RNG: if the hw is already running, try to read some entropy
  * for the random core.  If not (or if reading fails), reset the hw.
  */
@@ -259,9 +269,6 @@ static int __devinit msm_rng_enable_hw(struct msm_rng_device *rng)
 	return 0;
 }
 
-/* Seed erandom's pool */
-void init_rand_state(void);
-
 static int __devinit msm_rng_probe(struct platform_device *pdev)
 {
 	struct resource *res;
@@ -323,11 +330,10 @@ static int __devinit msm_rng_probe(struct platform_device *pdev)
 	randbuf = kmalloc(RANDBUF_SIZE, GFP_KERNEL);
 	if (randbuf) {
 		schedule_work(&randbuf_work);
+		schedule_delayed_work(&randomness_work, HZ / 4);
 	} else {
 		printk(KERN_WARNING "%s: can't allocate buffer\n", __func__);
 	}
-
-	init_rand_state();
 #endif
 
 	return 0;
