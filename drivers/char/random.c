@@ -328,13 +328,14 @@ static int trickle_thresh __read_mostly = INPUT_POOL_WORDS * 14;
 static int random_depletions = 0;
 
 /* Erandom stuff */
-void init_rand_state(void);
 static void erandom_get_random_bytes(void *buf, int count);
+static void erandom_mix_pool(unsigned char *buf, ssize_t len);
 static int erandom_eviction_thread(void *nil);
 static DEFINE_SPINLOCK(erandom_lock);
 static u8 erS[256];
-static u8 eri;
+static u8 eri = 255;
 static u8 erj;
+static bool erandom_init;
 static unsigned int erandom_reads;
 static int erandom_stir_thresh __read_mostly = 256;
 
@@ -651,10 +652,11 @@ struct timer_rand_state {
  * problem of the nonblocking pool having similar initial state
  * across largely identical devices.
  */
-void add_device_randomness(const void *buf, unsigned int size)
+void add_device_randomness(void *buf, unsigned int size)
 {
 	unsigned long time = get_cycles() ^ jiffies;
 
+	erandom_mix_pool(buf, size);
 	mix_pool_bytes(&input_pool, buf, size, NULL);
 	mix_pool_bytes(&input_pool, &time, sizeof(time), NULL);
 }
@@ -1013,10 +1015,6 @@ static int rand_initialize(void)
 {
 	init_std_data(&input_pool);
 	init_std_data(&blocking_pool);
-	/* Called by msm_rng_probe instead */
-#ifndef CONFIG_ARCH_RANDOM_HWRNG
-	init_rand_state();
-#endif
 	return 0;
 }
 core_initcall(rand_initialize);
@@ -1029,49 +1027,84 @@ static inline void swap_byte(u8 *a, u8 *b) {
 	*b = swapByte;
 }
 
-void init_rand_state(void) {
+/* erandom_iter:
+ * Multi-purpose RC4 KSA (seed != 0) and PRGA (seed == 0) iteration step.  The
+ * KSA doesn't reset i & j like it should; the first seed is still correct and
+ * we can incrementally reseed this way.
+ *
+ * In theory, incremental reseeding doesn't offer much improved security.  In
+ * practice, the reseed interval should be short enough to make theoretical
+ * attacks impossible.
+ */
+static inline u8 erandom_iter(u8 seed) {
+	eri = (eri + 1) & 0xff;
+	erj = (erj + erS[eri] + seed) & 0xff;
+	swap_byte(&erS[eri], &erS[erj]);
+	return erS[(erS[eri] + erS[erj]) & 0xff];
+}
+
+/* Stir new bytes into the erandom state.  We run the RC4 KSA, drop 256 bytes
+ * of output, and run the RC4 PRGA into *buf to seed input_pool.
+ *
+ * FIXME: It would be nice to give input_pool the original buffer and use the
+ *        pseudo-randomized buffer for erandom.
+ */
+static void erandom_mix_pool(unsigned char *buf, ssize_t len) {
+	unsigned long flags;
 	unsigned int k;
-	u8 seed[256];
+	bool start_krngd = 0;
 
-	get_random_bytes_arch(seed, 256);
+	spin_lock_irqsave(&erandom_lock, flags);
 
-	for (k=0; k<256; k++)
-		erS[k] = k;
-
-	for (k = 0, erj = 0; k < 256; k++) {
-		erj = (erj + erS[k] + seed[k]) & 0xff;
-		swap_byte(&erS[k], &erS[erj]);
+	/* The first time we're called, we need a full seed. */
+	if (unlikely(!erandom_init && len < 256)) {
+		spin_unlock_irqrestore(&erandom_lock, flags);
+		pr_warn("%s: refusing to trash RC4 state (%i)\n",
+			__func__, len);
+		return;
 	}
 
-	/* drop1024: we're in no hurry; dummy_random is handling
-	 * get_random_bytes for us.
-	 */
-	eri=0; erj=0;
-	for (k=0; k<1024; k++) {
-		eri = (eri + 1) & 0xff;
-		erj = (erj + erS[eri]) & 0xff;
-		swap_byte(&erS[eri], &erS[erj]);
+	if (!erandom_init) {
+		start_krngd = 1;
+		erandom_init = 1;
+		for (k=0; k<256; k++)
+			erS[k] = k;
 	}
-	smp_wmb();
 
-	/* Actually enable erandom */
-	get_random_bytes = erandom_get_random_bytes;
-	/* Kick off the eviction thread */
-	kthread_run(erandom_eviction_thread, NULL, "krngd");
+	for (k = 0; k < len; k++)
+		erandom_iter(buf[k]);
+	for (k = 0; k < 256; k++)
+		erandom_iter(0);
+	for (k = 0; k < len; k++)
+		buf[k] = erandom_iter(0);
+
+	spin_unlock_irqrestore(&erandom_lock, flags);
+
+	if (start_krngd) {
+		kthread_run(erandom_eviction_thread, NULL, "krngd");
+		get_random_bytes = erandom_get_random_bytes;
+	}
 }
 
 static void _erandom_get_random_bytes(u8 *buf, size_t count) {
-	size_t k;
-
-	for (k=0; k<count; k++) {
-		eri = (eri + 1) & 0xff;
-		erj = (erj + erS[eri]) & 0xff;
-		swap_byte(&erS[eri], &erS[erj]);
-		buf[k] = erS[(erS[eri] + erS[erj]) & 0xff];
-	}
 	erandom_reads += count;
-	if (erandom_reads >= erandom_stir_thresh)
+	if (erandom_reads - count < erandom_stir_thresh &&
+		erandom_reads >= erandom_stir_thresh)
 		wake_up_interruptible(&random_krngd_wait);
+
+	if (unlikely(count & 3)) {
+		while (count & 3) {
+			*buf++ = erandom_iter(0);
+			count--;
+		}
+	}
+	count /= 4;
+	while (count--) {
+		*buf++ = erandom_iter(0);
+		*buf++ = erandom_iter(0);
+		*buf++ = erandom_iter(0);
+		*buf++ = erandom_iter(0);
+	}
 }
 
 static int erandom_eviction_thread(void *nil) {
@@ -1101,10 +1134,7 @@ more:
 
 	spin_lock_irqsave(&erandom_lock, flags);
 	for (i = 4; i; i--) {
-		eri = (eri + 1) & 0xff;
-		erj = (erj + erS[eri] + (in & 0xff)) & 0xff;
-		swap_byte(&erS[eri], &erS[erj]);
-		out[j] = ror32(out[j], 8) ^ erS[(erS[eri] + erS[erj]) & 0xff];
+		out[j] = ror32(out[j], 8) ^ erandom_iter(in & 0xff);
 		in >>= 8;
 	}
 	erandom_reads = 0;
@@ -1130,37 +1160,37 @@ static inline void erandom_get_random_bytes(void *buf, int count) {
 }
 
 static ssize_t
+random_read(struct file *file, char __user *buf, size_t nbytes, loff_t *ppos);
+
+static ssize_t
 erandom_read(struct file *file, char __user *buf, size_t nbytes, loff_t *ppos) {
-	u8 tmp[16];
-	int m;
-	unsigned long flags;
+	u8 tmp[64];
 	ssize_t ret = 0;
 
-	spin_lock_irqsave(&erandom_lock, flags);
-
 	while (nbytes) {
-		m = min((int)nbytes, 16);
-		if (need_resched()) {
-			spin_unlock_irqrestore(&erandom_lock, flags);
-			if (signal_pending(current)) {
-				if (ret == 0)
-					ret = -ERESTARTSYS;
-				break;
-			}
-			schedule();
-			spin_lock_irqsave(&erandom_lock, flags);
-		}
+		int m = min(nbytes, sizeof(tmp));
 
-		_erandom_get_random_bytes(tmp, m);
-		if (copy_to_user(buf, tmp, m))
-			break;
+		if (signal_pending(current)) {
+			if (!ret)
+				ret = -ERESTARTSYS;
+			goto out;
+		}
+		cond_resched();
+
+		get_random_bytes(tmp, m);
+		if (copy_to_user(buf, tmp, m)) {
+			if (!ret)
+				ret = -EFAULT;
+			goto out;
+		}
 
 		nbytes -= m;
 		ret += m;
 		buf += m;
 	}
 
-	spin_unlock_irqrestore(&erandom_lock, flags);
+out:
+	memset(tmp, 0, sizeof(tmp));
 	return ret;
 }
 
