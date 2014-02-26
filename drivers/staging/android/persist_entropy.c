@@ -1,4 +1,4 @@
-/* drivers/android/persist_entropy.c
+/* drivers/staging/android/persist_entropy.c
  * Copyright (C) 2014, Ryan Pennucci <decimalman@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -41,10 +41,11 @@ static int __devinit persist_entropy_probe(struct platform_device *pdev)
 	}
 
 	old_buf = persistent_ram_old(prz);
-	pr_info("%s: restoring %i bytes entropy\n",
+	pr_info("%s: restoring %i bytes of entropy\n",
 		__func__, old_size);
 	add_device_randomness(old_buf, old_size);
 	memset(old_buf, 0, old_size);
+	persistent_ram_free_old(prz);
 
 	return 0;
 }
