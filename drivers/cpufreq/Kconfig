@@ -226,6 +226,38 @@ config CPU_FREQ_GOV_ASSWAX
         tristate "'asswax' cpufreq governor"
         depends on CPU_FREQ
 
+config CPU_FREQ_GOV_INTELLIACTIVE
+	tristate "'intelliactive' cpufreq policy governor"
+	select CPU_FREQ_TABLE
+
+config CPU_FREQ_GOV_INTELLIDEMAND
+	tristate "'intellidemand' cpufreq policy governor"
+	select CPU_FREQ_TABLE
+
+menu "Intellidemand configuration"
+depends on CPU_FREQ_GOV_INTELLIDEMAND
+
+config CPUFREQ_ID_PERFLOCK
+	bool "Intellidemand Performance Lock"
+	depends on CPU_FREQ_GOV_INTELLIDEMAND
+	default n
+
+config INTELLI_MAX_ACTIVE_FREQ
+	int "Max Active Freq for Intellidemand"
+	depends on CPU_FREQ_GOV_INTELLIDEMAND
+	default 1350000
+
+config INTELLI_MAX_INACTIVE_FREQ
+	int "Max Inactive Freq for Intellidemand"
+	depends on CPU_FREQ_GOV_INTELLIDEMAND
+	default 1026000
+
+config CPUFREQ_LIMIT_MAX_FREQ
+	bool "Limit Max Freq"
+	depends on CPU_FREQ_GOV_INTELLIDEMAND
+
+endmenu
+
 config CPU_FREQ_DVFS_MONITOR
 	bool "dvfs monitor"
 	depends on CPU_FREQ
