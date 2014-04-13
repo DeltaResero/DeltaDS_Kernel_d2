@@ -114,6 +114,10 @@ struct cpufreq_governor cpufreq_gov_intellidemand = {
        .owner                  = THIS_MODULE,
 };
 
+#ifdef CONFIG_EARLYSUSPEND
+static struct early_suspend cpufreq_intellidemand_early_suspend_info;
+#endif
+
 /* Sampling types */
 enum {DBS_NORMAL_SAMPLE, DBS_SUB_SAMPLE};
 
@@ -1239,8 +1243,6 @@ enum {
 enum {	
 	BOOT_CPU = 0,	
 	NON_BOOT_CPU1,
-	NON_BOOT_CPU2,
-	NON_BOOT_CPU3,
 };
 
 #define SAMPLE_DURATION_MSEC	(10*1000) // 10 secs >= 10000 msec
@@ -1390,16 +1392,10 @@ static void do_dbs_timer(struct work_struct *work)
 				cpufreq_set_limits(BOOT_CPU, SET_MAX, lmf_active_max_limit);
 				
 				//pr_info("LMF: CPUX set max freq to: %lu\n", lmf_active_max_limit);
-				if (cpu_online(NON_BOOT_CPU1) ||
-					cpu_online(NON_BOOT_CPU2) ||
-					cpu_online(NON_BOOT_CPU3)) {
+				if (cpu_online(NON_BOOT_CPU1)) {
 					cpufreq_set_limits(NON_BOOT_CPU1, SET_MAX, lmf_active_max_limit);
-					cpufreq_set_limits(NON_BOOT_CPU2, SET_MAX, lmf_active_max_limit);
-					cpufreq_set_limits(NON_BOOT_CPU3, SET_MAX, lmf_active_max_limit);
 				} else {
 					cpufreq_set_limits_off(NON_BOOT_CPU1, SET_MAX, lmf_active_max_limit);
-					cpufreq_set_limits_off(NON_BOOT_CPU2, SET_MAX, lmf_active_max_limit);
-					cpufreq_set_limits_off(NON_BOOT_CPU3, SET_MAX, lmf_active_max_limit);
 				}
 			}
 			
@@ -1421,7 +1417,7 @@ static void do_dbs_timer(struct work_struct *work)
 		unsigned long load_total  = 0;
 		unsigned long jiffies_cur = jiffies;
 
-		if (cpu == NON_BOOT_CPU1 || cpu == NON_BOOT_CPU2 || cpu == NON_BOOT_CPU3)
+		if (cpu == NON_BOOT_CPU1)
 		{
 			delay_msec = (dbs_tuners_ins.sampling_rate * dbs_info->rate_mult) / 1000;
 			policy = dbs_info->cur_policy;
@@ -1507,16 +1503,10 @@ static void do_dbs_timer(struct work_struct *work)
 								cpufreq_set_limits(BOOT_CPU, SET_MAX, lmf_inactive_max_limit);
 								
 								//pr_info("LMF: CPUX set max freq to: %lu\n", lmf_inactive_max_limit);
-								if (cpu_online(NON_BOOT_CPU1) ||
-									cpu_online(NON_BOOT_CPU2) ||
-									cpu_online(NON_BOOT_CPU3)) {
+								if (cpu_online(NON_BOOT_CPU1)) {
 									cpufreq_set_limits(NON_BOOT_CPU1, SET_MAX, lmf_inactive_max_limit);
-									cpufreq_set_limits(NON_BOOT_CPU2, SET_MAX, lmf_inactive_max_limit);
-									cpufreq_set_limits(NON_BOOT_CPU3, SET_MAX, lmf_inactive_max_limit);
 								} else {
 									cpufreq_set_limits_off(NON_BOOT_CPU1, SET_MAX, lmf_inactive_max_limit);
-									cpufreq_set_limits_off(NON_BOOT_CPU2, SET_MAX, lmf_inactive_max_limit);
-									cpufreq_set_limits_off(NON_BOOT_CPU3, SET_MAX, lmf_inactive_max_limit);
 								}
 							}
 							else
@@ -1554,16 +1544,10 @@ static void do_dbs_timer(struct work_struct *work)
 								cpufreq_set_limits(BOOT_CPU, SET_MAX, lmf_active_max_limit);
 								
 								//pr_info("LMF: CPUX set max freq to: %lu\n", lmf_active_max_limit);
-								if (cpu_online(NON_BOOT_CPU1) ||
-									cpu_online(NON_BOOT_CPU2) ||
-									cpu_online(NON_BOOT_CPU3)) {
+								if (cpu_online(NON_BOOT_CPU1)) {
 									cpufreq_set_limits(NON_BOOT_CPU1, SET_MAX, lmf_active_max_limit);
-									cpufreq_set_limits(NON_BOOT_CPU2, SET_MAX, lmf_active_max_limit);
-									cpufreq_set_limits(NON_BOOT_CPU3, SET_MAX, lmf_active_max_limit);
 								} else {
 									cpufreq_set_limits_off(NON_BOOT_CPU1, SET_MAX, lmf_active_max_limit);
-									cpufreq_set_limits_off(NON_BOOT_CPU2, SET_MAX, lmf_active_max_limit);
-									cpufreq_set_limits_off(NON_BOOT_CPU3, SET_MAX, lmf_active_max_limit);
 								}
 
 							}
@@ -1882,6 +1866,10 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 
 			if (dbs_tuners_ins.sync_freq == 0)
 				dbs_tuners_ins.sync_freq = policy->min;
+
+#ifdef CONFIG_EARLYSUSPEND
+			register_early_suspend(&cpufreq_intellidemand_early_suspend_info);
+#endif
 		}
 		if (!cpu)
 			rc = input_register_handler(&dbs_input_handler);
@@ -1904,9 +1892,13 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		this_dbs_info->cur_policy = NULL;
 		if (!cpu)
 			input_unregister_handler(&dbs_input_handler);
-		if (!dbs_enable)
+		if (!dbs_enable) {
 			sysfs_remove_group(cpufreq_global_kobject,
 					   &dbs_attr_group);
+#ifdef CONFIG_EARLYSUSPEND
+			unregister_early_suspend(&cpufreq_intellidemand_early_suspend_info);
+#endif
+		}
 		mutex_unlock(&dbs_mutex);
 
 		break;
@@ -1934,6 +1926,7 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 static void cpufreq_intellidemand_early_suspend(struct early_suspend *h)
 {
 	mutex_lock(&dbs_mutex);
+	lmf_screen_state = false;
 	stored_sampling_rate = dbs_tuners_ins.sampling_rate;
 	dbs_tuners_ins.sampling_rate = DEF_SAMPLING_RATE * 6;
 	update_sampling_rate(dbs_tuners_ins.sampling_rate);
@@ -1943,6 +1936,7 @@ static void cpufreq_intellidemand_early_suspend(struct early_suspend *h)
 static void cpufreq_intellidemand_late_resume(struct early_suspend *h)
 {
 	mutex_lock(&dbs_mutex);
+	lmf_screen_state = true;
 	dbs_tuners_ins.sampling_rate = stored_sampling_rate;
 	update_sampling_rate(dbs_tuners_ins.sampling_rate);
 	mutex_unlock(&dbs_mutex);
@@ -1996,9 +1990,6 @@ static int __init cpufreq_gov_dbs_init(void)
 		dbs_work->cpu = i;
 	}
 
-#ifdef CONFIG_EARLYSUSPEND
-	register_early_suspend(&cpufreq_intellidemand_early_suspend_info);
-#endif
 	return cpufreq_register_governor(&cpufreq_gov_intellidemand);
 }
 
@@ -2012,9 +2003,6 @@ static void __exit cpufreq_gov_dbs_exit(void)
 			&per_cpu(id_cpu_dbs_info, i);
 		mutex_destroy(&this_dbs_info->timer_mutex);
 	}
-#ifdef CONFIG_EARLYSUSPEND
-	unregister_early_suspend(&cpufreq_intellidemand_early_suspend_info);
-#endif
 	destroy_workqueue(input_wq);
 }
 
