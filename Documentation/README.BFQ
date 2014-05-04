@@ -1,22 +1,38 @@
 Budget Fair Queueing I/O Scheduler
 ==================================
 
-This patchset introduces BFQ-v7r2 into Linux 3.4.0.
+This patchset introduces BFQ-v7r3 into Linux 3.4.0.
 For further information: http://www.algogroup.unimo.it/people/paolo/disk_sched/.
 
 The overall diffstat is the following:
 
- block/Kconfig.iosched         |   33 ++
+ block/Kconfig.iosched         |   33 +
  block/Makefile                |    1 +
- block/bfq-cgroup.c            |  896 ++++++++++++++++++++++++++++
+ block/bfq-cgroup.c            |  897 ++++++++++++++++++++++++++
  block/bfq-ioc.c               |   36 ++
- block/bfq-iosched.c           | 3543 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- block/bfq-sched.c             | 1050 +++++++++++++++++++++++++++++++++
- block/bfq.h                   |  636 ++++++++++++++++++++
+ block/bfq-iosched.c           | 3854 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ block/bfq-sched.c             | 1176 ++++++++++++++++++++++++++++++++++
+ block/bfq.h                   |  703 +++++++++++++++++++++
  include/linux/cgroup_subsys.h |    6 +
- 8 files changed, 6201 insertions(+)
+ 8 files changed, 6706 insertions(+)
 
 CHANGELOG
+
+v7r3:
+. IMPROVEMENT: Improved throughput boosting with NCQ-capable HDDs and
+  random workloads. The mechanism that further boosts throghput with
+  these devices and workloads is activated only in the cases where it
+  does not cause any violation of throughput-distribution and latency
+  guarantees.
+. IMPROVEMENT: Generalized the computation of the parameters of the
+  low-latency heuristic for interactive applications, so as to fit also
+  slower storage devices. The purpose of this improvement is to preserve
+  low-latency guarantees for interactive applications also on slower
+  devices, such as portable hard disks, multimedia and SD cards.
+. BUGFIX: Re-added MODULE_LICENSE macro.
+. CODE IMPROVEMENTS: Small code cleanups; introduced a coherent naming
+  scheme for all identifiers related to weight raising; refactored and
+  optimized a few hot paths.
 
 v7r2:
 . BUGFIX/IMPROVEMENT. One of the requirements for an application to be
