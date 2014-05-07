@@ -329,7 +329,7 @@ static int random_depletions = 0;
 
 /* Erandom stuff */
 static void erandom_get_random_bytes(void *buf, int count);
-static void erandom_mix_pool(unsigned char *buf, ssize_t len);
+static void erandom_mix_pool(const unsigned char *buf, ssize_t len);
 static int erandom_eviction_thread(void *nil);
 static DEFINE_SPINLOCK(erandom_lock);
 static u8 erS[256];
@@ -652,7 +652,7 @@ struct timer_rand_state {
  * problem of the nonblocking pool having similar initial state
  * across largely identical devices.
  */
-void add_device_randomness(void *buf, unsigned int size)
+void add_device_randomness(const void *buf, unsigned int size)
 {
 	unsigned long time = get_cycles() ^ jiffies;
 
@@ -1049,7 +1049,7 @@ static inline u8 erandom_iter(u8 seed) {
  * FIXME: It would be nice to give input_pool the original buffer and use the
  *        pseudo-randomized buffer for erandom.
  */
-static void erandom_mix_pool(unsigned char *buf, ssize_t len) {
+static void erandom_mix_pool(const unsigned char *buf, ssize_t len) {
 	unsigned long flags;
 	unsigned int k;
 	bool start_krngd = 0;
@@ -1075,8 +1075,6 @@ static void erandom_mix_pool(unsigned char *buf, ssize_t len) {
 		erandom_iter(buf[k]);
 	for (k = 0; k < 256; k++)
 		erandom_iter(0);
-	for (k = 0; k < len; k++)
-		buf[k] = erandom_iter(0);
 
 	spin_unlock_irqrestore(&erandom_lock, flags);
 
