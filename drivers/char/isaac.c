@@ -1,5 +1,4 @@
-/*
- * drivers/char/isaac.c
+/* drivers/char/isaac.c
  * Implementation (c) 2014 Ryan Pennucci
  * Bob Jenkins has placed ISAAC in the public domain.
  *
@@ -23,8 +22,11 @@
  *	- RP
  */
 /* TODO:
+ *  - Implement random_int, random_long, etc.
+ *  - Implement get_random_bytes
+ *  - Dynamically allocate
  *  - External seeding
- *  - implement random_int, random_long, etc.
+ *  - Don't allocate until reading > 32 bytes or so?
  */
 
 #include <linux/kernel.h>
@@ -35,6 +37,7 @@
 #include <linux/slab.h>
 #include <linux/random.h>
 #include <linux/fs.h>
+#include <asm/uaccess.h>
 #ifdef MODULE
 #include <linux/cdev.h>
 #include <linux/device.h>
@@ -70,7 +73,7 @@ static void isaac(struct isaac_ctx *ctx, u32 *buf)
 	mm = ctx->mem;
 	r = buf;
 	a = ctx->a;
-	b = ctx->b + (++ctx->randc);
+	b = ctx->b + (++ctx->c);
 	for (m = mm, mend = m2 = m + (RANDSIZ/2); m < mend; ) {
 		STEP(a<<13);
 		STEP(a>>6);
@@ -87,7 +90,7 @@ static void isaac(struct isaac_ctx *ctx, u32 *buf)
 	ctx->b = b;
 }
 
-#if defined(FUTURE_USE) && defined(UNTESTED)
+#if defined(FUTURE_USE) && defined(UNTESTED) && defined(BROKEN)
 /* Copy out random bytes, in no particular order */
 static void isaac_copyout(struct isaac_ctx *ctx, void *mem, size_t len)
 {
@@ -156,7 +159,7 @@ static void isaac_init(struct isaac_ctx *seed, struct isaac_ctx *ctx)
 
 	m = ctx->mem;
 	r = ctx->res;
-	ctx->randa = ctx->randb = ctx->randc = 0;
+	ctx->a = ctx->b = ctx->c = 0;
 	ctx->idx = RANDSIZB;
 	a = b = c = d = e = f = g = h = 0x9e3779b9;
 
@@ -191,7 +194,7 @@ static int isaac_open(struct inode *inode, struct file *filp)
 
 	ctx = kmalloc(sizeof(struct isaac_ctx), GFP_KERNEL);
 
-	seed = get_cpu_var(cpu_seeds);
+	seed = &get_cpu_var(cpu_seeds);
 	isaac_init(seed, ctx);
 	put_cpu_var(cpu_seeds);
 
@@ -204,6 +207,8 @@ static int isaac_open(struct inode *inode, struct file *filp)
 
 static int isaac_release(struct inode *inode, struct file *filp)
 {
+	printk(KERN_DEBUG "%s: instance destroyed after %i blocks\n",
+		__func__, ((struct isaac_ctx *)filp->private_data)->c);
 	kfree(filp->private_data);
 	return 0;
 }
@@ -211,39 +216,41 @@ static int isaac_release(struct inode *inode, struct file *filp)
 static ssize_t isaac_read(struct file *filp, char __user *buf, size_t count,
 		loff_t *f_pos)
 {
-	struct isaac_ctx *ctx = (struct isaac_ctx *)filp->priavate_data;
+	struct isaac_ctx *ctx = (struct isaac_ctx *)filp->private_data;
 	ssize_t cnt, ret = count;
-	if (down_interruptible(ctx->sem))
+	if (down_interruptible(&ctx->sem))
 		return -ERESTARTSYS;
 
 	/* Copy out any existing bytes */
 	if (ctx->idx != RANDSIZB) {
-		cnt = min_t(size_t, len, RANDSIZB - ctx->idx);
-		if (copy_to_user(mem, ctx->bytes + ctx->idx, cnt)) {
+		cnt = min_t(size_t, count, RANDSIZB - ctx->idx);
+		if (copy_to_user(buf, ctx->bytes + ctx->idx, cnt)) {
 			ret = -EFAULT;
 			goto out;
 		}
-		mem += cnt;
-		len -= cnt;
+		ctx->idx += cnt;
+		buf += cnt;
+		count -= cnt;
 	}
 	/* Generate more bytes as needed */
-	if (len) {
+	if (count) {
 		do {
 			isaac(ctx, ctx->res);
-			cnt = min_t(size_t, len, RANDSIZB);
-			if (copy_to_user(mem, ctx->bytes, cnt)) {
+			cnt = min_t(size_t, count, RANDSIZB);
+			if (copy_to_user(buf, ctx->bytes, cnt)) {
 				ret = -EFAULT;
 				goto out;
 			}
-			len -= cnt;
-		} while (len);
+			buf += cnt;
+			count -= cnt;
+		} while (count);
 		ctx->idx = RANDSIZB - cnt;
 	}
 
 out:
-	up(ctx->sem);
+	up(&ctx->sem);
 
-	return (ssize_t)count;
+	return (ssize_t)ret;
 }
 
 const struct file_operations isaac_fops = {
@@ -303,7 +310,7 @@ out_destroy:
 
 static void __exit unregister_device(void)
 {
-	unreegister_chrdev_region(MKDEV(235, 11), 1);
+	unregister_chrdev_region(MKDEV(235, 11), 1);
 	cdev_del(&isaac_cdev);
 	device_destroy(isaac_class, MKDEV(235, 11));
 	class_destroy(isaac_class);
@@ -314,7 +321,7 @@ module_exit(unregister_device);
 /* FIXME: There's this new thing called locking */
 static int __init isaac_seeds_init(void)
 {
-	int i, j, n;
+	int i, j;
 	struct isaac_ctx *seed, *ctx;
 
 	i = 0;
@@ -336,3 +343,6 @@ static int __init isaac_seeds_init(void)
 #endif
 }
 core_initcall(isaac_seeds_init);
+
+MODULE_DESCRIPTION("ISAAC PRNG");
+MODULE_LICENSE("GPL");
