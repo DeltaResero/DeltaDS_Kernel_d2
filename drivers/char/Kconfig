@@ -263,6 +263,13 @@ config NWFLASH
 
 source "drivers/char/hw_random/Kconfig"
 
+config ISAAC
+	tristate "ISAAC PRNG device"
+	---help---
+	  ISAAC is a fast and secure pseudo-random number generator.  This
+	  module adds a device alongside /dev/random, exposing an ISAAC
+	  generator.
+
 config NVRAM
 	tristate "/dev/nvram support"
 	depends on ATARI || X86 || (ARM && RTC_DRV_CMOS) || GENERIC_NVRAM
