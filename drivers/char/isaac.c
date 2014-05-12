@@ -42,15 +42,10 @@
 #include <linux/device.h>
 #endif
 
+/* FIXME: do this right; also, for !MODULE, use mem.c */
 #define ISAAC_DEV MKDEV(235, 11)
 
-/* Provide (untested) get_random_...()? */
-//#define ISAAC_RANDOM
-
-/* Use ISAAC+ generator? */
-#define ISAAC_PLUS
-
-#define RANDSIZL (8)
+#define RANDSIZL (CONFIG_ISAAC_SHIFT)
 #define RANDSIZ  (1<<RANDSIZL)
 #define RANDSIZB (RANDSIZ<<2)
 struct isaac_ctx {
@@ -60,7 +55,7 @@ struct isaac_ctx {
 		u8	bytes[RANDSIZB];
 	};
 	u32		a, b, c;
-	u16		idx;
+	u32		rem;
 	struct semaphore sem;
 };
 
@@ -70,7 +65,9 @@ struct isaac_ctx {
 static DEFINE_PER_CPU(struct isaac_ctx, cpu_seeds);
 
 /* Generate random bytes. */
-#ifndef ISAAC_PLUS
+#ifndef CONFIG_ISAAC_PLUS
+/* Bob Jenkins' ISAAC algorithm.
+ */
 #define IND(x) (*(u32 *)((u8 *)(mm) + ((x) & ((RANDSIZ-1)<<2))))
 #define STEP(mix) {				\
 	x = *m;					\
@@ -82,7 +79,6 @@ static DEFINE_PER_CPU(struct isaac_ctx, cpu_seeds);
 /* Jean-Philippe Aumasson's ISAAC+ algorithm, almost.  ISAAC's IND() macro is
  * used, since it's equivalent (and generates better code) for RANDSIZL < 16.
  */
-//#define IND2(x,s) (mm[ror32(x,s)&(RANDSIZ-1)])
 #define IND(x) (*(u32 *)((u8 *)(mm) + ((x) & ((RANDSIZ-1)<<2))))
 #define STEP(mix) {				\
 	x = *m;					\
@@ -91,6 +87,13 @@ static DEFINE_PER_CPU(struct isaac_ctx, cpu_seeds);
 	*(r++) = b = IND(y >> RANDSIZL) ^ a + x;\
 }
 #endif
+
+/* Generate random bytes from an isaac_ctx into an arbitrary buffer of type
+ * u32 buf[RANDSIZ]; ctx->res is handy.
+ *
+ * NB: isaac() does not necessarily write to ctx->res; it doesn't make sense
+ * for it to update ctx->rem.  Caller must update ctx->rem iff buf == ctx->res.
+ */
 static void isaac(struct isaac_ctx *ctx, u32 *buf)
 {
 	register u32 a, b, x, y, *m, *mm, *m2, *r, *mend;
@@ -148,7 +151,7 @@ static void isaac_init(struct isaac_ctx *ctx)
 	m = ctx->mem;
 	r = ctx->res;
 	ctx->a = ctx->b = ctx->c = 0;
-	ctx->idx = RANDSIZB;
+	ctx->rem = 0;
 	a = b = c = d = e = f = g = h = 0x9e3779b9;
 
 	for (i = 5; --i; ) {
@@ -182,7 +185,7 @@ static void isaac_init_seed(struct isaac_ctx *seed, struct isaac_ctx *ctx)
 	m = ctx->mem;
 	r = ctx->res;
 	ctx->a = ctx->b = ctx->c = 0;
-	ctx->idx = RANDSIZB;
+	ctx->rem = 0;
 	a = b = c = d = e = f = g = h = 0x9e3779b9;
 
 	for (i = 5; --i; ) {
@@ -190,9 +193,7 @@ static void isaac_init_seed(struct isaac_ctx *seed, struct isaac_ctx *ctx)
 	}
 
 	if (seed) {
-		/* To reseed a cpu_seed, isaac_init_seed(ctx, ctx); */
-		if (seed != ctx)
-			isaac(seed, r);
+		isaac(seed, r);
 		for (i = 0; i < RANDSIZ; i += 8) {
 			LOAD(r);
 			MIX();
@@ -204,36 +205,20 @@ static void isaac_init_seed(struct isaac_ctx *seed, struct isaac_ctx *ctx)
 			STORE();
 		}
 	} else {
+		/* FIXME: Get an actual seed here. */
 		pr_warn("initializing without a seed!\n");
 		for (i = 0; i < RANDSIZ; i += 8) {
 			MIX();
 			STORE();
 		}
-		for (i = 9; --i; ) {
+		for (i = 9; --i; )
 			isaac(ctx, ctx->res);
-		}
 	}
 }
 
-void isaac_add_randomness(const void *buf, unsigned int len)
-{
-	const u32 *src = buf;
-	u32 *dst;
-	struct isaac_ctx *ctx = &get_cpu_var(cpu_seeds);
-	while (len >= 4) {
-		dst = &ctx->res[ctx->idx >> 2];
-		*dst = *dst + *src;
-		len -= 4;
-		src++;
-		ctx->idx = (ctx->idx + 4) % RANDSIZB;
-		if (!ctx->idx) {
-			pr_info("reseeding seed for cpu %i\n",
-				smp_processor_id());
-			isaac_init_seed(ctx, ctx);
-		}
-	}
-}
-
+/* Create a new isaac_ctx for this file.
+ * TODO: explore deferring this until a large read comes in.
+ */
 static int isaac_open(struct inode *inode, struct file *filp)
 {
 	struct isaac_ctx *ctx;
@@ -258,6 +243,9 @@ static int isaac_release(struct inode *inode, struct file *filp)
 	return 0;
 }
 
+/* isaac_read returns data strictly in the order it was generated.  There's
+ * nothing to be gained with the tricks isaac_copyout uses.
+ */
 static ssize_t isaac_read(struct file *filp, char __user *buf, size_t count,
 		loff_t *f_pos)
 {
@@ -270,13 +258,13 @@ static ssize_t isaac_read(struct file *filp, char __user *buf, size_t count,
 		return -ERESTARTSYS;
 
 	/* Copy out any existing bytes */
-	if (ctx->idx != RANDSIZB) {
-		cnt = min_t(size_t, count, RANDSIZB - ctx->idx);
-		if (copy_to_user(buf, ctx->bytes + ctx->idx, cnt)) {
+	if (ctx->rem) {
+		cnt = min_t(size_t, count, ctx->rem);
+		if (copy_to_user(buf, ctx->bytes + ctx->rem - cnt, cnt)) {
 			ret = -EFAULT;
 			goto out;
 		}
-		ctx->idx += cnt;
+		ctx->rem -= cnt;
 		buf += cnt;
 		count -= cnt;
 	}
@@ -285,14 +273,14 @@ static ssize_t isaac_read(struct file *filp, char __user *buf, size_t count,
 		do {
 			isaac(ctx, ctx->res);
 			cnt = min_t(size_t, count, RANDSIZB);
-			if (copy_to_user(buf, ctx->bytes, cnt)) {
+			if (copy_to_user(buf, ctx->bytes + RANDSIZB - cnt, cnt)) {
 				ret = -EFAULT;
 				goto out;
 			}
 			buf += cnt;
 			count -= cnt;
 		} while (count);
-		ctx->idx = RANDSIZB - cnt;
+		ctx->rem = RANDSIZB - cnt;
 	}
 
 out:
@@ -301,62 +289,38 @@ out:
 	return (ssize_t)ret;
 }
 
-static ssize_t isaac_write(struct file *filp, const char __user *buf,
-		size_t count, loff_t *f_pos)
-{
-	u32 tmp[64];
-	ssize_t ret = count;
-	size_t cnt;
-
-	count &= ~3;
-	while (count) {
-		cnt = min_t(size_t, count, sizeof(tmp));
-		if (copy_from_user(tmp, buf, cnt)) {
-			ret = -EFAULT;
-			break;
-		}
-		isaac_add_randomness(tmp, cnt);
-		buf += cnt;
-		count -= cnt;
-	}
-
-	return ret;
-}
-
 const struct file_operations isaac_fops = {
 	.open = isaac_open,
 	.release = isaac_release,
 	.read = isaac_read,
-	.write = isaac_write,
-	//.unlocked_ioctl = isaac_ioctl,
 };
 
-#ifdef ISAAC_RANDOM
+#ifdef CONFIG_ISAAC_RANDOM
+/* As much as possible, we generate data directly into the output buffer.  This
+ * often saves a memcpy, and occasionally shaves off an iteration of isaac().
+ */
 static inline void isaac_copyout(struct isaac_ctx *ctx, void *buf, size_t len)
 {
-	/* Micro-optimization: by ignoring output ordering, we can avoid a
-	 * memcpy and (occasionally) run one less iteration of isaac().
-	 */
 	while (len > RANDSIZB) {
 		isaac(ctx, buf);
 		len -= RANDSIZB;
 		buf += RANDSIZB;
 	}
 	while (len) {
-		size_t cnt = RANDSIZB - ctx->idx;
+		size_t cnt = ctx->rem;
 		if (!cnt) {
 			isaac(ctx, ctx->res);
-			ctx->idx = 0;
-			cnt = RANDSIZB;
+			cnt = ctx->rem = RANDSIZB;
 		}
 		cnt = min_t(size_t, len, cnt);
-		memcpy(buf, ctx->bytes + ctx->idx, cnt);
-		ctx->idx += cnt;
-		buf += cnt;
+		memcpy(buf, ctx->bytes + ctx->rem - cnt, cnt);
+		ctx->rem -= cnt;
 		len -= cnt;
+		buf += cnt;
 	}
 }
 
+/* isaac_copyout wrappers. */
 unsigned int get_random_int(void)
 {
 	unsigned int r;
@@ -365,7 +329,6 @@ unsigned int get_random_int(void)
 	put_cpu_var(cpu_seeds);
 	return r;
 }
-
 void get_random_bytes(void *buf, int nbytes)
 {
 	isaac_copyout(&get_cpu_var(cpu_seeds), buf, nbytes);
@@ -374,6 +337,7 @@ void get_random_bytes(void *buf, int nbytes)
 #endif
 
 #ifdef MODULE
+/* FIXME */
 static struct class *isaac_class;
 static struct cdev isaac_cdev;
 static struct device *isaac_device;
@@ -431,7 +395,10 @@ static void __exit unregister_device(void)
 module_exit(unregister_device);
 #endif
 
-/* FIXME: There's this new thing called locking */
+/* TODO:
+ *  - How much locking do we need here?
+ *  - How can we capture a seed?
+ */
 static int __init isaac_seeds_init(void)
 {
 	int i, j;
