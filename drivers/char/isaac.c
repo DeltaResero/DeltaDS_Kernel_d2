@@ -32,6 +32,7 @@
 #include <linux/module.h>
 #include <linux/percpu.h>
 #include <linux/cpumask.h>
+#include <linux/bitops.h>
 #include <linux/slab.h>
 #include <linux/random.h>
 #include <linux/fs.h>
@@ -67,6 +68,8 @@ static DEFINE_PER_CPU(struct isaac_ctx, cpu_seeds);
 #ifndef CONFIG_ISAAC_PLUS
 /* Bob Jenkins' ISAAC algorithm.
  */
+#define SHR(x,s) (x>>s)
+#define SHL(x,s) (x<<s)
 #define IND(x) (*(u32 *)((u8 *)(mm) + ((x) & ((RANDSIZ-1)<<2))))
 #define STEP(mix) {				\
 	x = *m;					\
@@ -78,6 +81,8 @@ static DEFINE_PER_CPU(struct isaac_ctx, cpu_seeds);
 /* Jean-Philippe Aumasson's ISAAC+ algorithm, almost.  ISAAC's IND() macro is
  * used, since it's equivalent (and generates better code) for RANDSIZL < 16.
  */
+#define SHR(x,s) ror32(x,s)
+#define SHL(x,s) rol32(x,s)
 #define IND(x) (*(u32 *)((u8 *)(mm) + ((x) & ((RANDSIZ-1)<<2))))
 #define STEP(mix) {				\
 	x = *m;					\
@@ -101,16 +106,16 @@ static void isaac(struct isaac_ctx *ctx, u32 *buf)
 	a = ctx->a;
 	b = ctx->b + (++ctx->c);
 	for (m = mm, mend = m2 = m + (RANDSIZ/2); m < mend; ) {
-		STEP(a<<13);
-		STEP(a>>6);
-		STEP(a<<2);
-		STEP(a>>16);
+		STEP(SHL(a,13));
+		STEP(SHR(a,6));
+		STEP(SHL(a,2));
+		STEP(SHR(a,16));
 	}
 	for (m2 = mm; m2 < mend; ) {
-		STEP(a<<13);
-		STEP(a>>6);
-		STEP(a<<2);
-		STEP(a>>16);
+		STEP(SHL(a,13));
+		STEP(SHR(a,6));
+		STEP(SHL(a,2));
+		STEP(SHR(a,16));
 	}
 	ctx->a = a;
 	ctx->b = b;
