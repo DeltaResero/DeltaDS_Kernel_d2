@@ -921,6 +921,22 @@ static ssize_t extract_entropy_user(struct entropy_store *r, void __user *buf,
 	return ret;
 }
 
+#ifdef CONFIG_ISAAC_RANDOM
+/* FIXME */
+void isaac_extract_seed(void *buf, int nbytes)
+{
+	ssize_t i;
+	__u8 tmp[EXTRACT_SIZE];
+	while (nbytes) {
+		extract_buf(&blocking_pool, tmp);
+		i = min_t(int, nbytes, EXTRACT_SIZE);
+		memcpy(buf, tmp, i);
+		buf += i;
+		nbytes -= i;
+	}
+}
+EXPORT_SYMBOL(isaac_extract_seed);
+#else
 /*
  * This function is the exported kernel interface.  It returns some
  * number of good random numbers, suitable for key generation, seeding
@@ -941,6 +957,7 @@ static void dummy_random(void *buf, int nbytes)
 }
 void (*get_random_bytes)(void *, int) = dummy_random;
 EXPORT_SYMBOL(get_random_bytes);
+#endif
 
 /*
  * This function will use the architecture-specific hardware random
@@ -1045,9 +1062,6 @@ static inline u8 erandom_iter(u8 seed) {
 
 /* Stir new bytes into the erandom state.  We run the RC4 KSA, drop 256 bytes
  * of output, and run the RC4 PRGA into *buf to seed input_pool.
- *
- * FIXME: It would be nice to give input_pool the original buffer and use the
- *        pseudo-randomized buffer for erandom.
  */
 static void erandom_mix_pool(const unsigned char *buf, ssize_t len) {
 	unsigned long flags;
@@ -1080,7 +1094,9 @@ static void erandom_mix_pool(const unsigned char *buf, ssize_t len) {
 
 	if (start_krngd) {
 		kthread_run(erandom_eviction_thread, NULL, "krngd");
+#ifndef CONFIG_ISAAC_RANDOM
 		get_random_bytes = erandom_get_random_bytes;
+#endif
 	}
 }
 
@@ -1175,7 +1191,7 @@ erandom_read(struct file *file, char __user *buf, size_t nbytes, loff_t *ppos) {
 		}
 		cond_resched();
 
-		get_random_bytes(tmp, m);
+		erandom_get_random_bytes(tmp, m);
 		if (copy_to_user(buf, tmp, m)) {
 			if (!ret)
 				ret = -EFAULT;
@@ -1510,6 +1526,7 @@ ctl_table random_table[] = {
 };
 #endif 	/* CONFIG_SYSCTL */
 
+#ifndef CONFIG_ISAAC_RANDOM
 /*
  * Get a random word for internal kernel use only. Similar to urandom but
  * with the goal of minimal entropy pool depletion. As a result, the random
@@ -1521,6 +1538,7 @@ unsigned int get_random_int(void) {
 	get_random_bytes((u8 *)&ret, sizeof(ret));
 	return ret;
 }
+#endif
 
 /*
  * randomize_range() returns a start address such that

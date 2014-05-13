@@ -23,7 +23,6 @@
  */
 /* TODO:
  *  - Fix seeding
- *  - Intergrate with kernel
  */
 
 #define pr_fmt(fmt) "%s: " fmt, __func__
@@ -42,7 +41,7 @@
 #include <linux/device.h>
 #endif
 
-/* FIXME: do this right; also, for !MODULE, use mem.c */
+/* FIXME: do this right */
 #define ISAAC_DEV MKDEV(235, 11)
 
 #define RANDSIZL (CONFIG_ISAAC_SHIFT)
@@ -205,9 +204,14 @@ static void isaac_init_seed(struct isaac_ctx *seed, struct isaac_ctx *ctx)
 			STORE();
 		}
 	} else {
+#ifndef CONFIG_ISAAC_RANDOM
 		/* FIXME: Get an actual seed here. */
 		pr_warn("initializing without a seed!\n");
+#else
+		isaac_extract_seed(r, RANDSIZ);
+#endif
 		for (i = 0; i < RANDSIZ; i += 8) {
+			LOAD(r);
 			MIX();
 			STORE();
 		}
@@ -216,30 +220,30 @@ static void isaac_init_seed(struct isaac_ctx *seed, struct isaac_ctx *ctx)
 	}
 }
 
-/* Create a new isaac_ctx for this file.
- * TODO: explore deferring this until a large read comes in.
- */
-static int isaac_open(struct inode *inode, struct file *filp)
+/* Allocate a new context, with its semaphore locked */
+static struct isaac_ctx *isaac_alloc(void)
 {
-	struct isaac_ctx *ctx;
-
-	ctx = kmalloc(sizeof(struct isaac_ctx), GFP_KERNEL);
+	struct isaac_ctx *ctx = kmalloc(sizeof(struct isaac_ctx), GFP_KERNEL);
 	if (!ctx)
-		return -ENOMEM;
+		return NULL;
 
 	isaac_init(ctx);
-	sema_init(&ctx->sem, 1);
+	sema_init(&ctx->sem, 0);
+	return ctx;
+}
 
-	filp->private_data = ctx;
-
+static int isaac_open(struct inode *inode, struct file *filp)
+{
+	if (filp->private_data)
+		pr_warn("clobbering file private data\n");
+	filp->private_data = NULL;
 	return 0;
 }
 
 static int isaac_release(struct inode *inode, struct file *filp)
 {
-	printk(KERN_DEBUG "%s: instance destroyed after %i blocks\n",
-		__func__, ((struct isaac_ctx *)filp->private_data)->c);
-	kfree(filp->private_data);
+	if (filp->private_data)
+		kfree(filp->private_data);
 	return 0;
 }
 
@@ -249,13 +253,21 @@ static int isaac_release(struct inode *inode, struct file *filp)
 static ssize_t isaac_read(struct file *filp, char __user *buf, size_t count,
 		loff_t *f_pos)
 {
-	struct isaac_ctx *ctx;
+	struct isaac_ctx *ctx = NULL;
 	size_t cnt;
 	ssize_t ret = count;
 
-	ctx = filp->private_data;
-	if (down_interruptible(&ctx->sem))
-		return -ERESTARTSYS;
+	if (filp->private_data) {
+		ctx = filp->private_data;
+		if (down_interruptible(&ctx->sem))
+			return -ERESTARTSYS;
+	} else if (count > 1024) {
+		/* initialized with sem locked */
+		ctx = filp->private_data = isaac_alloc();
+	}
+	if (!ctx) {
+		ctx = &get_cpu_var(cpu_seeds);
+	}
 
 	/* Copy out any existing bytes */
 	if (ctx->rem) {
@@ -284,7 +296,10 @@ static ssize_t isaac_read(struct file *filp, char __user *buf, size_t count,
 	}
 
 out:
-	up(&ctx->sem);
+	if (filp->private_data)
+		up(&ctx->sem);
+	else
+		put_cpu_var(cpu_seeds);
 
 	return (ssize_t)ret;
 }
@@ -334,6 +349,7 @@ void get_random_bytes(void *buf, int nbytes)
 	isaac_copyout(&get_cpu_var(cpu_seeds), buf, nbytes);
 	put_cpu_var(cpu_seeds);
 }
+EXPORT_SYMBOL(get_random_bytes);
 #endif
 
 #ifdef MODULE

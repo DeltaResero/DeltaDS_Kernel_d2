@@ -20,7 +20,7 @@
 #include <linux/random.h>
 
 // Bytes of entropy to save across a reboot
-#define SAVE_SIZE (512)
+#define SAVE_SIZE (1024)
 
 static int __devinit persist_entropy_probe(struct platform_device *pdev)
 {
