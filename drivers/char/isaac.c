@@ -208,6 +208,7 @@ static void isaac_init_seed(struct isaac_ctx *seed, struct isaac_ctx *ctx)
 			MIX();
 			STORE();
 		}
+		isaac(ctx, r);
 	} else {
 #ifndef CONFIG_ISAAC_RANDOM
 		/* FIXME: Get an actual seed here. */
@@ -239,8 +240,6 @@ static struct isaac_ctx *isaac_alloc(void)
 
 static int isaac_open(struct inode *inode, struct file *filp)
 {
-	if (filp->private_data)
-		pr_warn("clobbering file private data\n");
 	filp->private_data = NULL;
 	return 0;
 }
