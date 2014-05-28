@@ -92,6 +92,7 @@ static int consumer_map_len;
 #define RPM_VREG_PIN_CTRL_EN3		0x08
 #define RPM_VREG_PIN_CTRL_ALL		0x0F
 
+#if 0
 static const char *label_freq[] = {
 	[RPM_VREG_FREQ_NONE]		= " N/A",
 	[RPM_VREG_FREQ_19p20]		= "19.2",
@@ -118,6 +119,7 @@ static const char *label_corner[] = {
 	[RPM_VREG_CORNER_NOMINAL]	= "NOM",
 	[RPM_VREG_CORNER_HIGH]		= "HIGH",
 };
+#endif
 
 /*
  * This is used when voting for LPM or HPM by subtracting or adding to the

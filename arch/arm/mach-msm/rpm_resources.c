@@ -228,17 +228,6 @@ static void msm_rpmrs_aggregate_l2_cache(struct msm_rpmrs_limits *limits)
 	}
 }
 
-static bool msm_spm_l2_cache_beyond_limits(struct msm_rpmrs_limits *limits)
-{
-	struct msm_rpmrs_resource *rs = &msm_rpmrs_l2_cache;
-	uint32_t l2_cache = rs->rs[0].value;
-
-	if (!rs->enable_low_power)
-		l2_cache = MSM_RPMRS_L2_CACHE_ACTIVE;
-
-	return l2_cache > limits->l2_cache;
-}
-
 static void msm_rpmrs_restore_l2_cache(void)
 {
 	struct msm_rpmrs_resource *rs = &msm_rpmrs_l2_cache;

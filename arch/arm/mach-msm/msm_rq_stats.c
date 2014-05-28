@@ -351,7 +351,7 @@ static void def_work_fn(struct work_struct *work)
 	 * rq_hotplug_enable to migrate to auto-hotplug.
 	 */
 	if (unlikely((rq_info.def_interval > 5000) && !rq_info.hotplug_disabled)) {
-		printk(KERN_DEBUG "rq-stats: interval %lu\n", rq_info.def_interval);
+		printk(KERN_DEBUG "rq-stats: interval %u\n", rq_info.def_interval);
 		printk(KERN_DEBUG "rq-stats: where's mpdecision? migrating to auto-hotplug\n");
 		rq_hotplug_enable(HP_AUTOHP);
 	}
