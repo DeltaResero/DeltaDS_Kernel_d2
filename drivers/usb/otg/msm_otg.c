@@ -1093,6 +1093,9 @@ skip_phy_resume:
 }
 #endif
 
+/* Currently commented out below. */
+static int msm_otg_notify_host_mode(struct msm_otg *motg, bool host_mode)
+	__attribute__((unused));
 static int msm_otg_notify_host_mode(struct msm_otg *motg, bool host_mode)
 {
 	int ret;
