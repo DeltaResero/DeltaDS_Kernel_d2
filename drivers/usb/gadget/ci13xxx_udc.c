@@ -147,6 +147,7 @@ struct ci13xxx_ebi_err_entry {
 	struct ci13xxx_ebi_err_entry *next;
 };
 
+#if 0
 struct ci13xxx_ebi_err_data {
 	u32 ebi_err_addr;
 	u32 apkt0;
@@ -154,6 +155,7 @@ struct ci13xxx_ebi_err_data {
 	struct ci13xxx_ebi_err_entry *ebi_err_entry;
 };
 static struct ci13xxx_ebi_err_data *ebi_err_data;
+#endif
 
 /******************************************************************************
  * HW block
@@ -3830,7 +3832,9 @@ free_udc:
 static void udc_remove(void)
 {
 	struct ci13xxx *udc = _udc;
+#if 0
 	int retval;
+#endif
 
 	if (udc == NULL) {
 		err("EINVAL");
