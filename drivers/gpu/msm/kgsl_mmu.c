@@ -384,7 +384,9 @@ void kgsl_setstate(struct kgsl_mmu *mmu, unsigned int context_id,
 			uint32_t flags)
 {
 	struct kgsl_device *device = mmu->device;
+#if !CONFIG_AXXX_REV
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
+#endif
 
 	if (!(flags & (KGSL_MMUFLAGS_TLBFLUSH | KGSL_MMUFLAGS_PTUPDATE))
 		&& !adreno_is_a2xx(adreno_dev))

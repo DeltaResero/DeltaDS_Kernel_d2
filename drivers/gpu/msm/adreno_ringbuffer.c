@@ -465,8 +465,10 @@ int adreno_ringbuffer_start(struct adreno_ringbuffer *rb)
 
 void adreno_ringbuffer_stop(struct adreno_ringbuffer *rb)
 {
+#if !CONFIG_AXXX_REV
 	struct kgsl_device *device = rb->device;
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
+#endif
 
 	if (rb->flags & KGSL_FLAGS_STARTED) {
 		if (adreno_is_a200(adreno_dev))
@@ -539,7 +541,9 @@ adreno_ringbuffer_addcmds(struct adreno_ringbuffer *rb,
 				unsigned int flags, unsigned int *cmds,
 				int sizedwords)
 {
+#if !CONFIG_AXXX_REV
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(rb->device);
+#endif
 	unsigned int *ringcmds;
 	unsigned int total_sizedwords = sizedwords;
 	unsigned int i;

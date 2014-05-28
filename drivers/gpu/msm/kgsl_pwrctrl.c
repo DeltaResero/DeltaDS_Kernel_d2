@@ -1218,7 +1218,6 @@ int kgsl_pwrctrl_wake(struct kgsl_device *device)
 {
 	int status = 0;
 	unsigned int context_id;
-	unsigned int state = device->state;
 	unsigned int ts_processed = 0xdeaddead;
 	struct kgsl_context *context;
 
@@ -1244,7 +1243,7 @@ int kgsl_pwrctrl_wake(struct kgsl_device *device)
 			ts_processed = kgsl_readtimestamp(device, context,
 				KGSL_TIMESTAMP_RETIRED);
 		KGSL_PWR_INFO(device, "Wake from %s state. CTXT: %d RTRD TS: %08X\n",
-			kgsl_pwrstate_to_str(state),
+			kgsl_pwrstate_to_str(device->state),
 			context ? context->id : -1, ts_processed);
 		kgsl_context_put(context);
 		/* fall through */

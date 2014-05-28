@@ -662,12 +662,10 @@ static void adreno_iommu_setstate(struct kgsl_device *device,
 {
 	unsigned int pt_val, reg_pt_val;
 	unsigned int link[250];
-	unsigned int *cmds = &link[0];
-	int sizedwords = 0;
+	unsigned int *cmds = link;
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
 	int num_iommu_units, i;
 	struct kgsl_context *context;
-	struct adreno_context *adreno_ctx = NULL;
 
 	/*
 	 * If we're idle and we don't need to use the GPU to save context
@@ -683,7 +681,6 @@ static void adreno_iommu_setstate(struct kgsl_device *device,
 
 	if (context == NULL)
 		return;
-	adreno_ctx = context->devctxt;
 
 	if (kgsl_mmu_enable_clk(&device->mmu,
 				KGSL_IOMMU_CONTEXT_USER))
@@ -786,22 +783,19 @@ static void adreno_iommu_setstate(struct kgsl_device *device,
 
 	cmds += adreno_add_idle_cmds(adreno_dev, cmds);
 
-	sizedwords += (cmds - &link[0]);
-	if (sizedwords) {
+	if (likely(cmds > link)) {
 		/* invalidate all base pointers */
 		*cmds++ = cp_type3_packet(CP_INVALIDATE_STATE, 1);
 		*cmds++ = 0x7fff;
-		sizedwords += 2;
 		/* This returns the per context timestamp but we need to
 		 * use the global timestamp for iommu clock disablement */
-		adreno_ringbuffer_issuecmds(device, adreno_ctx,
-			KGSL_CMD_FLAGS_PMODE,
-			&link[0], sizedwords);
+		adreno_ringbuffer_issuecmds(device, context->devctxt,
+			KGSL_CMD_FLAGS_PMODE, link, cmds - link);
 		kgsl_mmu_disable_clk_on_ts(&device->mmu,
 				adreno_dev->ringbuffer.global_ts, true);
 	}
 
-	if (sizedwords > (sizeof(link)/sizeof(unsigned int))) {
+	if (unlikely(cmds > link + (sizeof(link)/sizeof(unsigned int) - 1))) {
 		KGSL_DRV_ERR(device, "Temp command buffer overflow\n");
 		BUG();
 	}
@@ -998,8 +992,10 @@ a2xx_getchipid(struct kgsl_device *device)
 static unsigned int
 adreno_getchipid(struct kgsl_device *device)
 {
+#if !CONFIG_AXXX_REV
 	struct kgsl_device_platform_data *pdata =
 		kgsl_device_get_drvdata(device);
+#endif
 
 	/*
 	 * All A3XX chipsets will have pdata set, so assume !pdata->chipid is

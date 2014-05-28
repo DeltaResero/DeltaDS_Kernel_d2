@@ -937,8 +937,4 @@ error_vfree:
 end:
 	return result;
 }
-#else
-int adreno_postmortem_dump(struct kgsl_device *device, int manual) {
-	return 0;
-}
 #endif

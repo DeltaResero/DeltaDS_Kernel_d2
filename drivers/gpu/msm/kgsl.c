@@ -1363,7 +1363,6 @@ static long _device_waittimestamp(struct kgsl_device_private *dev_priv,
 {
 	int result = 0;
 	struct kgsl_device *device = dev_priv->device;
-	unsigned int context_id = context ? context->id : KGSL_MEMSTORE_GLOBAL;
 
 	result = device->ftbl->waittimestamp(dev_priv->device,
 					context, timestamp, timeout);
@@ -1542,7 +1541,9 @@ static long _cmdstream_freememontimestamp(struct kgsl_device_private *dev_priv,
 {
 	int result = 0;
 	struct kgsl_mem_entry *entry = NULL;
+#if !CONFIG_AXXX_REV
 	struct kgsl_device *device = dev_priv->device;
+#endif
 	unsigned int context_id = context ? context->id : KGSL_MEMSTORE_GLOBAL;
 
 	entry = kgsl_sharedmem_find(dev_priv->process_priv, gpuaddr);
@@ -2362,7 +2363,6 @@ static long
 kgsl_ioctl_gpumem_alloc_id(struct kgsl_device_private *dev_priv,
 			unsigned int cmd, void *data)
 {
-	struct kgsl_process_private *private = dev_priv->process_priv;
 	struct kgsl_gpumem_alloc_id *param = data;
 	struct kgsl_mem_entry *entry = NULL;
 	int result;
@@ -3294,7 +3294,6 @@ EXPORT_SYMBOL(kgsl_device_platform_probe);
 int kgsl_postmortem_dump(struct kgsl_device *device, int manual)
 {
 	bool saved_nap;
-	struct kgsl_pwrctrl *pwr = &device->pwrctrl;
 
 	BUG_ON(device == NULL);
 
@@ -3307,17 +3306,6 @@ int kgsl_postmortem_dump(struct kgsl_device *device, int manual)
 
 		if (device->state == KGSL_STATE_ACTIVE)
 			kgsl_idle(device);
-
-	}
-
-	if (device->pm_dump_enable) {
-
-		KGSL_LOG_DUMP(device,
-				"POWER: FLAGS = %08lX | ACTIVE POWERLEVEL = %08X",
-				pwr->power_flags, pwr->active_pwrlevel);
-
-		KGSL_LOG_DUMP(device, "POWER: INTERVAL TIMEOUT = %08X ",
-				pwr->interval_timeout);
 
 	}
 
