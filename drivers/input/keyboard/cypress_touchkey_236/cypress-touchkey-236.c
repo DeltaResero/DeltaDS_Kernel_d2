@@ -101,6 +101,7 @@ struct cypress_touchkey_info {
 	struct completion	anim_done;
 	int			anim_idx, anim_delay, anim_step;
 	enum touchkey_status	status;
+	atomic_t		keypad_enable;
 };
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
@@ -247,6 +248,10 @@ static irqreturn_t cypress_touchkey_interrupt(int irq, void *dev_id)
 	int code;
 	int press;
 	int ret;
+
+	if (!atomic_read(&info->keypad_enable)) {
+		goto out;
+	}
 
 	ret = gpio_get_value(info->pdata->gpio_int);
 	if (ret) {
@@ -815,6 +820,38 @@ static ssize_t autocalibration_status(struct device *dev,
 		return sprintf(buf, "Disabled\n");
 }
 
+static ssize_t sec_keypad_enable_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct cypress_touchkey_info *info = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%d\n", atomic_read(&info->keypad_enable));
+}
+
+static ssize_t sec_keypad_enable_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct cypress_touchkey_info *info = dev_get_drvdata(dev);
+	int i;
+
+	unsigned int val = 0;
+	sscanf(buf, "%d", &val);
+	val = (val == 0 ? 0 : 1);
+	atomic_set(&info->keypad_enable, val);
+	if (val) {
+		for (i = 0; i < ARRAY_SIZE(info->keycode); i++)
+			set_bit(info->keycode[i], info->input_dev->keybit);
+	} else {
+		for (i = 0; i < ARRAY_SIZE(info->keycode); i++)
+			clear_bit(info->keycode[i], info->input_dev->keybit);
+	}
+	input_sync(info->input_dev);
+
+	return count;
+}
+
+static DEVICE_ATTR(keypad_enable, S_IRUGO|S_IWUSR, sec_keypad_enable_show,
+	      sec_keypad_enable_store);
 static DEVICE_ATTR(touchkey_firm_update_status,
 		S_IRUGO | S_IWUSR | S_IWGRP, touchkey_firm_status_show, NULL);
 static DEVICE_ATTR(touchkey_firm_version_panel, S_IRUGO,
@@ -932,6 +969,9 @@ static int __devinit cypress_touchkey_probe(struct i2c_client *client,
 	set_bit(EV_KEY, input_dev->evbit);
 	set_bit(EV_LED, input_dev->evbit);
 	set_bit(LED_MISC, input_dev->ledbit);
+
+	atomic_set(&info->keypad_enable, 1);
+
 	for (i = 0; i < ARRAY_SIZE(info->keycode); i++)
 		set_bit(info->keycode[i], input_dev->keybit);
 
@@ -1175,6 +1215,13 @@ static int __devinit cypress_touchkey_probe(struct i2c_client *client,
 			&dev_attr_touchkey_brightness_level) < 0) {
 		pr_err("Failed to create device file(%s)!\n",
 			dev_attr_touchkey_brightness_level.attr.name);
+		goto err_sysfs;
+	}
+
+	if (device_create_file(sec_touchkey,
+		&dev_attr_keypad_enable) < 0) {
+		printk(KERN_ERR "Failed to create device file(%s)!\n",
+		dev_attr_keypad_enable.attr.name);
 		goto err_sysfs;
 	}
 
