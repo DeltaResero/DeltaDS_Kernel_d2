@@ -1570,6 +1570,7 @@ adreno_probe(struct platform_device *pdev)
 
 	kgsl_pwrscale_init(device);
 	kgsl_pwrscale_attach_policy(device, ADRENO_DEFAULT_PWRSCALE_POLICY);
+	kgsl_pwrctrl_init_sysfs(device);
 
 	device->flags &= ~KGSL_FLAGS_SOFT_RESET;
 	return 0;
