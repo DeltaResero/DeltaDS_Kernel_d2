@@ -1,22 +1,42 @@
 Budget Fair Queueing I/O Scheduler
 ==================================
 
-This patchset introduces BFQ-v7r3 into Linux 3.4.0.
+This patchset introduces BFQ-v7r5 into Linux 3.4.0.
 For further information: http://www.algogroup.unimo.it/people/paolo/disk_sched/.
 
 The overall diffstat is the following:
 
  block/Kconfig.iosched         |   33 +
  block/Makefile                |    1 +
- block/bfq-cgroup.c            |  897 ++++++++++++++++++++++++++
+ block/bfq-cgroup.c            |  902 ++++++++++++++++++++++++++
  block/bfq-ioc.c               |   36 ++
- block/bfq-iosched.c           | 3854 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- block/bfq-sched.c             | 1176 ++++++++++++++++++++++++++++++++++
- block/bfq.h                   |  703 +++++++++++++++++++++
+ block/bfq-iosched.c           | 3903 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ block/bfq-sched.c             | 1179 ++++++++++++++++++++++++++++++++++
+ block/bfq.h                   |  768 ++++++++++++++++++++++
  include/linux/cgroup_subsys.h |    6 +
- 8 files changed, 6706 insertions(+)
+ 8 files changed, 6828 insertions(+)
 
 CHANGELOG
+
+v7r5:
+. IMPROVEMENT: Improve throughput boosting by idling the device
+  only for processes that, in addition to perform sequential I/O,
+  are I/O-bound (apart from weight-raised queues, for which idling
+  is always performed to guarantee them a low latency).
+. IMPROVEMENT: Improve throughput boosting by depriving processes
+  that cooperate often of weight-raising.
+. CODE IMPROVEMENT: Pass of improvement of the readability of both
+  comments and actual code.
+
+v7r4:
+. BUGFIX. Modified the code so as to be robust against late detection of
+  NCQ support for a rotational device.
+. BUGFIX. Removed a bug that hindered the correct throughput distribution
+  on flash-based devices when not every process had to receive the same
+  fraction of the throughput. This fix entailed also a little efficiency
+  improvement, because it implied the removal of a short function executed
+  in a hot path.
+. CODESTYLE IMPROVEMENT: removed quoted strings split across lines.
 
 v7r3:
 . IMPROVEMENT: Improved throughput boosting with NCQ-capable HDDs and
