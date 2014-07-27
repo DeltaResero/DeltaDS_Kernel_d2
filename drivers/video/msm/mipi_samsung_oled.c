@@ -13,7 +13,6 @@
 #include <linux/lcd.h>
 #include <linux/wakelock.h>
 #include <linux/pm_qos.h>
-#include <linux/gen_attr.h>
 #include <mach/cpuidle.h>
 #include "mipi_samsung_oled.h"
 #include "mdp4.h"
@@ -30,10 +29,6 @@
 	|| defined(CONFIG_FB_MSM_MIPI_MAGNA_OLED_VIDEO_WVGA_PT)
 #include "mdp4_video_enhance.h"
 #endif
-
-extern int enable_panel_shift;
-extern int panel_shift_coeff;
-extern void mipi_bump_gamma(void);
 
 static struct mipi_samsung_driver_data msd;
 static struct pm_qos_request pm_qos_req;
@@ -481,9 +476,6 @@ static int mipi_samsung_disp_send_cmd(struct msm_fb_data_type *mfd,
 		goto unknown_command;
 		;
 	}
-
-	if (cmd == PANEL_ON)
-		reenable_mdnie();
 
 	if (!cmd_size)
 		goto unknown_command;
@@ -1369,33 +1361,6 @@ static DEVICE_ATTR(auto_brightness, S_IRUGO | S_IWUSR | S_IWGRP,
 
 #endif
 
-static int panel_colors_get(void *ptr) {
-	return (20 - panel_shift_coeff) / 10;
-}
-static void panel_colors_set(void *ptr, int val) {
-	panel_shift_coeff = 20 - val * 10;
-}
-static struct gen_attr gattr_panel_colors = {
-	.attr = { .name = "panel_colors", .mode = 0644 },
-	.show = gattr_generic_show, .store = gattr_generic_store,
-	.min = 0, .max = 4, .cnt = 1,
-	.set = panel_colors_set, .get = panel_colors_get,
-	.cb = mipi_bump_gamma
-};
-struct gen_attr gattr_mdnie_mcm_temperature = {
-	.attr = { .name = "mcm_temperature", .mode = 0644 },
-	.show = gattr_generic_show, .store = gattr_generic_store,
-	.min = -20, .max = 20, .cnt = 1,
-	.ptr = &panel_shift_coeff,
-	.cb = mipi_bump_gamma
-};
-struct gen_attr gattr_mdnie_mcm = {
-	.attr = { .name = "s_MCM", .mode = 0644 },
-	.show = gattr_generic_show, .store = gattr_generic_store,
-	.min = 0, .max = 1, .cnt = 1,
-	.ptr = &enable_panel_shift,
-	.cb = mipi_bump_gamma
-};
 
 #ifdef READ_REGISTER_ESD
 #define ID_E5H_IDLE 0x80
@@ -1582,10 +1547,6 @@ static int __devinit mipi_samsung_disp_probe(struct platform_device *pdev)
 		pr_info("sysfs create fail-%s\n",
 				dev_attr_power_reduce.attr.name);
 	}
-
-	ret = sysfs_create_file(&lcd_device->dev.kobj,
-					&gen_attr(panel_colors));
-
 #if defined(CONFIG_BACKLIGHT_CLASS_DEVICE)
 	bd = backlight_device_register("panel", &lcd_device->dev,
 						NULL, NULL, NULL);

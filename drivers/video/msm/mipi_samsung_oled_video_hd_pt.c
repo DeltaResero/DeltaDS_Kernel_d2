@@ -1234,7 +1234,7 @@ static int set_elvss_level_4_8(int bl_level)
 
 void reset_gamma_level(void)
 {
-	pr_info("reset_gamma_level\n");
+	pr_debug("reset_gamma_level\n");
 	mipi_pd.lcd_current_cd_idx = -1;
 
 	mipi_pd.ldi_acl_stat = false;
@@ -1395,14 +1395,9 @@ static int set_gamma_level(int bl_level, enum gamma_mode_list gamma_mode)
 	return aid_change;
 }
 
-extern void smart_mtp_bump_coeffs(void);
-extern void mipi_samsung_bump_backlight(int bl_level);
-void mipi_bump_gamma(void) {
-	int old;
-	smart_mtp_bump_coeffs();
-	old = mipi_pd.lcd_current_cd_idx;
-	mipi_pd.lcd_current_cd_idx = -1;
-	mipi_samsung_bump_backlight((old + 2) * 10);
+int get_lcd_current_cd_index(void)
+{
+	return mipi_pd.lcd_current_cd_idx;
 }
 
 static void  prepare_fast_init_cmd_array(int lcd_type)
