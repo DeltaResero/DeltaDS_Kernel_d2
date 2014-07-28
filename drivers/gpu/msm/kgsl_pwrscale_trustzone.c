@@ -236,7 +236,7 @@ static void tz_idle(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 
 	/* If the GPU has stayed in turbo mode for a while, *
 	 * stop writing out values. */
-	if (pwr->active_pwrlevel == 0) {
+	if (pwr->active_pwrlevel == pwr->thermal_pwrlevel) {
 		if (priv->no_switch_cnt > SWITCH_OFF) {
 			priv->skip_cnt++;
 			if (priv->skip_cnt > SKIP_COUNTER) {
