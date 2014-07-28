@@ -48,6 +48,9 @@ spinlock_t tz_lock;
  * per frame for 60fps content.
  */
 #define FLOOR			5000
+/* SIMPLE_FLOOR is 7.5msec to keep simple's aggressive scaling in check.
+ */
+#define SIMPLE_FLOOR		7500
 /* CEILING is 50msec, larger than any standard
  * frame length, but less than the idle timer.
  */
@@ -165,6 +168,12 @@ static int simple_governor(struct kgsl_device *device, int idle_stat)
 			/* already maxed, so do nothing */
 			return 0;
 
+		/* don't immediately scale up if we were just idle */
+		if (laziness < default_laziness) {
+			laziness = default_laziness;
+			return 0;
+		}
+
 		else if ((pwr->active_pwrlevel > 0) &&
 			(pwr->active_pwrlevel <= (pwr->num_pwrlevels - 1)))
 			/* bump up to next pwrlevel */
@@ -215,9 +224,15 @@ static void tz_idle(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 	 * the GPU just started, or if less than FLOOR time
 	 * has passed since the last run.
 	 */
+#ifdef CONFIG_MSM_KGSL_SIMPLE_GOV
+	if (stats.total_time == 0 || priv->bin.total_time <
+	    (priv->governor == TZ_GOVERNOR_SIMPLE ? SIMPLE_FLOOR : FLOOR))
+		return;
+#else
 	if ((stats.total_time == 0) ||
 		(priv->bin.total_time < FLOOR))
 		return;
+#endif
 
 	/* If the GPU has stayed in turbo mode for a while, *
 	 * stop writing out values. */
