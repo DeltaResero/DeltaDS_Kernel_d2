@@ -1591,7 +1591,7 @@ static long kgsl_ioctl_rb_issueibcmds(struct kgsl_device_private *dev_priv,
 			goto done;
 		}
 
-		ibdesc = kzalloc(sizeof(struct kgsl_ibdesc) * param->numibs,
+		ibdesc = kmalloc(sizeof(struct kgsl_ibdesc) * param->numibs,
 					GFP_KERNEL);
 		if (!ibdesc) {
 			KGSL_MEM_ERR(dev_priv->device,
