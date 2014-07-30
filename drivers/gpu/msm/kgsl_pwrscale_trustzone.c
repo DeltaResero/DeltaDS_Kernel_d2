@@ -167,43 +167,36 @@ static int simple_governor(struct kgsl_device *device, int idle_stat)
 {
 	struct kgsl_pwrctrl *pwr = &device->pwrctrl;
 
-	/* it's currently busy */
 	if (idle_stat < ramp_up_threshold)
 	{
-		if (pwr->active_pwrlevel == 0)
-			/* already maxed, so do nothing */
-			return 0;
-
-		/* don't immediately scale up if we were just idle */
-		if (laziness < default_laziness) {
-			laziness = default_laziness;
+		if (laziness > 0) {
+			laziness = 0;
 			return 0;
 		}
 
-		else if ((pwr->active_pwrlevel > 0) &&
-			(pwr->active_pwrlevel <= (pwr->num_pwrlevels - 1)))
-			/* bump up to next pwrlevel */
-			return -1;
-	}
-	/* idle case */
-	else
-	{
-		if ((pwr->active_pwrlevel >= 0) &&
-			(pwr->active_pwrlevel < (pwr->num_pwrlevels - 1))) {
-			if (likely(--laziness > 0))
-			{
-				/* don't change anything yet hold off for a while */
-				return 0;
-			}
-			else
-			{
-				/* above min, lower it */
-				laziness = default_laziness;
-				return 1;
-			}
-		} else if (pwr->active_pwrlevel == (pwr->num_pwrlevels - 1)) {
-			/* already @ min, so do nothing */
+		laziness--;
+
+		if (pwr->active_pwrlevel <= pwr->thermal_pwrlevel)
 			return 0;
+
+		if (laziness < -default_laziness / 2) {
+			laziness = 0;
+			return -1;
+		}
+	} else {
+		if (laziness < 0) {
+			laziness = 0;
+			return 0;
+		}
+
+		laziness++;
+
+		if (pwr->active_pwrlevel == pwr->num_pwrlevels - 1)
+			return 0;
+
+		if (laziness > default_laziness) {
+			laziness = 0;
+			return 1;
 		}
 	}
 
