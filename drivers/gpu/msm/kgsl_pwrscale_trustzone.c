@@ -356,6 +356,9 @@ reset_stats:
 }
 #endif
 
+static int idle_scale = 16667;
+module_param(idle_scale, int, 0664);
+
 static void tz_idle(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 {
 	struct kgsl_pwrctrl *pwr = &device->pwrctrl;
@@ -395,26 +398,18 @@ static void tz_idle(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 		return;
 #endif
 
-	/* If the GPU has stayed in turbo mode for a while, *
-	 * stop writing out values. */
-	if (pwr->active_pwrlevel == pwr->thermal_pwrlevel) {
-		if (priv->no_switch_cnt > SWITCH_OFF) {
-			priv->skip_cnt++;
-			if (priv->skip_cnt > SKIP_COUNTER) {
-				priv->no_switch_cnt -= SWITCH_OFF_RESET_TH;
-				priv->skip_cnt = 0;
-			}
-			return;
-		}
-		priv->no_switch_cnt++;
-	} else {
-		priv->no_switch_cnt = 0;
-	}
+	if (++priv->skip_cnt & priv->no_switch_cnt)
+		return;
+	if (priv->no_switch_cnt <
+	    ((pwr->active_pwrlevel == pwr->thermal_pwrlevel) ? 31 : 7))
+		priv->no_switch_cnt = (priv->no_switch_cnt << 1) + 1;
 
-	idle = stats.total_time - stats.busy_time;
+	idle = priv->bin.total_time - priv->bin.busy_time;
 	idle = (idle > 0) ? idle : 0;
-	idle *= 16640;
-	do_div(idle, stats.total_time);
+	idle *= idle_scale;
+	do_div(idle, priv->bin.total_time);
+	priv->bin.total_time = 0;
+	priv->bin.busy_time = 0;
 #ifdef CONFIG_MSM_KGSL_SIMPLE_GOV
 	if (priv->governor == TZ_GOVERNOR_SIMPLE)
 		val = simple_governor(device, idle);
@@ -428,6 +423,8 @@ static void tz_idle(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 					     pwr->active_pwrlevel + val);
 		//pr_info("TZ idle stat: %d, TZ PL: %d, TZ out: %d\n",
 		//		idle, pwr->active_pwrlevel, val);
+		priv->skip_cnt = 0;
+		priv->no_switch_cnt = 0;
 	}
 }
 
@@ -443,6 +440,7 @@ static void tz_sleep(struct kgsl_device *device,
 	struct tz_priv *priv = pwrscale->priv;
 
 	__secure_tz_entry(TZ_RESET_ID, 0, device->id);
+	priv->skip_cnt = 0;
 	priv->no_switch_cnt = 0;
 	priv->bin.total_time = 0;
 	priv->bin.busy_time = 0;
