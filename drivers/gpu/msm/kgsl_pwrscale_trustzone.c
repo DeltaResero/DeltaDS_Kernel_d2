@@ -27,14 +27,11 @@
 #include "kgsl_pwrscale.h"
 #include "kgsl_device.h"
 
-#ifdef CONFIG_MSM_KGSL_SIMPLE_GOV
-#include <linux/module.h>
-#endif
-
 #define TZ_GOVERNOR_PERFORMANCE 0
 #define TZ_GOVERNOR_ONDEMAND    1
 #ifdef CONFIG_MSM_KGSL_SIMPLE_GOV
 #define TZ_GOVERNOR_SIMPLE	2
+#define SIMPLE_FLOOR		10000
 #endif
 #ifdef CONFIG_MSM_KGSL_TIERED_GOV
 #define TZ_GOVERNOR_TIERED	3
@@ -55,9 +52,6 @@ spinlock_t tz_lock;
  * per frame for 60fps content.
  */
 #define FLOOR			5000
-/* SIMPLE_FLOOR is 7.5msec to keep simple's aggressive scaling in check.
- */
-#define SIMPLE_FLOOR		7500
 /* CEILING is 50msec, larger than any standard
  * frame length, but less than the idle timer.
  */
@@ -466,7 +460,7 @@ static int tz_init(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 	if (pwrscale->priv == NULL)
 		return -ENOMEM;
 
-	priv->governor = TZ_GOVERNOR_SIMPLE;
+	priv->governor = TZ_GOVERNOR_ONDEMAND;
 	spin_lock_init(&tz_lock);
 	kgsl_pwrscale_policy_add_files(device, pwrscale, &tz_attr_group);
 
