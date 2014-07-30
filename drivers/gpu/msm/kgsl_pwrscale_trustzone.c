@@ -21,6 +21,7 @@
 #include <linux/spinlock.h>
 #include <mach/socinfo.h>
 #include <mach/scm.h>
+#include <linux/module.h>
 
 #include "kgsl.h"
 #include "kgsl_pwrscale.h"
@@ -35,12 +36,18 @@
 #ifdef CONFIG_MSM_KGSL_SIMPLE_GOV
 #define TZ_GOVERNOR_SIMPLE	2
 #endif
+#ifdef CONFIG_MSM_KGSL_TIERED_GOV
+#define TZ_GOVERNOR_TIERED	3
+#endif
 
 struct tz_priv {
 	int governor;
 	unsigned int no_switch_cnt;
 	unsigned int skip_cnt;
 	struct kgsl_power_stats bin;
+#ifdef CONFIG_MSM_KGSL_TIERED_GOV
+	s64 tiered_last_check;
+#endif
 };
 spinlock_t tz_lock;
 
@@ -92,6 +99,10 @@ static ssize_t tz_governor_show(struct kgsl_device *device,
 	else if (priv->governor == TZ_GOVERNOR_SIMPLE)
 		ret = snprintf(buf, 8, "simple\n");
 #endif
+#ifdef CONFIG_MSM_KGSL_TIERED_GOV
+	else if (priv->governor == TZ_GOVERNOR_TIERED)
+		ret = snprintf(buf, 13, "interactive\n");
+#endif
 	else
 		ret = snprintf(buf, 13, "performance\n");
 
@@ -112,6 +123,12 @@ static ssize_t tz_governor_store(struct kgsl_device *device,
 #ifdef CONFIG_MSM_KGSL_SIMPLE_GOV
 	else if (!strncmp(buf, "simple", 6))
 		priv->governor = TZ_GOVERNOR_SIMPLE;
+#endif
+#ifdef CONFIG_MSM_KGSL_TIERED_GOV
+	else if (!strncmp(buf, "interactive", 11)) {
+		priv->governor = TZ_GOVERNOR_TIERED;
+		priv->tiered_last_check = 0;
+	}
 #endif
 	else if (!strncmp(buf, "performance", 11))
 		priv->governor = TZ_GOVERNOR_PERFORMANCE;
@@ -138,12 +155,7 @@ static void tz_wake(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 {
 	struct tz_priv *priv = pwrscale->priv;
 	if (device->state != KGSL_STATE_NAP &&
-#ifdef CONFIG_MSM_KGSL_SIMPLE_GOV
-		(priv->governor == TZ_GOVERNOR_ONDEMAND ||
-		 priv->governor == TZ_GOVERNOR_SIMPLE))
-#else
-		priv->governor == TZ_GOVERNOR_ONDEMAND)
-#endif
+	    priv->governor != TZ_GOVERNOR_PERFORMANCE)
 		kgsl_pwrctrl_pwrlevel_change(device,
 					device->pwrctrl.default_pwrlevel);
 }
@@ -205,6 +217,158 @@ static int simple_governor(struct kgsl_device *device, int idle_stat)
 }
 #endif
 
+#ifdef CONFIG_MSM_KGSL_TIERED_GOV
+/* tiered GPU governor: frequency control based on utilization ranges
+ *
+ * Each iteration, tiered checks whether the current frequency is still
+ * optimial for the current workload.  If an adjustment must be made, a
+ * frequency with appropriate utilization limits is selected.  A small time
+ * limit is imposed to prevent unnecessary frequency changes, which are
+ * somewhat expensive.
+ *
+ * The efficiency_mode parameter is a catch-all for small changes that attempt
+ * to use lower frequencies more often.
+ */
+
+/**
+ * struct freq_tier:
+ * @mhz: GPU frequency for this power level
+ * @min_util_mhz: minimum utilization this level may use
+ * @max_util_mhz: maximum utilization this level may use
+ * @down_delay_us: minimum time before reducing frequency; also sampling period
+ * @up_delay_us: minimum time before increasing frequency
+ *
+ * Defines the parameters for each GPU power level.  Some utilization overlap
+ * between levels is encouraged to prevent excessive frequency changes.
+ *
+ * NB: ARRAY_SIZE(freq_tier_table) == pwr->num_pwrlevels - 1
+ */
+struct freq_tier {
+	unsigned long	mhz;
+	unsigned long	min_util_mhz;
+	unsigned long	max_util_mhz;
+	unsigned long	down_delay_us;
+	unsigned long	up_delay_us;
+};
+/* FIXME: this should be customizable */
+static const struct freq_tier freq_tier_table[] = {
+	{ 600,	400,	1000,	167000,	100000 },
+	{ 533,	333,	433,	100000,	67000 },
+	{ 480,	267,	367,	100000,	67000 },
+	/* lower this minimum to allow 128->400 transition? */
+	{ 400,	200,	300,	100000,	50000 },
+	{ 300,	100,	233,	67000,	33000 },
+	{ 200,	33,	133,	67000,	17000 },
+	{ 128,	0,	67,	17000,	10000 },
+};
+#define freq_tier_cnt (ARRAY_SIZE(freq_tier_table))
+
+/* efficiency_mode:
+ * If enabled, select the lowest appropriate frequency, rather than the
+ * highest.  Also, attempt to further lower the GPU frequency whenever
+ * possible.
+ */
+static bool efficiency_mode = 0;
+module_param_named(tiered_efficiency_mode, efficiency_mode, bool, 0664);
+
+static inline bool pwrlevel_suitable(s64 mhz_util,
+				     const struct freq_tier *ramp)
+{
+	return mhz_util >= ramp->min_util_mhz && mhz_util <= ramp->max_util_mhz;
+}
+
+static void tiered_idle(struct kgsl_device *dev, struct kgsl_pwrscale *pwrs)
+{
+	struct kgsl_pwrctrl *pwr = &dev->pwrctrl;
+	struct tz_priv *priv = pwrs->priv;
+	struct kgsl_power_stats stats;
+	const struct freq_tier *ramp;
+	int i = -1, delta = 1, end;
+	s64 mhz_util;
+
+	dev->ftbl->power_stats(dev, &stats);
+	priv->bin.total_time += stats.total_time;
+	priv->bin.busy_time += stats.busy_time;
+	ramp = &freq_tier_table[pwr->active_pwrlevel];
+
+	/* Don't check until up_delay_us (<= down_delay_us) have passed;
+	 * thereafter, wait at least FLOOR usec between checks; wait until
+	 * down_delay_us if we're at max pwrlevel already.
+	 */
+	if (priv->bin.total_time < ramp->up_delay_us ||
+	    priv->bin.total_time < priv->tiered_last_check + FLOOR)
+		return;
+	if (pwr->active_pwrlevel == pwr->thermal_pwrlevel &&
+	    priv->bin.total_time < ramp->down_delay_us)
+		return;
+	priv->tiered_last_check = priv->bin.total_time;
+
+	mhz_util = ramp->mhz * priv->bin.busy_time;
+	do_div(mhz_util, priv->bin.total_time);
+
+	/*
+	pr_warn("%s: checking %lu -> %lli/%lli = %lli\n", __func__, ramp->mhz,
+		priv->bin.busy_time, priv->bin.total_time, mhz_util);
+	*/
+
+	/* Check whether we can scale, save freq search bounds */
+	if (mhz_util > ramp->max_util_mhz) {
+		if (pwr->active_pwrlevel <= pwr->thermal_pwrlevel)
+			goto reset_stats;
+
+		i = pwr->thermal_pwrlevel;
+		end = pwr->active_pwrlevel - 1;
+	} else if (priv->bin.total_time >= ramp->down_delay_us &&
+		   (mhz_util < ramp->min_util_mhz || efficiency_mode)) {
+		/* efficiency_mode: try rebalancing every down_delay_us */
+		if (pwr->active_pwrlevel == pwr->num_pwrlevels - 1)
+			goto reset_stats;
+
+		i = pwr->active_pwrlevel + !efficiency_mode;
+		end = pwr->num_pwrlevels - 1;
+	} else {
+		goto reset_stats;
+	}
+
+	/* efficiency_mode: reverse search order */
+	if (efficiency_mode) {
+		int tmp = i;
+		i = end;
+		end = tmp;
+		delta = -1;
+	}
+
+	while (i != end && !pwrlevel_suitable(mhz_util, &freq_tier_table[i]))
+		i += delta;
+
+	/* Possible with efficiency_mode */
+	if (i == pwr->active_pwrlevel)
+		goto reset_stats;
+
+	/*
+	pr_warn("%s: scaling %lu -> %lu (%lli/%lli = %lli)\n", __func__,
+		ramp->mhz, freq_tier_table[i].mhz,
+		priv->bin.busy_time, priv->bin.total_time, mhz_util);
+	*/
+	kgsl_pwrctrl_pwrlevel_change(dev, i);
+	priv->bin.total_time = 0;
+	priv->bin.busy_time = 0;
+	priv->tiered_last_check = 0;
+	return;
+
+reset_stats:
+	if (priv->bin.total_time >= ramp->down_delay_us) {
+		/*
+		do_div(priv->bin.total_time, 2);
+		do_div(priv->bin.busy_time, 2);
+		*/
+		priv->bin.total_time = 0;
+		priv->bin.busy_time = 0;
+		priv->tiered_last_check = 0;
+	}
+}
+#endif
+
 static void tz_idle(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 {
 	struct kgsl_pwrctrl *pwr = &device->pwrctrl;
@@ -216,6 +380,12 @@ static void tz_idle(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 	   the same */
 	if (priv->governor == TZ_GOVERNOR_PERFORMANCE)
 		return;
+#ifdef CONFIG_MSM_KGSL_TIERED_GOV
+	else if (priv->governor == TZ_GOVERNOR_TIERED) {
+		tiered_idle(device, pwrscale);
+		return;
+	}
+#endif
 
 	device->ftbl->power_stats(device, &stats);
 	priv->bin.total_time += stats.total_time;
