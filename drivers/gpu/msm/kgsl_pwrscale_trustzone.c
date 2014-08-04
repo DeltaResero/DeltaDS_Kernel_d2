@@ -366,14 +366,10 @@ static void tz_idle(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 	struct kgsl_power_stats stats;
 	int val, idle;
 
-	/* In "performance" mode the clock speed follows the user maximum
-	 */
-	if (priv->governor == TZ_GOVERNOR_PERFORMANCE) {
-		if (unlikely(pwr->active_pwrlevel != pwr->thermal_pwrlevel))
-			kgsl_pwrctrl_pwrlevel_change(device,
-					     pwr->thermal_pwrlevel);
+	/* In "performance" mode the clock speed always stays
+	   the same */
+	if (priv->governor == TZ_GOVERNOR_PERFORMANCE)
 		return;
-	}
 #ifdef CONFIG_MSM_KGSL_TIERED_GOV
 	else if (priv->governor == TZ_GOVERNOR_TIERED) {
 		tiered_idle(device, pwrscale);

@@ -178,7 +178,7 @@ static int kgsl_pwrctrl_thermal_pwrlevel_store(struct device *dev,
 	struct kgsl_device *device = kgsl_device_from_dev(dev);
 	struct kgsl_pwrctrl *pwr;
 	int ret;
-	unsigned int level = 0;
+	unsigned int level = 0, saved;
 
 	if (device == NULL)
 		return 0;
@@ -195,6 +195,7 @@ static int kgsl_pwrctrl_thermal_pwrlevel_store(struct device *dev,
 	if (level > pwr->num_pwrlevels - 2)
 		level = pwr->num_pwrlevels - 2;
 
+	saved = pwr->thermal_pwrlevel;
 	pwr->thermal_pwrlevel = level;
 
 	/*
@@ -206,7 +207,8 @@ static int kgsl_pwrctrl_thermal_pwrlevel_store(struct device *dev,
 	 */
 
 	if (device->pwrscale.policy == NULL ||
-		pwr->thermal_pwrlevel > pwr->active_pwrlevel)
+		pwr->thermal_pwrlevel > pwr->active_pwrlevel ||
+		saved == pwr->active_pwrlevel)
 		kgsl_pwrctrl_pwrlevel_change(device, pwr->thermal_pwrlevel);
 
 	mutex_unlock(&device->mutex);
