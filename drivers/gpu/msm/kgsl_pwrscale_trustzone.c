@@ -38,7 +38,8 @@ struct tz_priv {
 	unsigned int skip_cnt;
 	struct kgsl_power_stats bin;
 #ifdef CONFIG_MSM_KGSL_TIERED_GOV
-	s64 tiered_last_check;
+	ktime_t tiered_next_up;
+	ktime_t tiered_next_down;
 #endif
 };
 static spinlock_t tz_lock;
@@ -117,7 +118,7 @@ static ssize_t tz_governor_store(struct kgsl_device *device,
 #ifdef CONFIG_MSM_KGSL_TIERED_GOV
 	else if (!strncmp(buf, "interactive", 11)) {
 		priv->governor = TZ_GOVERNOR_TIERED;
-		priv->tiered_last_check = 0;
+		priv->tiered_next_up = priv->tiered_next_down = ktime_get();
 	}
 #endif
 	else if (!strncmp(buf, "performance", 11))
@@ -145,9 +146,16 @@ static void tz_wake(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 {
 	struct tz_priv *priv = pwrscale->priv;
 	if (device->state != KGSL_STATE_NAP &&
-	    priv->governor != TZ_GOVERNOR_PERFORMANCE)
+	    priv->governor != TZ_GOVERNOR_PERFORMANCE) {
 		kgsl_pwrctrl_pwrlevel_change(device,
 					device->pwrctrl.default_pwrlevel);
+#ifdef CONFIG_MSM_KGSL_TIERED_GOV
+		if (priv->governor == TZ_GOVERNOR_TIERED) {
+			priv->tiered_next_up =
+				priv->tiered_next_down = ktime_get();
+		}
+#endif
+	}
 }
 
 #ifdef CONFIG_MSM_KGSL_SIMPLE_GOV
@@ -212,11 +220,13 @@ static int simple_governor(struct kgsl_device *device, int idle_stat)
  * @max_util_mhz: maximum utilization this level may use
  * @down_delay_us: minimum time before reducing frequency; also sampling period
  * @up_delay_us: minimum time before increasing frequency
+ * @period_len_us: period time for accumulated stats
  *
  * Defines the parameters for each GPU power level.  Some utilization overlap
  * between levels is encouraged to prevent excessive frequency changes.
  *
  * NB: ARRAY_SIZE(freq_tier_table) == pwr->num_pwrlevels - 1
+ * NB: up_delay_us < down_delay_us
  */
 struct freq_tier {
 	unsigned long	mhz;
@@ -224,27 +234,36 @@ struct freq_tier {
 	unsigned long	max_util_mhz;
 	unsigned long	down_delay_us;
 	unsigned long	up_delay_us;
+	unsigned long	period_len_us;
 };
 /* FIXME: this should be customizable */
 static const struct freq_tier freq_tier_table[] = {
-	{ 600,	400,	1000,	167000,	100000 },
-	{ 533,	333,	433,	100000,	67000 },
-	{ 480,	267,	367,	100000,	67000 },
-	/* lower this minimum to allow 128->400 transition? */
-	{ 400,	200,	300,	100000,	50000 },
-	{ 300,	100,	233,	67000,	33000 },
-	{ 200,	33,	133,	67000,	17000 },
-	{ 128,	0,	67,	17000,	10000 },
+	{ 600,	433,	1000,	100000,	100000,	50000 },
+	{ 533,	333,	467,	100000,	67000,	50000 },
+	{ 480,	267,	367,	100000,	67000,	50000 },
+	{ 400,	200,	300,	67000,	50000,	33000 },
+	{ 300,	100,	233,	50000,	17000,	17000 },
+	{ 200,	33,	133,	33000,	17000,	8300 },
+	{ 128,	0,	67,	17000,	8300,	5600 },
 };
-#define freq_tier_cnt (ARRAY_SIZE(freq_tier_table))
 
 /* efficiency_mode:
- * If enabled, select the lowest appropriate frequency, rather than the
- * highest.  Also, attempt to further lower the GPU frequency whenever
- * possible.
+ * If enabled, makes subtle changes to prefer lower frequencies:
+ *  - Searches for lowest appropriate frequencies first
+ *  - Attempts to periodically lower frequency
+ *  - Clear stats when lowering GPU frequency
  */
-static bool efficiency_mode = 0;
-module_param_named(tiered_efficiency_mode, efficiency_mode, bool, 0664);
+static bool efficiency_mode = 1;
+module_param_named(tiered_efficiency_mode, efficiency_mode, bool, 0644);
+
+static bool tiered_logspam = 0;
+module_param(tiered_logspam, bool, 0644);
+
+static bool always_clear = 1;
+module_param_named(tiered_always_clear, always_clear, bool, 0644);
+
+static unsigned long sample_floor = 17000;
+module_param_named(tiered_sample_time, sample_floor, ulong, 0644);
 
 static inline bool pwrlevel_suitable(s64 mhz_util,
 				     const struct freq_tier *ramp)
@@ -258,88 +277,116 @@ static void tiered_idle(struct kgsl_device *dev, struct kgsl_pwrscale *pwrs)
 	struct tz_priv *priv = pwrs->priv;
 	struct kgsl_power_stats stats;
 	const struct freq_tier *ramp;
-	int i = -1, delta = 1, end;
+	int start, delta = 1, end;
 	s64 mhz_util;
+	ktime_t now;
 
 	dev->ftbl->power_stats(dev, &stats);
 	priv->bin.total_time += stats.total_time;
 	priv->bin.busy_time += stats.busy_time;
 	ramp = &freq_tier_table[pwr->active_pwrlevel];
 
-	/* Don't check until up_delay_us (<= down_delay_us) have passed;
-	 * thereafter, wait at least FLOOR usec between checks; wait until
-	 * down_delay_us if we're at max pwrlevel already.
+	/* Don't bother running unless we can make a frequency adjustment and
+	 * it's been at least sample_floor usecs since the last run.
 	 */
-	if (priv->bin.total_time < ramp->up_delay_us ||
-	    priv->bin.total_time < priv->tiered_last_check + FLOOR)
+	if (!priv->bin.total_time)
 		return;
+
+	now = ktime_get();
+	if (ktime_compare(now, priv->tiered_next_up) < 0)
+		return;
+	priv->tiered_next_up = ktime_add_us(now,
+		min_t(unsigned long, sample_floor, ramp->up_delay_us));
+
 	if (pwr->active_pwrlevel == pwr->thermal_pwrlevel &&
-	    priv->bin.total_time < ramp->down_delay_us)
+	    ktime_compare(now, priv->tiered_next_down) < 0)
 		return;
-	priv->tiered_last_check = priv->bin.total_time;
 
 	mhz_util = ramp->mhz * priv->bin.busy_time;
 	do_div(mhz_util, priv->bin.total_time);
 
-	/*
-	pr_warn("%s: checking %lu -> %lli/%lli = %lli\n", __func__, ramp->mhz,
-		priv->bin.busy_time, priv->bin.total_time, mhz_util);
-	*/
+	if (unlikely(tiered_logspam))
+		pr_warn("%s: %lu*%lli/%lli=%lli; d%i\n", __func__, ramp->mhz,
+			priv->bin.busy_time, priv->bin.total_time, mhz_util,
+			ktime_compare(now, priv->tiered_next_down) >= 0);
 
-	/* Check whether we can scale, save freq search bounds */
+	/* Determine which pwrlevels we can search based on ramp delays,
+	 * current utilization, and efficiency_mode setting.  With
+	 * efficiency_mode, run the search ascending (frequency) rather than
+	 * descending.
+	 */
 	if (mhz_util > ramp->max_util_mhz) {
 		if (pwr->active_pwrlevel <= pwr->thermal_pwrlevel)
 			goto reset_stats;
 
-		i = pwr->thermal_pwrlevel;
+		start = pwr->thermal_pwrlevel;
 		end = pwr->active_pwrlevel - 1;
-	} else if (priv->bin.total_time >= ramp->down_delay_us &&
-		   (mhz_util < ramp->min_util_mhz || efficiency_mode)) {
-		/* efficiency_mode: try rebalancing every down_delay_us */
+	} else if ((mhz_util < ramp->min_util_mhz || efficiency_mode) &&
+	           ktime_compare(now, priv->tiered_next_down) >= 0) {
 		if (pwr->active_pwrlevel == pwr->num_pwrlevels - 1)
 			goto reset_stats;
 
-		i = pwr->active_pwrlevel + !efficiency_mode;
+		start = pwr->active_pwrlevel + !efficiency_mode;
 		end = pwr->num_pwrlevels - 1;
 	} else {
 		goto reset_stats;
 	}
 
-	/* efficiency_mode: reverse search order */
 	if (efficiency_mode) {
-		int tmp = i;
-		i = end;
+		int tmp = start;
+		start = end;
 		end = tmp;
 		delta = -1;
 	}
 
-	while (i != end && !pwrlevel_suitable(mhz_util, &freq_tier_table[i]))
-		i += delta;
+	while (start != end &&
+	       !pwrlevel_suitable(mhz_util, &freq_tier_table[start]))
+		start += delta;
 
-	/* Possible with efficiency_mode */
-	if (i == pwr->active_pwrlevel)
+	/* During an efficiency_mode periodic sample, the current pwrlevel may
+	 * already be optimal.
+	 */
+	if (start == pwr->active_pwrlevel)
 		goto reset_stats;
 
 	/*
 	pr_warn("%s: scaling %lu -> %lu (%lli/%lli = %lli)\n", __func__,
-		ramp->mhz, freq_tier_table[i].mhz,
+		ramp->mhz, freq_tier_table[start].mhz,
 		priv->bin.busy_time, priv->bin.total_time, mhz_util);
 	*/
-	kgsl_pwrctrl_pwrlevel_change(dev, i);
-	priv->bin.total_time = 0;
-	priv->bin.busy_time = 0;
-	priv->tiered_last_check = 0;
-	return;
+
+	/* Clear the stats when increasing frequency (decreasing with
+	 * efficiency_mode) in an attempt to perform subsequent increases
+	 * sooner.  Otherwise, scale stats to the new frequency.
+	 *
+	 * TODO: Just clear instead?
+	 */
+	if (always_clear ||
+	    (efficiency_mode == (start > pwr->active_pwrlevel))) {
+		priv->bin.total_time =
+			priv->bin.busy_time = 0;
+	} else {
+		priv->bin.busy_time *= ramp->mhz;
+		do_div(priv->bin.busy_time, freq_tier_table[start].mhz);
+	}
+
+	/* Calculate next allowed adjustment times
+	 */
+	ramp = &freq_tier_table[start];
+	priv->tiered_next_up = ktime_add_us(now, ramp->up_delay_us);
+	priv->tiered_next_down = ktime_add_us(now, ramp->down_delay_us);
+
+	kgsl_pwrctrl_pwrlevel_change(dev, start);
 
 reset_stats:
-	if (priv->bin.total_time >= ramp->down_delay_us) {
-		/*
-		do_div(priv->bin.total_time, 2);
-		do_div(priv->bin.busy_time, 2);
-		*/
-		priv->bin.total_time = 0;
-		priv->bin.busy_time = 0;
-		priv->tiered_last_check = 0;
+	/* Scale stats back to the current tier's period length
+	 * TODO: Is this optimal?  Clear instead?  Fixed scale?
+	 */
+	if (priv->bin.total_time > ramp->period_len_us) {
+		// <3 int64
+		priv->bin.busy_time *= ramp->period_len_us;
+		do_div(priv->bin.busy_time, priv->bin.total_time);
+		priv->bin.total_time = ramp->period_len_us;
 	}
 }
 #endif
