@@ -16,12 +16,12 @@
 
 #include <linux/export.h>
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/io.h>
 #include <linux/spinlock.h>
 #include <mach/socinfo.h>
 #include <mach/scm.h>
-#include <linux/module.h>
 
 #include "kgsl.h"
 #include "kgsl_pwrscale.h"
@@ -29,13 +29,8 @@
 
 #define TZ_GOVERNOR_PERFORMANCE 0
 #define TZ_GOVERNOR_ONDEMAND    1
-#ifdef CONFIG_MSM_KGSL_SIMPLE_GOV
 #define TZ_GOVERNOR_SIMPLE	2
-#define SIMPLE_FLOOR		10000
-#endif
-#ifdef CONFIG_MSM_KGSL_TIERED_GOV
 #define TZ_GOVERNOR_TIERED	3
-#endif
 
 struct tz_priv {
 	int governor;
@@ -52,6 +47,7 @@ spinlock_t tz_lock;
  * per frame for 60fps content.
  */
 #define FLOOR			5000
+#define SIMPLE_FLOOR		5000
 /* CEILING is 50msec, larger than any standard
  * frame length, but less than the idle timer.
  */
@@ -155,7 +151,7 @@ static void tz_wake(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 }
 
 #ifdef CONFIG_MSM_KGSL_SIMPLE_GOV
-static int default_laziness = 5;
+static int default_laziness = 3;
 module_param_named(simple_laziness, default_laziness, int, 0664);
 
 static int ramp_up_threshold = 6000;
@@ -169,32 +165,24 @@ static int simple_governor(struct kgsl_device *device, int idle_stat)
 
 	if (idle_stat < ramp_up_threshold)
 	{
-		if (laziness > 0) {
-			laziness = 0;
-			return 0;
-		}
-
-		laziness--;
+		if (laziness > -default_laziness / 2)
+			laziness--;
 
 		if (pwr->active_pwrlevel <= pwr->thermal_pwrlevel)
 			return 0;
 
-		if (laziness < -default_laziness / 2) {
+		if (laziness <= -default_laziness / 2) {
 			laziness = 0;
 			return -1;
 		}
 	} else {
-		if (laziness < 0) {
-			laziness = 0;
-			return 0;
-		}
+		if (laziness < default_laziness)
+			laziness++;
 
-		laziness++;
-
-		if (pwr->active_pwrlevel == pwr->num_pwrlevels - 1)
+		if (pwr->active_pwrlevel >= pwr->num_pwrlevels - 1)
 			return 0;
 
-		if (laziness > default_laziness) {
+		if (laziness >= default_laziness) {
 			laziness = 0;
 			return 1;
 		}
