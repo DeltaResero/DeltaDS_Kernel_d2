@@ -257,9 +257,20 @@ static int isaac_release(struct inode *inode, struct file *filp)
 static ssize_t isaac_read(struct file *filp, char __user *buf, size_t count,
 		loff_t *f_pos)
 {
-	struct isaac_ctx *ctx = NULL;
+	struct isaac_ctx *ctx;
 	size_t cnt;
 	ssize_t ret = count;
+
+	if (unlikely(!count))
+		return ret;
+
+	/* Workaround for Dead Trigger 2
+	 * TODO: fix the actual bug that's causing copy_to_user to abort.
+	 */
+	if (unlikely(count == 24)) {
+		if (!access_ok(VERIFY_WRITE, buf, count) || put_user(0, buf))
+			return -EFAULT;
+	}
 
 	if (filp->private_data) {
 		ctx = filp->private_data;
@@ -268,8 +279,7 @@ static ssize_t isaac_read(struct file *filp, char __user *buf, size_t count,
 	} else if (count > 1024) {
 		/* initialized with sem locked */
 		ctx = filp->private_data = isaac_alloc();
-	}
-	if (!ctx) {
+	} else {
 		ctx = &get_cpu_var(cpu_seeds);
 	}
 
