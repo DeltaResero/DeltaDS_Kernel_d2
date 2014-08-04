@@ -34,14 +34,14 @@
 
 struct tz_priv {
 	int governor;
-	unsigned int no_switch_cnt;
+	unsigned int skip_mask;
 	unsigned int skip_cnt;
 	struct kgsl_power_stats bin;
 #ifdef CONFIG_MSM_KGSL_TIERED_GOV
 	s64 tiered_last_check;
 #endif
 };
-spinlock_t tz_lock;
+static spinlock_t tz_lock;
 
 /* FLOOR is 5msec to capture up to 3 re-draws
  * per frame for 60fps content.
@@ -372,21 +372,18 @@ static void tz_idle(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 	 * the GPU just started, or if less than FLOOR time
 	 * has passed since the last run.
 	 */
-#ifdef CONFIG_MSM_KGSL_SIMPLE_GOV
 	if (stats.total_time == 0 || priv->bin.total_time <
 	    (priv->governor == TZ_GOVERNOR_SIMPLE ? SIMPLE_FLOOR : FLOOR))
 		return;
-#else
-	if ((stats.total_time == 0) ||
-		(priv->bin.total_time < FLOOR))
+	/* Skip progressively more samples as the frequency stays stable for
+	 * long periods.  For non-maximum frequencies, sample more frequently
+	 * to allow faster response to demand.
+	 */
+	if (++priv->skip_cnt & priv->skip_mask)
 		return;
-#endif
-
-	if (++priv->skip_cnt & priv->no_switch_cnt)
-		return;
-	if (priv->no_switch_cnt <
+	if (priv->skip_cnt > 31 && priv->skip_mask <
 	    ((pwr->active_pwrlevel == pwr->thermal_pwrlevel) ? 31 : 7))
-		priv->no_switch_cnt = (priv->no_switch_cnt << 1) + 1;
+		priv->skip_mask = (priv->skip_mask << 1) + 1;
 
 	idle = priv->bin.total_time - priv->bin.busy_time;
 	idle = (idle > 0) ? idle : 0;
@@ -408,7 +405,7 @@ static void tz_idle(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 		//pr_info("TZ idle stat: %d, TZ PL: %d, TZ out: %d\n",
 		//		idle, pwr->active_pwrlevel, val);
 		priv->skip_cnt = 0;
-		priv->no_switch_cnt = 0;
+		priv->skip_mask = 0;
 	}
 }
 
@@ -425,7 +422,7 @@ static void tz_sleep(struct kgsl_device *device,
 
 	__secure_tz_entry(TZ_RESET_ID, 0, device->id);
 	priv->skip_cnt = 0;
-	priv->no_switch_cnt = 0;
+	priv->skip_mask = 0;
 	priv->bin.total_time = 0;
 	priv->bin.busy_time = 0;
 }
