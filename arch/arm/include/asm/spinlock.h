@@ -187,16 +187,19 @@ static inline void arch_spin_lock(arch_spinlock_t *lock)
 "	strex	%[tmp], %[next_ticket], [%[lockaddr]]\n"
 "	teq	%[tmp], #0\n"
 "	bne	1b\n"
+
+"	teq	%[ticket], %[ticket], ror #16\n"
+"	beq	3f\n"
 "	uxth	%[ticket], %[ticket]\n"
+
 "2:\n"
 #ifdef CONFIG_CPU_32v6K
-"	beq	3f\n"
 	WFE_SAFE("%[fixup]", "%[tmp]")
-"3:\n"
 #endif
 "	ldr	%[tmp], [%[lockaddr]]\n"
 "	cmp	%[ticket], %[tmp], lsr #16\n"
-"	bne	2b"
+"	bne	2b\n"
+"3:\n"
 	: [ticket]"=&r" (ticket), [tmp]"=&r" (tmp),
 	  [next_ticket]"=&r" (next_ticket), [fixup]"+r" (fixup)
 	: [lockaddr]"r" (&lock->lock), [val1]"r" (1)
@@ -206,19 +209,17 @@ static inline void arch_spin_lock(arch_spinlock_t *lock)
 
 static inline int arch_spin_trylock(arch_spinlock_t *lock)
 {
-	unsigned long tmp, ticket, next_ticket;
+	unsigned long tmp, ticket;
 
 	/* Grab lock if now_serving == next_ticket and access is exclusive */
 	__asm__ __volatile__(
 "	ldrex	%[ticket], [%[lockaddr]]\n"
-"	ror	%[tmp], %[ticket], #16\n"
-"	eors	%[tmp], %[tmp], %[ticket]\n"
+"	eors	%[tmp], %[ticket], %[ticket], ror #16\n"
 "	bne	1f\n"
-"	uadd16	%[next_ticket], %[ticket], %[val1]\n"
-"	strex	%[tmp], %[next_ticket], [%[lockaddr]]\n"
-"1:"
-	: [ticket]"=&r" (ticket), [tmp]"=&r" (tmp),
-	  [next_ticket]"=&r" (next_ticket)
+"	uadd16	%[ticket], %[ticket], %[val1]\n"
+"	strex	%[tmp], %[ticket], [%[lockaddr]]\n"
+"1:\n"
+	: [ticket]"=&r" (ticket), [tmp]"=&r" (tmp)
 	: [lockaddr]"r" (&lock->lock), [val1]"r" (1)
 	: "cc");
 	if (!tmp)
@@ -238,7 +239,7 @@ static inline void arch_spin_unlock(arch_spinlock_t *lock)
 "	uadd16	%[ticket], %[ticket], %[serving1]\n"
 "	strex	%[tmp], %[ticket], [%[lockaddr]]\n"
 "	teq	%[tmp], #0\n"
-"	bne	1b"
+"	bne	1b\n"
 	: [ticket]"=&r" (ticket), [tmp]"=&r" (tmp)
 	: [lockaddr]"r" (&lock->lock), [serving1]"r" (0x00010000)
 	: "cc");
@@ -251,20 +252,17 @@ static inline void arch_spin_unlock_wait(arch_spinlock_t *lock)
 
 	/* Wait for now_serving == next_ticket */
 	__asm__ __volatile__(
-#ifdef CONFIG_CPU_32v6K
-"	cmpne	%[lockaddr], %[lockaddr]\n"
 "1:\n"
+"	ldr	%[ticket], [%[lockaddr]]\n"
+"	teq	%[ticket], %[ticket], ror #16\n"
+#ifdef CONFIG_CPU_32v6K
 "	beq	2f\n"
 	WFE_SAFE("%[fixup]", "%[tmp]")
+"	b	1b\n"
 "2:\n"
 #else
-"1:\n"
+"	bne	1b\n"
 #endif
-"	ldr	%[ticket], [%[lockaddr]]\n"
-"	eor	%[ticket], %[ticket], %[ticket], lsr #16\n"
-"	uxth	%[ticket], %[ticket]\n"
-"	cmp	%[ticket], #0\n"
-"	bne	1b"
 	: [ticket]"=&r" (ticket), [tmp]"=&r" (tmp),
 	  [fixup]"+r" (fixup)
 	: [lockaddr]"r" (&lock->lock)
@@ -274,7 +272,7 @@ static inline void arch_spin_unlock_wait(arch_spinlock_t *lock)
 static inline int arch_spin_is_locked(arch_spinlock_t *lock)
 {
 	unsigned long tmp = ACCESS_ONCE(lock->lock);
-	return (((tmp >> TICKET_SHIFT) ^ tmp) & TICKET_MASK) != 0;
+	return tmp ^ ror32(tmp, TICKET_SHIFT);
 }
 
 static inline int arch_spin_is_contended(arch_spinlock_t *lock)
