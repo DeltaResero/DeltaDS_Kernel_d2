@@ -255,7 +255,7 @@ static int __devinit mms_ts_probe(struct i2c_client *client,
 	struct input_dev *input_dev;
 	int ret = 0;
 	int max_x, max_y;
-	void (*register_cb)(struct tsp_callbacks *);
+	void (*register_cb)(struct tsp_callbacks *) = NULL;
 	touch_is_pressed = 0;
 
 	if (!i2c_check_functionality(adapter, I2C_FUNC_I2C))
