@@ -372,7 +372,7 @@ static int kgsl_pwrctrl_max_gpuclk_store(struct device *dev,
 	struct kgsl_device *device = kgsl_device_from_dev(dev);
 	struct kgsl_pwrctrl *pwr;
 	unsigned int val = 0;
-	int ret, level;
+	int ret, level, saved;
 
 	if (device == NULL)
 		return 0;
@@ -388,6 +388,7 @@ static int kgsl_pwrctrl_max_gpuclk_store(struct device *dev,
 	if (level < 0)
 		goto done;
 
+	saved = pwr->thermal_pwrlevel;
 	pwr->thermal_pwrlevel = level;
 
 	/*
@@ -395,7 +396,8 @@ static int kgsl_pwrctrl_max_gpuclk_store(struct device *dev,
 	 * move the speed down immediately
 	 */
 
-	if (pwr->thermal_pwrlevel > pwr->active_pwrlevel)
+	if (pwr->thermal_pwrlevel > pwr->active_pwrlevel ||
+	    saved == pwr->active_pwrlevel)
 		kgsl_pwrctrl_pwrlevel_change(device, pwr->thermal_pwrlevel);
 
 done:
