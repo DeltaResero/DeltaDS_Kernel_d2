@@ -153,6 +153,18 @@ static irqreturn_t mms_ts_interrupt(int irq, void *dev_id)
 	struct i2c_client *client = info->client;
 	u8 buf[MAX_FINGERS*FINGER_EVENT_SZ];
 	int i;
+	struct input_event_list ev_list[] = {
+		{ EV_ABS, ABS_MT_SLOT },
+		{ EV_ABS, ABS_MT_TRACKING_ID },
+		{ EV_ABS, ABS_MT_WIDTH_MAJOR },
+		{ EV_ABS, ABS_MT_POSITION_X },
+		{ EV_ABS, ABS_MT_POSITION_Y },
+		{ EV_ABS, ABS_MT_TOUCH_MAJOR },
+		{ EV_ABS, ABS_MT_TOUCH_MINOR },
+		{ EV_ABS, ABS_MT_ANGLE },
+		{ EV_ABS, ABS_MT_PALM },
+		{ EV_CNT },
+	};
 	/* Since the QUP driver can't merge operations past a read, we can safely
 	 * merge the smbus & i2c reads into a single block and avoid locking
 	 * and reinitializing.
@@ -213,6 +225,9 @@ static irqreturn_t mms_ts_interrupt(int irq, void *dev_id)
 		}
 
 		if ((tmp[0] & 0x80) == 0) {
+			// XXX is this even needed?
+			if (!(info->finger_state & (1 << id)))
+				continue;
 			input_mt_slot(info->input_dev, id);
 			input_mt_report_slot_state(info->input_dev,
 						   MT_TOOL_FINGER, false);
@@ -220,20 +235,19 @@ static irqreturn_t mms_ts_interrupt(int irq, void *dev_id)
 			continue;
 		}
 
-		input_mt_slot(info->input_dev, id);
-		input_mt_report_slot_state(info->input_dev,
-					   MT_TOOL_FINGER, true);
-		input_report_abs(info->input_dev, ABS_MT_WIDTH_MAJOR, tmp[4]);
-		input_report_abs(info->input_dev, ABS_MT_POSITION_X,
-			tmp[2] | ((tmp[1] & 0xf) << 8));
-		input_report_abs(info->input_dev, ABS_MT_POSITION_Y,
-			tmp[3] | ((tmp[1] & 0xf0) << 4));
-		input_report_abs(info->input_dev, ABS_MT_TOUCH_MAJOR, tmp[6]);
-		input_report_abs(info->input_dev, ABS_MT_TOUCH_MINOR, tmp[7]);
-		input_report_abs(info->input_dev, ABS_MT_ANGLE,
-			tmp[5] > 127 ? (tmp[5] - 256) : tmp[5]);
-		input_report_abs(info->input_dev, ABS_MT_PALM,
-			(buf[0] & 0x10) >> 4);
+		ev_list[0].value = id;
+		ev_list[1].value = input_mt_get_value(&info->input_dev->mt[id],
+			ABS_MT_TRACKING_ID);
+		if (ev_list[1].value < 0)
+			ev_list[1].value = input_mt_new_trkid(info->input_dev);
+		ev_list[2].value = tmp[4];
+		ev_list[3].value = tmp[2] | ((tmp[1] & 0xf) << 8);
+		ev_list[4].value = tmp[3] | ((tmp[1] & 0xf0) << 4);
+		ev_list[5].value = tmp[6];
+		ev_list[6].value = tmp[7];
+		ev_list[7].value = tmp[5] > 127 ? (tmp[5] - 256) : tmp[5];
+		ev_list[8].value = (buf[0] & 0x10) >> 4;
+		input_event_list(info->input_dev, ev_list);
 		info->finger_state |= 1 << id;
 	}
 

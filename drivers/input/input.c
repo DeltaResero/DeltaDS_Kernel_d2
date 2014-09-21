@@ -373,6 +373,22 @@ void input_event(struct input_dev *dev,
 }
 EXPORT_SYMBOL(input_event);
 
+void input_event_list(struct input_dev *dev,
+		      struct input_event_list *list)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&dev->event_lock, flags);
+	while (list->type != EV_CNT) {
+		if (is_event_supported(list->type, dev->evbit, EV_MAX))
+			input_handle_event(dev, list->type,
+					   list->code, list->value);
+		list++;
+	}
+	spin_unlock_irqrestore(&dev->event_lock, flags);
+}
+EXPORT_SYMBOL(input_event_list);
+
 /**
  * input_inject_event() - send input event from input handler
  * @handle: input handle to send event through
