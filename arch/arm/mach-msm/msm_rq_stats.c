@@ -71,13 +71,11 @@ int mpdecision_available(void) {
 static void mpdecision_enable(int enable) {
 	if (enable != notifiers_registered) {
 		if (enable) {
-			printk(KERN_DEBUG "rq-stats: enable cpufreq notifier\n");
 			cpufreq_register_notifier(&freq_transition,
 						CPUFREQ_TRANSITION_NOTIFIER);
 			// Reregistering this likes to hang, so let's not.
 			//register_hotcpu_notifier(&cpu_hotplug);
 		} else {
-			printk(KERN_DEBUG "rq-stats: disable cpufreq notifier\n");
 			cpufreq_unregister_notifier(&freq_transition,
 						CPUFREQ_TRANSITION_NOTIFIER);
 			//unregister_hotcpu_notifier(&cpu_hotplug);
@@ -92,7 +90,6 @@ static void mpdecision_enable(int enable) {
 			rq_info.rq_avg = 0;
 			rq_info.def_start_time = ktime_to_ns(ktime_get());
 		}
-		printk(KERN_DEBUG "rq-stats: rq_info.init = %i\n", enable);
 		rq_info.init = enable;
 	}
 }
@@ -350,8 +347,9 @@ static void def_work_fn(struct work_struct *work)
 	 * isn't anymore.  We still need non-governor hotplug, so call
 	 * rq_hotplug_enable to migrate to auto-hotplug.
 	 */
-	if (unlikely((rq_info.def_interval > 5000) && !rq_info.hotplug_disabled)) {
-		printk(KERN_DEBUG "rq-stats: interval %u\n", rq_info.def_interval);
+	if (unlikely(time_after(jiffies, rq_info.mpdec_timeout) &&
+		     !rq_info.hotplug_disabled &&
+		     hotplug_enable != HP_DISABLE)) {
 		printk(KERN_DEBUG "rq-stats: where's mpdecision? migrating to auto-hotplug\n");
 		rq_hotplug_enable(HP_AUTOHP);
 	}
@@ -366,7 +364,7 @@ static ssize_t run_queue_avg_show(struct kobject *kobj,
 	/* Fingers crossed, we only get here when mpdecision initially
 	 * restarts, rather than at random while using hotplugging governors.
 	 */
-	if (unlikely(!rq_info.init)) {
+	if (unlikely(!rq_info.init && hotplug_enable != HP_DISABLE)) {
 		printk(KERN_DEBUG "rq-stats: here comes mpdecision! stopping auto-hotplug\n");
 		rq_hotplug_enable(HP_MPDEC);
 	}
@@ -375,6 +373,7 @@ static ssize_t run_queue_avg_show(struct kobject *kobj,
 	/* rq avg currently available only on one core */
 	val = rq_info.rq_avg;
 	rq_info.rq_avg = 0;
+	rq_info.mpdec_timeout = jiffies + msecs_to_jiffies(5000);
 	spin_unlock_irqrestore(&rq_lock, flags);
 
 	return snprintf(buf, PAGE_SIZE, "%d.%d\n", val/10, val%10);
