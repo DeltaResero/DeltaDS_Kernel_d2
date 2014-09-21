@@ -283,6 +283,9 @@ int adreno_ringbuffer_load_pm4_ucode(struct kgsl_device *device)
 		adreno_regwrite(device, REG_CP_ME_RAM_DATA,
 			adreno_dev->pm4_fw[i]);
 
+	/* Done writing firmware, reset debug flags */
+	adreno_regwrite(device, REG_CP_DEBUG, 0);
+
 	return 0;
 }
 
@@ -575,8 +578,8 @@ adreno_ringbuffer_addcmds(struct adreno_ringbuffer *rb,
 	if (adreno_is_a3xx(adreno_dev))
 		total_sizedwords += 7;
 
-	if (adreno_is_a2xx(adreno_dev))
-		total_sizedwords += 2; /* CP_WAIT_FOR_IDLE */
+	/*if (adreno_is_a2xx(adreno_dev))
+		total_sizedwords += 2;*/ /* CP_WAIT_FOR_IDLE */
 
 	total_sizedwords += 2; /* scratchpad ts for recovery */
 	total_sizedwords += 3; /* sop timestamp */
@@ -647,11 +650,13 @@ adreno_ringbuffer_addcmds(struct adreno_ringbuffer *rb,
 	* due to memory getting free early before
 	* GPU completes it.
 	*/
+	/*
 	if (adreno_is_a2xx(adreno_dev)) {
 		GSL_RB_WRITE(ringcmds, rcmd_gpu,
 			cp_type3_packet(CP_WAIT_FOR_IDLE, 1));
 		GSL_RB_WRITE(ringcmds, rcmd_gpu, 0x00);
 	}
+	*/
 
 	if (adreno_is_a3xx(adreno_dev)) {
 		/*

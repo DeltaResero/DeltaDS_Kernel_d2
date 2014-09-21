@@ -2144,11 +2144,14 @@ static int msm_fb_pan_display_sub(struct fb_var_screeninfo *var,
 	}
 	complete(&mfd->msmfb_update_notify);
 	mutex_lock(&msm_fb_notify_update_sem);
+	/*
 	if (mfd->msmfb_no_update_notify_timer.function)
 		del_timer(&mfd->msmfb_no_update_notify_timer);
 
 	mfd->msmfb_no_update_notify_timer.expires = jiffies + (2 * HZ);
 	add_timer(&mfd->msmfb_no_update_notify_timer);
+	*/
+	mod_timer(&mfd->msmfb_no_update_notify_timer, 2 * HZ);
 	mutex_unlock(&msm_fb_notify_update_sem);
 
 	down(&msm_fb_pan_sem);

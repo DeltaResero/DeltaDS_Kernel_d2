@@ -2743,7 +2743,7 @@ static long kgsl_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 		if (_IOC_SIZE(cmd) < sizeof(ustack))
 			uptr = ustack;
 		else {
-			uptr = kzalloc(_IOC_SIZE(cmd), GFP_KERNEL);
+			uptr = kmalloc(_IOC_SIZE(cmd), GFP_KERNEL);
 			if (uptr == NULL) {
 				KGSL_MEM_ERR(dev_priv->device,
 					"kzalloc(%d) failed\n", _IOC_SIZE(cmd));
