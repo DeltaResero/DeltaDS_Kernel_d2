@@ -1,16 +1,15 @@
 #include <asm/unwind.h>
 
 #if __LINUX_ARM_ARCH__ >= 6
-/* TODO: beneficial to ldr before ldrex? */
-/* revb: branch with reversed logic */
+/* revb: branch with reversed logic (eq and ne only) */
 	.macro	revb, cond, tgt
-	.ifc \cond,"eq"
+.ifc \cond,eq
 	bne	\tgt
-	.else
-	.ifc \cond,"ne"
+.else
+.ifc \cond,ne
 	beq	\tgt
-	.endif
-	.endif
+.endif
+.endif
 	.endm
 
 	.macro	bitop, name, instr, cond
@@ -23,13 +22,13 @@ UNWIND(	.fnstart	)
 	mov	r0, r0, lsr #5
 	add	r1, r1, r0, lsl #2	@ Get word offset
 	mov	r3, r2, lsl r3
-.ifnc \cond,""
+.ifnc \cond,
 	ldr	r2, [r1]
 	tst	r2, r3
 	revb	\cond, 2f
 .endif
 1:	ldrex	r2, [r1]
-.ifnc \cond,""
+.ifnc \cond,
 	tst	r2, r3
 .endif
 	\instr	r2, r2, r3
@@ -52,9 +51,8 @@ UNWIND(	.fnstart	)
 	mov	r0, r0, lsr #5
 	add	r1, r1, r0, lsl #2	@ Get word offset
 	mov	r3, r2, lsl r3		@ create mask
-	mov	ip, #0
 	smp_dmb
-.ifnc \cond,""
+.ifnc \cond,
 	ldr	r2, [r1]
 	ands	r0, r2, r3
 	revb	\cond, 2f

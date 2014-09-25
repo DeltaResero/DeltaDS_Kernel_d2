@@ -12,4 +12,4 @@
 #include "bitops.h"
                 .text
 
-testop	_test_and_change_bit, eor, ""
+testop	_test_and_change_bit, eor
