@@ -14,25 +14,27 @@ static inline unsigned long arch_local_irq_save(void)
 {
 	unsigned long flags;
 
-	asm("	mrs	%0, cpsr"
-	    : "=r" (flags));
-
-	flags &= PSR_I_BIT;
-
-	if (!flags)
-		asm volatile("	cpsid i		@ arch_local_irq_save");
+	asm volatile(
+	"	mrs	%0, cpsr\n"
+	"	ands	%0, %0, #0x80\n"
+	"	bne	1f\n"
+	"	cpsid	i			@ arch_local_irq_save\n"
+	"1:\n"
+	    : "=r" (flags) : : "memory", "cc");
 
 	return flags;
 }
 
 static inline void arch_local_irq_enable(void)
 {
-	asm volatile("	cpsie i			@ arch_local_irq_enable");
+	asm volatile("	cpsie i			@ arch_local_irq_enable"
+		: : : "memory");
 }
 
 static inline void arch_local_irq_disable(void)
 {
-	asm volatile("	cpsid i			@ arch_local_irq_disable");
+	asm volatile("	cpsid i			@ arch_local_irq_disable"
+		: : : "memory");
 }
 
 /*
@@ -42,7 +44,7 @@ static inline unsigned long arch_local_save_flags(void)
 {
 	unsigned long flags;
 	asm("	mrs	%0, cpsr		@ local_save_flags"
-	    : "=r" (flags));
+	    : "=r" (flags) : : "memory");
 	return flags & PSR_I_BIT;
 }
 
@@ -52,7 +54,8 @@ static inline unsigned long arch_local_save_flags(void)
 static inline void arch_local_irq_restore(unsigned long flags)
 {
 	if (!flags)
-		asm volatile("	cpsie i		@ local_irq_restore");
+		asm volatile("	cpsie i		@ local_irq_restore"
+			: : : "memory");
 }
 
 static inline int arch_irqs_disabled_flags(unsigned long flags)
