@@ -115,7 +115,7 @@ static unsigned long down_rate_us = 20000;
  * The frequency to set when waking up from sleep.
  * When sleep_ideal_freq=0 this will have no effect.
  */
-static unsigned int sleep_wakeup_freq = 151200; // typo? -dm
+static unsigned int sleep_wakeup_freq = 1512000;
 
 /*
  * Sampling rate, I highly recommend to leave it at 2.

@@ -121,10 +121,11 @@ static struct dbs_tuners {
 // }}}
 // {{{2 sysfs crap
 /************************** sysfs interface ************************/
+#define SAMPLING_RATE_MIN (1000000/HZ)
 static ssize_t show_sampling_rate_min(struct kobject *kobj,
 				      struct attribute *attr, char *buf)
 {
-	return sprintf(buf, "%u\n", 10000);
+	return sprintf(buf, "%u\n", SAMPLING_RATE_MIN);
 }
 
 define_one_global_ro(sampling_rate_min);
@@ -160,7 +161,7 @@ i_am_lazy(overestimate_khz, 0, 4000000)
 i_am_lazy(hispeed_thresh, 0, 4000000)
 i_am_lazy(hispeed_decrease, 0, 4000000)
 i_am_lazy(hispeed_divisor, 0, 25)
-i_am_lazy(interaction_sampling_rate, 10000, 1000000)
+i_am_lazy(interaction_sampling_rate, SAMPLING_RATE_MIN, 1000000)
 i_am_lazy(interaction_overestimate_khz, 0, 4000000)
 i_am_lazy(interaction_return_usage, 0, 4000000)
 i_am_lazy(interaction_return_cycles, 0, 100)
@@ -194,7 +195,7 @@ static ssize_t store_sampling_rate(struct kobject *a, struct attribute *b,
 	if (ret != 1)
 		return -EINVAL;
 
-	dbs_tuners_ins.sampling_rate = max(input, (unsigned int)10000);
+	dbs_tuners_ins.sampling_rate = max(input, (unsigned int)SAMPLING_RATE_MIN);
 	return count;
 }
 
