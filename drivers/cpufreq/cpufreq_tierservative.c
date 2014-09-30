@@ -71,7 +71,7 @@ static struct ts_global_priv ts_global __read_mostly = {
 	.extra_mhz = 200,
 	.sample_time = MS(16),
 	.max_sample = 333,
-	.active_sample = 85,
+	.active_sample = 100,
 	.int_timeout = MS(50),
 	.delay_up = { MS( 16), MS( 16), MS( 16), MS( 20), MS( 30), MS( 50),
 		      MS(100), MS(200), MS(200), MS(200), MS(200), MS(200),
@@ -337,6 +337,7 @@ struct ts_cpu_priv {
 	struct usage_average	*usage;
 	struct usage_average	*tiers[MAX_TIER];
 	unsigned int		active_tier;
+	unsigned int		stats_tier;
 	unsigned int		max_tier;
 
 	unsigned int		interaction;
@@ -384,6 +385,8 @@ static void rebuild_priv(struct ts_cpu_priv *ts)
 	ts->max_tier = ts_global.tier_count - 1;
 	if (ts->active_tier > ts->max_tier)
 		ts->active_tier = ts->max_tier;
+	if (ts->stats_tier > ts->max_tier)
+		ts->stats_tier = ts->max_tier;
 
 alloc_fail:
 	// Update max_sample and trim tiers
@@ -442,20 +445,19 @@ static void insert_current_sample(struct ts_cpu_priv *ts)
 	int i;
 	struct usage_sample samp = ts->current_usage;
 
-	if (ts->active_tier == 0) {
-		usage_average_insert(ts->tiers[0], &samp);
-		return;
+	if (ts->current_usage_khz > ts->tiers[ts->stats_tier]->avg_khz) {
+		if (ts->stats_tier < ts->max_tier)
+			ts->stats_tier++;
+	} else {
+		if (ts->stats_tier)
+			ts->stats_tier--;
 	}
 
-	if (ts->current_usage_khz < ts->policy->min / 4)
-		return;
-
-	usage_average_insert(ts->tiers[ts->active_tier], &samp);
-
-	samp.usage >>= 1;
-	samp.nsec >>= 1;
-	for (i = ts->active_tier - 1; i >= 0; i--)
+	for (i = ts->stats_tier; i >= 0; i--) {
 		usage_average_insert(ts->tiers[i], &samp);
+		samp.usage >>= 1;
+		samp.nsec >>= 1;
+	}
 }
 
 /* get_usage:
@@ -509,17 +511,7 @@ static int find_tier_up(struct ts_cpu_priv *ts, unsigned long usage)
 	if (ts->active_tier == max)
 		return ts->active_tier;
 
-	i = ts->active_tier + DIV_ROUND_UP(ts_global.tier_count, 3);
-	if (max > i)
-		max = i;
-
 	for (i = ts->active_tier + 1; i < max; i++) {
-		// Avoid flattening the entire curve during light load
-		if (i > DIV_ROUND_UP(ts_global.tier_count, 3) &&
-		    usage < ts->policy->min) {
-			i--;
-			break;
-		}
 		if (usage_suitable(i, usage))
 			break;
 	}
