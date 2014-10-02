@@ -63,6 +63,7 @@ struct ts_global_priv {
 	unsigned int		max_sample;
 	unsigned int		active_sample;
 	unsigned int		int_timeout;
+	unsigned int		saved_timeout;
 };
 
 #define MS(x) DIV_ROUND_UP(x*HZ, 1000)
@@ -73,6 +74,7 @@ static struct ts_global_priv ts_global __read_mostly = {
 	.max_sample = 333,
 	.active_sample = 100,
 	.int_timeout = MS(50),
+	.saved_timeout = MS(100),
 	.delay_up = { MS( 16), MS( 16), MS( 16), MS( 20), MS( 30), MS( 50),
 		      MS(100), MS(200), MS(200), MS(200), MS(200), MS(200),
 		      MS(200), MS(200), MS(200), MS(200) },
@@ -147,6 +149,7 @@ KNOB(sample_time_ms, sample_time, 2, MS(100), jiffies_to_msecs(1), 0);
 KNOB(max_sample_ms, max_sample, 10, 1000, 1, 1);
 KNOB(active_sample_ms, active_sample, 1, 1000, 1, 1);
 KNOB(interaction_ms, int_timeout, 0, MS(500), jiffies_to_msecs(1), 0);
+KNOB(saved_expire_ms, saved_timeout, 0, MS(500), jiffies_to_msecs(1), 0);
 static struct attribute *ts_attrs[] = {
 	&delay_up_ms.attr,
 	&delay_down_ms.attr,
@@ -156,6 +159,7 @@ static struct attribute *ts_attrs[] = {
 	&max_sample_ms.attr,
 	&active_sample_ms.attr,
 	&interaction_ms.attr,
+	&saved_expire_ms.attr,
 	NULL
 };
 static struct attribute_group ts_attr_grp = {
@@ -337,12 +341,13 @@ struct ts_cpu_priv {
 	struct usage_average	*usage;
 	struct usage_average	*tiers[MAX_TIER];
 	unsigned int		active_tier;
-	unsigned int		stats_tier;
+	unsigned int		saved_tier;
 	unsigned int		max_tier;
 
 	unsigned int		interaction;
 	unsigned long		up_timeout;
 	unsigned long		down_timeout;
+	unsigned long		saved_timeout;
 	unsigned long		interaction_timeout;
 };
 
@@ -385,8 +390,8 @@ static void rebuild_priv(struct ts_cpu_priv *ts)
 	ts->max_tier = ts_global.tier_count - 1;
 	if (ts->active_tier > ts->max_tier)
 		ts->active_tier = ts->max_tier;
-	if (ts->stats_tier > ts->max_tier)
-		ts->stats_tier = ts->max_tier;
+	if (ts->saved_tier > ts->max_tier)
+		ts->saved_tier = ts->max_tier;
 
 alloc_fail:
 	// Update max_sample and trim tiers
@@ -445,15 +450,20 @@ static void insert_current_sample(struct ts_cpu_priv *ts)
 	int i;
 	struct usage_sample samp = ts->current_usage;
 
-	if (ts->current_usage_khz > ts->tiers[ts->stats_tier]->avg_khz) {
-		if (ts->stats_tier < ts->max_tier)
-			ts->stats_tier++;
-	} else {
-		if (ts->stats_tier)
-			ts->stats_tier--;
+	if (!ts->active_tier) {
+		usage_average_insert(ts->tiers[0], &samp);
+		return;
 	}
 
-	for (i = ts->stats_tier; i >= 0; i--) {
+	if (ts->current_usage_khz < ts->policy->min / 4)
+		return;
+
+	i = ts->active_tier;
+	if (ts->current_usage_khz < ts->policy->min &&
+	    i > DIV_ROUND_UP(ts_global.tier_count, 3))
+		i = DIV_ROUND_UP(ts_global.tier_count, 3);
+
+	for (; i >= 0; i--) {
 		usage_average_insert(ts->tiers[i], &samp);
 		samp.usage >>= 1;
 		samp.nsec >>= 1;
@@ -511,9 +521,18 @@ static int find_tier_up(struct ts_cpu_priv *ts, unsigned long usage)
 	if (ts->active_tier == max)
 		return ts->active_tier;
 
-	for (i = ts->active_tier + 1; i < max; i++) {
+	i = ts->active_tier + 1;
+	if (i < ts->saved_tier)
+		i = ts->saved_tier;
+
+	for (; i < max; i++) {
 		if (usage_suitable(i, usage))
 			break;
+	}
+
+	if (i > ts->saved_tier) {
+		ts->saved_tier = i;
+		ts->saved_timeout = jiffies + ts_global.saved_timeout;
 	}
 
 	return i;
@@ -526,23 +545,18 @@ static int find_tier_down(struct ts_cpu_priv *ts, unsigned long usage)
 	if (ts->active_tier && !usage_suitable(ts->active_tier, usage))
 		return -1;
 
-	if (ts->active_tier == 0) {
+	if (!ts->active_tier) {
 		if (ts->interaction == 1 &&
-		    time_after(jiffies, ts->interaction_timeout))
+		    time_after_eq(jiffies, ts->interaction_timeout))
 			ts->interaction = 0;
 		return ts->active_tier;
 	}
 
-	/* We can only ramp a limited distance.  If we've been at elevated
-	 * frequency for a while, all the lower tiers' averages have been
-	 * obliterated, and we'll ramp all the way down.  Ideally, we should
-	 * rebuild the frequency curve on the way back down.
-	 */
-	i = ts->active_tier - 1;
-	if (!usage_suitable(i, usage))
-		return -1;
-
-	return i;
+	for (i = ts->active_tier - 1; i >= 0; i--) {
+		if (!usage_suitable(i, usage))
+			return (i + 1 == ts->active_tier) ? -1 : i + 1;
+	}
+	return 0;
 }
 
 /* ts_sample_worker:
@@ -568,6 +582,12 @@ static void ts_sample_worker(struct work_struct *work)
 		usage_khz / ts->policy->user_policy.max);
 #endif
 
+	if (ts->saved_tier > 0 &&
+	    time_after_eq(jiffies, ts->saved_timeout) &&
+	    usage_khz < ts->tiers[ts->saved_tier]->avg_khz) {
+		ts->saved_tier--;
+		ts->saved_timeout = jiffies + ts_global.saved_timeout;
+	}
 	if (time_after_eq(jiffies, ts->up_timeout)) {
 		next = find_tier_up(ts, usage_khz);
 		if (next >= 0)
@@ -711,7 +731,7 @@ static int ts_governor(struct cpufreq_policy *policy, unsigned int event)
 
 		ts->policy = policy;
 		ts->interaction = 0;
-		ts->active_tier = 0;
+		ts->saved_tier = ts->active_tier = 0;
 		ts->up_timeout = jiffies + ts_global.delay_up[0];
 		ts->down_timeout = jiffies + ts_global.delay_down[0];
 		ts->interaction_timeout = jiffies;
