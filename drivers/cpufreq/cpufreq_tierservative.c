@@ -51,18 +51,13 @@
 struct ts_global_priv {
 	struct mutex		global_mutex;
 	unsigned int		enabled;
-	struct notifier_block	hotplug_notifier;
 	struct kmem_cache	*sample_cache;
-	bool			notifiers_registered;
 
 	unsigned int		tier_count;
 	unsigned int		extra_mhz;
-	unsigned int		delay_up[MAX_TIER];
-	unsigned int		delay_down[MAX_TIER];
 	unsigned int		sample_time;
 	unsigned int		max_sample;
 	unsigned int		active_sample;
-	unsigned int		int_timeout;
 	unsigned int		saved_timeout;
 };
 
@@ -73,14 +68,7 @@ static struct ts_global_priv ts_global __read_mostly = {
 	.sample_time = MS(16),
 	.max_sample = 333,
 	.active_sample = 100,
-	.int_timeout = MS(50),
-	.saved_timeout = MS(100),
-	.delay_up = { MS( 16), MS( 16), MS( 16), MS( 20), MS( 30), MS( 50),
-		      MS(100), MS(200), MS(200), MS(200), MS(200), MS(200),
-		      MS(200), MS(200), MS(200), MS(200) },
-	.delay_down = { MS(  0), MS(100), MS( 75), MS( 50), MS( 40), MS( 30),
-			MS( 75), MS(100), MS(100), MS(100), MS(100), MS(100),
-			MS(100), MS(100), MS(100), MS(100) },
+	.saved_timeout = MS(83),
 };
 
 static void rebuild_all_privs(void);
@@ -140,25 +128,19 @@ const char *buf, size_t count)				\
 }							\
 define_one_global_rw(fn);
 
-TKNOB(delay_up_ms, delay_up, 1, 100, jiffies_to_msecs(1));
-TKNOB(delay_down_ms, delay_down, 1, 100, jiffies_to_msecs(1));
 KNOB(tier_count, tier_count, 2, MAX_TIER, 1, 1);
 KNOB(extra_mhz, extra_mhz, 75, 500, 1, 0);
 // Need at least 2 jiffies to keep get_idle_ktime well-behaved.
 KNOB(sample_time_ms, sample_time, 2, MS(100), jiffies_to_msecs(1), 0);
 KNOB(max_sample_ms, max_sample, 10, 1000, 1, 1);
 KNOB(active_sample_ms, active_sample, 1, 1000, 1, 1);
-KNOB(interaction_ms, int_timeout, 0, MS(500), jiffies_to_msecs(1), 0);
 KNOB(saved_expire_ms, saved_timeout, 0, MS(500), jiffies_to_msecs(1), 0);
 static struct attribute *ts_attrs[] = {
-	&delay_up_ms.attr,
-	&delay_down_ms.attr,
 	&tier_count.attr,
 	&extra_mhz.attr,
 	&sample_time_ms.attr,
 	&max_sample_ms.attr,
 	&active_sample_ms.attr,
-	&interaction_ms.attr,
 	&saved_expire_ms.attr,
 	NULL
 };
@@ -344,11 +326,7 @@ struct ts_cpu_priv {
 	unsigned int		saved_tier;
 	unsigned int		max_tier;
 
-	unsigned int		interaction;
-	unsigned long		up_timeout;
-	unsigned long		down_timeout;
 	unsigned long		saved_timeout;
-	unsigned long		interaction_timeout;
 };
 
 static DEFINE_PER_CPU(struct ts_cpu_priv, ts_cpu);
@@ -546,20 +524,20 @@ static int find_tier_down(struct ts_cpu_priv *ts, unsigned long usage)
 {
 	int i;
 
-	if (ts->active_tier && !usage_suitable(ts->active_tier, usage))
+	if (!ts->active_tier || !usage_suitable(ts->active_tier, usage))
 		return -1;
 
-	if (!ts->active_tier) {
-		if (ts->interaction == 1 &&
-		    time_after_eq(jiffies, ts->interaction_timeout))
-			ts->interaction = 0;
-		return -1;
+	if (ts->active_tier == 1) {
+		if (!usage_suitable(0, usage))
+			return -1;
+		return 0;
 	}
 
-	for (i = ts->active_tier - 1; i >= 0; i--) {
+	for (i = ts->active_tier - 2; i >= 0; i--) {
 		if (!usage_suitable(i, usage))
-			return (i + 1 == ts->active_tier) ? -1 : i + 1;
+			return (i + 2 == ts->active_tier) ? -1 : i + 2;
 	}
+
 	return 0;
 }
 
@@ -591,42 +569,19 @@ static void ts_sample_worker(struct work_struct *work)
 		ts->saved_tier--;
 		ts->saved_timeout = jiffies + ts_global.saved_timeout;
 	}
-	if (time_after_eq(jiffies, ts->up_timeout)) {
-		next = find_tier_up(ts, usage_khz);
-		if (next >= 0)
-			goto set_tier;
-	} else if (ts->current_usage_khz > ts->usage->avg_khz) {
-		if (ts->active_tier < ts->saved_tier) {
-			ts->active_tier = ts->saved_tier;
-			goto set_freq;
-		}
-	}
-	if (time_after_eq(jiffies, ts->down_timeout)) {
+	next = find_tier_up(ts, usage_khz);
+	if (next == -1)
 		next = find_tier_down(ts, usage_khz);
-		if (next >= 0)
-			goto set_tier;
-	}
+	if (next != -1)
+		ts->active_tier = next;
 
-	goto set_freq;
-
-set_tier:
-	// Kick off the interaction timeout when we switch to tier 0
-	if (ts->active_tier && !next && ts->interaction == 1)
-		ts->interaction_timeout = jiffies + ts_global.int_timeout;
-
-	ts->active_tier = next;
-	ts->up_timeout = jiffies + ts_global.delay_up[ts->active_tier];
-	ts->down_timeout = jiffies + ts_global.delay_down[ts->active_tier];
-
-set_freq:
 	insert_current_sample(ts);
 
 	if (usage_khz < ts->current_usage_khz)
 		usage_khz = ts->current_usage_khz;
 	usage_khz += (ts->current_usage_khz * 1000) / ts->policy->cur *
 		ts_global.extra_mhz;
-	if ((ts->active_tier || ts->interaction) &&
-	    usage_khz < ts->tiers[ts->active_tier]->avg_khz)
+	if (ts->active_tier && usage_khz < ts->tiers[ts->active_tier]->avg_khz)
 		usage_khz = ts->tiers[ts->active_tier]->avg_khz;
 	__cpufreq_driver_target(ts->policy, usage_khz, CPUFREQ_RELATION_L);
 
@@ -637,85 +592,13 @@ out_nosched:
 	mutex_unlock(&ts->cpu_mutex);
 }
 
-/* hotplug_handler:
- * During hot-remove, enables interaction on all online instances to rapidly
- * compensate for suddenly increasing demand.
- */
-static int hotplug_handler(struct notifier_block *nb,
-			   unsigned long val, void *data)
-{
-	int i;
-
-	if (val != CPU_DOWN_PREPARE)
-		return NOTIFY_OK;
-	if (!ts_global.enabled)
-		return NOTIFY_OK;
-
-	for_each_online_cpu(i) {
-		struct ts_cpu_priv *ts = &per_cpu(ts_cpu, i);
-		if (!ts->enabled)
-			continue;
-
-		mutex_lock(&ts->cpu_mutex);
-		if (ts->interaction != 2) {
-			ts->interaction = 1;
-			if (!ts->active_tier)
-				ts->interaction_timeout =
-					jiffies + ts_global.int_timeout;
-		}
-		mutex_unlock(&ts->cpu_mutex);
-	}
-
-	return NOTIFY_OK;
-}
-
-/* ts_(un)register_notifiers:
- * (Un)register the hotcpu notifier used for hotplug compensation.
- */
-static void ts_register_notifiers(void)
-{
-	int ret;
-	if (ts_global.notifiers_registered)
-		return;
-
-	ts_global.hotplug_notifier.notifier_call = hotplug_handler;
-	ret = register_hotcpu_notifier(&ts_global.hotplug_notifier);
-	if (ret) {
-		printk(KERN_WARNING "%s: register notifier failed (%i)!\n",
-			__func__, ret);
-		return;
-	}
-	ts_global.notifiers_registered = 1;
-}
-
-static void ts_unregister_notifiers(void)
-{
-	if (!ts_global.notifiers_registered)
-		return;
-
-	unregister_hotcpu_notifier(&ts_global.hotplug_notifier);
-	ts_global.notifiers_registered = 0;
-}
-
-// cpufreq boilerplate from here down
 static int ts_governor(struct cpufreq_policy *policy, unsigned int event)
 {
 	struct ts_cpu_priv *ts = &per_cpu(ts_cpu, policy->cpu);
 	int ret = 0;
 
-	if (likely(event & CPUFREQ_GOV_NOINTERACT)) {
-		mutex_lock(&ts->cpu_mutex);
-		if (event == CPUFREQ_GOV_INTERACT) {
-			ts->interaction = 2;
-		} else {
-			ts->interaction = 1;
-			if (!ts->active_tier)
-				ts->interaction_timeout =
-					jiffies + ts_global.int_timeout;
-		}
-		mutex_unlock(&ts->cpu_mutex);
+	if (likely(event & CPUFREQ_GOV_NOINTERACT))
 		return 0;
-	}
 
 	mutex_lock(&ts_global.global_mutex);
 
@@ -727,7 +610,6 @@ static int ts_governor(struct cpufreq_policy *policy, unsigned int event)
 		}
 
 		if (!ts_global.enabled++) {
-			ts_register_notifiers();
 			ret = sysfs_create_group(cpufreq_global_kobject,
 				&ts_attr_grp);
 			if (ret)
@@ -737,11 +619,8 @@ static int ts_governor(struct cpufreq_policy *policy, unsigned int event)
 		mutex_lock(&ts->cpu_mutex);
 
 		ts->policy = policy;
-		ts->interaction = 0;
-		ts->saved_tier = ts->active_tier = 0;
-		ts->up_timeout = jiffies + ts_global.delay_up[0];
-		ts->down_timeout = jiffies + ts_global.delay_down[0];
-		ts->interaction_timeout = jiffies;
+		ts->saved_tier =
+		ts->active_tier = 0;
 
 		ts->prev_wall = ktime_get();
 		ts->prev_idle = get_idle_ktime(policy->cpu);
@@ -772,7 +651,6 @@ static int ts_governor(struct cpufreq_policy *policy, unsigned int event)
 		mutex_unlock(&ts->cpu_mutex);
 
 		if (!--ts_global.enabled) {
-			ts_unregister_notifiers();
 			sysfs_remove_group(cpufreq_global_kobject,
 				&ts_attr_grp);
 			kmem_cache_shrink(ts_global.sample_cache);
