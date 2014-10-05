@@ -31,6 +31,7 @@ static void bump_idle_stat(struct rq *rq, struct task_struct *idle)
  */
 static void check_preempt_curr_idle(struct rq *rq, struct task_struct *p, int flags)
 {
+	bump_idle_stat(rq, p);
 	resched_task(rq->idle);
 }
 
@@ -86,7 +87,7 @@ static unsigned int get_rr_interval_idle(struct rq *rq, struct task_struct *task
 }
 
 ktime_t get_idle_ktime(unsigned int cpu) {
-	if (cpu > NR_CPUS) {
+	if (unlikely(cpu > NR_CPUS)) {
 		WARN_ONCE(1, KERN_ERR "Called with illegal cpu %i", cpu);
 		return (ktime_t) { .tv64 = 0 };
 	}
