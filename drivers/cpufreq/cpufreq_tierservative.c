@@ -73,40 +73,6 @@ static struct ts_global_priv ts_global __read_mostly = {
 
 static void rebuild_all_privs(void);
 
-#define TKNOB(fn, obj, min, max, mul)			\
-static ssize_t show_##fn				\
-(struct kobject *k, struct attribute *a, char *buf)	\
-{							\
-	int i, ret = 0;					\
-	for (i = 0; i < MAX_TIER; i++)			\
-		ret += sprintf(buf + ret, "%u ",	\
-			ts_global.obj[i] * mul);	\
-	buf[ret - 1] = '\n';				\
-	return ret;					\
-}							\
-static ssize_t store_##fn				\
-(struct kobject *k, struct attribute *a,		\
-const char *buf, size_t count)				\
-{							\
-	int i, v[MAX_TIER], ret = 0, len, pos = 0;	\
-	for (i = 0; i < MAX_TIER; i++) {		\
-		ret = sscanf(buf + pos,			\
-			"%u%n", v + i, &len);		\
-		if (!ret)				\
-			return -EINVAL;			\
-		v[i] /= mul;				\
-		if (v[i] < min || v[i] > max)		\
-			return -EINVAL;			\
-		pos += len + 1;				\
-	}						\
-	if (pos != count)				\
-		return -EINVAL;				\
-	for (i = 0; i < MAX_TIER; i++)			\
-		ts_global.obj[i] = v[i];		\
-	return pos;					\
-}							\
-define_one_global_rw(fn);
-
 #define KNOB(fn, obj, min, max, mul, rb)		\
 static ssize_t show_##fn				\
 (struct kobject *k, struct attribute *a, char *buf)	\
@@ -117,7 +83,7 @@ const char *buf, size_t count)				\
 {							\
 	int v, ret;					\
 	ret = sscanf(buf, "%i", &v);			\
-	v = v / mul;					\
+	v = DIV_ROUND_UP(v, mul);			\
 	if (ret != 1 || v < min || v > max)		\
 		return -EINVAL;				\
 	mutex_lock(&ts_global.global_mutex);		\
@@ -130,8 +96,7 @@ define_one_global_rw(fn);
 
 KNOB(tier_count, tier_count, 2, MAX_TIER, 1, 1);
 KNOB(extra_mhz, extra_mhz, 75, 500, 1, 0);
-// Need at least 2 jiffies to keep get_idle_ktime well-behaved.
-KNOB(sample_time_ms, sample_time, 2, MS(100), jiffies_to_msecs(1), 0);
+KNOB(sample_time_ms, sample_time, 1, MS(100), jiffies_to_msecs(1), 0);
 KNOB(max_sample_ms, max_sample, 10, 1000, 1, 1);
 KNOB(active_sample_ms, active_sample, 1, 1000, 1, 1);
 KNOB(saved_expire_ms, saved_timeout, 0, MS(500), jiffies_to_msecs(1), 0);
@@ -418,7 +383,8 @@ static void rebuild_all_privs(void)
 	for_each_possible_cpu(i) {
 		struct ts_cpu_priv *ts = &per_cpu(ts_cpu, i);
 		mutex_lock(&ts->cpu_mutex);
-		rebuild_priv(ts);
+		if (ts->enabled)
+			rebuild_priv(ts);
 		mutex_unlock(&ts->cpu_mutex);
 	}
 }
@@ -443,8 +409,8 @@ static void insert_current_sample(struct ts_cpu_priv *ts)
 
 	i = ts->active_tier;
 	if (ts->current_usage_khz < ts->policy->min &&
-	    i > DIV_ROUND_UP(ts_global.tier_count, 3))
-		i = DIV_ROUND_UP(ts_global.tier_count, 3);
+	    i > DIV_ROUND_UP(ts->max_tier + 1, 3))
+		i = DIV_ROUND_UP(ts->max_tier + 1, 3);
 
 	for (; i >= 0; i--) {
 		usage_average_insert(ts->tiers[i], &samp);
