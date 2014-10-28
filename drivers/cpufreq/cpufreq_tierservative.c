@@ -26,7 +26,8 @@
  */
 
 /*
- * TODO: add support for multi-CPU cpufreq policies
+ * TODO: consider moving to a timer rather than workqueue?
+ * TODO: add support for multi-CPU cpufreq policies (no longer possible?)
  * TODO: increase accuracy of usage_sample accessors
  */
 #include <linux/kernel.h>
@@ -42,8 +43,10 @@
 #include <linux/sched.h>
 #include <linux/list.h>
 
-#define USAGE_DIV	(100) // Use percent as user-facing usage unit
+// Fixed maximum tier count
 #define MAX_TIER	(16)
+// msecs_to_jiffies apparently doesn't work at compile time
+#define MS(x) DIV_ROUND_UP(x*HZ, 1000)
 
 /* struct ts_global_priv:
  * Shared state & configuration.
@@ -52,6 +55,8 @@ struct ts_global_priv {
 	struct mutex		global_mutex;
 	unsigned int		enabled;
 	struct kmem_cache	*sample_cache;
+	struct workqueue_struct	*wq;
+	struct notifier_block	idle_nb;
 
 	unsigned int		tier_count;
 	unsigned int		extra_mhz;
@@ -61,7 +66,6 @@ struct ts_global_priv {
 	unsigned int		saved_timeout;
 };
 
-#define MS(x) DIV_ROUND_UP(x*HZ, 1000)
 static struct ts_global_priv ts_global __read_mostly = {
 	.tier_count = 8,
 	.extra_mhz = 200,
@@ -84,8 +88,9 @@ const char *buf, size_t count)				\
 	int v, ret;					\
 	ret = sscanf(buf, "%i", &v);			\
 	v = DIV_ROUND_UP(v, mul);			\
-	if (ret != 1 || v < min || v > max)		\
-		return -EINVAL;				\
+	if (ret != 1) return -EINVAL;			\
+	if (v < min) v = min;				\
+	if (v > max) v = max;				\
 	mutex_lock(&ts_global.global_mutex);		\
 	ts_global.obj = v;				\
 	if (rb) rebuild_all_privs();			\
@@ -169,6 +174,7 @@ struct usage_sample_list {
 	struct list_head	list;
 	struct usage_sample	sample;
 };
+
 /* struct usage_average:
  * A time-weighted usage average.  The sample list is automatically maintained
  * by the insertion function.
@@ -282,6 +288,7 @@ struct ts_cpu_priv {
 
 	ktime_t			prev_wall;
 	ktime_t			prev_idle;
+	ktime_t			idle_enter;
 	struct usage_sample	current_usage;
 	unsigned long		current_usage_khz;
 
@@ -409,8 +416,8 @@ static void insert_current_sample(struct ts_cpu_priv *ts)
 
 	i = ts->active_tier;
 	if (ts->current_usage_khz < ts->policy->min &&
-	    i > DIV_ROUND_UP(ts->max_tier + 1, 3))
-		i = DIV_ROUND_UP(ts->max_tier + 1, 3);
+	    i > DIV_ROUND_UP(ts->max_tier + 1, 4))
+		i = DIV_ROUND_UP(ts->max_tier + 1, 4);
 
 	for (; i >= 0; i--) {
 		usage_average_insert(ts->tiers[i], &samp);
@@ -444,13 +451,21 @@ static unsigned long get_usage(struct ts_cpu_priv *ts)
 	else
 		samp.usage *= ts->policy->cur;
 
-	usage_average_insert(ts->usage, &samp);
-
 	// Save the current sample for insert_current_sample
 	ts->current_usage = samp;
 	ts->current_usage_khz = calc_sample_usage(&samp);
 
-	return ts->usage->avg_khz;
+	/* Allow no-demand conditions to bypass the long-term average to reduce
+	 * frequency more quickly.  Also, don't pollute the average with low
+	 * samples during idle.
+	 */
+	if (ts->active_tier &&
+	    ts->current_usage_khz > ts->policy->min * 2 / 3) {
+		usage_average_insert(ts->usage, &samp);
+		return ts->usage->avg_khz;
+	}
+
+	return ts->current_usage_khz;
 }
 
 /* find_tier_up/_down:
@@ -463,16 +478,11 @@ static int find_tier_up(struct ts_cpu_priv *ts, unsigned long usage)
 {
 	int i;
 
-	if (usage_suitable(ts->active_tier, usage))
+	if (usage_suitable(ts->active_tier, usage) ||
+	    ts->active_tier == ts->max_tier)
 		return -1;
 
-	if (ts->active_tier == ts->max_tier)
-		return -1;
-
-	i = ts->active_tier + 1;
-	if (i < ts->saved_tier)
-		i = ts->saved_tier;
-
+	i = max(ts->active_tier + 1, ts->saved_tier);
 	for (; i < ts->max_tier; i++) {
 		if (usage_suitable(i, usage))
 			break;
@@ -515,7 +525,7 @@ static void ts_sample_worker(struct work_struct *work)
 	struct ts_cpu_priv *ts =
 		container_of(work, struct ts_cpu_priv, work.work);
 	int next = -1;
-	unsigned long usage_khz;
+	unsigned long usage_khz, boost_tmp;
 
 	mutex_lock(&ts->cpu_mutex);
 
@@ -543,19 +553,95 @@ static void ts_sample_worker(struct work_struct *work)
 
 	insert_current_sample(ts);
 
-	if (usage_khz < ts->current_usage_khz)
-		usage_khz = ts->current_usage_khz;
-	usage_khz += (ts->current_usage_khz * 1000) / ts->policy->cur *
-		ts_global.extra_mhz;
+	/* Boost only according to momentary usage to reduce aggressiveness
+	 * when coming out of idle.  The long-term average will remain
+	 * significantly elevated during idle.
+	 */
+	boost_tmp = ts->current_usage_khz * 1000 / ts->policy->cur;
+	boost_tmp = boost_tmp * boost_tmp / 1000;
+	boost_tmp = ts->current_usage_khz + boost_tmp * ts_global.extra_mhz;
+	if (usage_khz < boost_tmp)
+		usage_khz = boost_tmp;
 	if (ts->active_tier && usage_khz < ts->tiers[ts->active_tier]->avg_khz)
 		usage_khz = ts->tiers[ts->active_tier]->avg_khz;
+
 	__cpufreq_driver_target(ts->policy, usage_khz, CPUFREQ_RELATION_L);
 
-	schedule_delayed_work_on(ts->policy->cpu, &ts->work,
+	queue_delayed_work_on(ts->policy->cpu, ts_global.wq, &ts->work,
 		ts_global.sample_time);
 
 out_nosched:
 	mutex_unlock(&ts->cpu_mutex);
+}
+
+/* ktime_add_clamp:
+ * Adds two ktimes, clamping them to @clamp as needed.
+ */
+static ktime_t ktime_add_clamp(ktime_t lhs, ktime_t rhs, ktime_t clamp)
+{
+	ktime_t ret = ktime_add(lhs, rhs);
+	if (unlikely(ktime_compare(ret, clamp) > 0))
+		return clamp;
+
+	return ret;
+}
+
+/* ts_idle_notify:
+ * Handles idle-time logic.
+ *
+ * We use this callback to filter out long periods of idleness.  This results
+ * in more responsive and more "correct" behavior.  Including the idle period
+ * in demand sampling in incorrect in the sense that it doesn't predict future
+ * demand well, except in the case of very light load at resume (e.g. a one-off
+ * interrupt).
+ *
+ * We don't care what frequency the core is running at during idle.  It's
+ * reasonable to expect that any task that was running prior to idle will
+ * resume at its previous demand, and it doesn't make sense to ramp down due to
+ * disk/net/whatever latency.
+ */
+static int ts_idle_notify(struct notifier_block *nb, unsigned long val,
+			  void *data)
+{
+	struct ts_cpu_priv *ts = &per_cpu(ts_cpu, smp_processor_id());
+	ktime_t now;
+
+	// Not strictly needed (everything is cpu-bound), but lock anyway.
+	if (unlikely(!mutex_trylock(&ts->cpu_mutex)))
+		return 0;
+	// NB: by default, all cores use the same governor in dkp
+	if (unlikely(!ts->enabled))
+		goto out;
+
+	now = ktime_get();
+
+	switch (val) {
+	case IDLE_START:
+		ts->idle_enter = now;
+		break;
+	case IDLE_END:
+		if (ktime_to_us(ktime_sub(now, ts->idle_enter)) <
+		    jiffies_to_usecs(DIV_ROUND_UP(ts_global.sample_time, 2)))
+			break;
+
+		ts->prev_wall = ktime_add_clamp(ts->prev_wall,
+			ktime_sub(now, ts->idle_enter),
+			now);
+		ts->prev_idle = ktime_add_clamp(ts->prev_idle,
+			ktime_sub(now, ts->idle_enter),
+			get_idle_ktime(ts->policy->cpu));
+
+		if (delayed_work_pending(&ts->work))
+			cancel_delayed_work(&ts->work);
+		// This should probably be hardcoded to 1 jiffy.
+		queue_delayed_work_on(ts->policy->cpu, ts_global.wq, &ts->work,
+				      DIV_ROUND_UP(ts_global.sample_time, 2));
+		break;
+	}
+
+out:
+	mutex_unlock(&ts->cpu_mutex);
+	return 0;
 }
 
 static int ts_governor(struct cpufreq_policy *policy, unsigned int event)
@@ -598,8 +684,8 @@ static int ts_governor(struct cpufreq_policy *policy, unsigned int event)
 		}
 
 		ts->enabled = 1;
-		INIT_DELAYED_WORK(&ts->work, ts_sample_worker);
-		schedule_delayed_work_on(policy->cpu, &ts->work,
+		INIT_DELAYED_WORK_DEFERRABLE(&ts->work, ts_sample_worker);
+		queue_delayed_work_on(ts->policy->cpu, ts_global.wq, &ts->work,
 			ts_global.sample_time);
 
 		mutex_unlock(&ts->cpu_mutex);
@@ -620,6 +706,7 @@ static int ts_governor(struct cpufreq_policy *policy, unsigned int event)
 			sysfs_remove_group(cpufreq_global_kobject,
 				&ts_attr_grp);
 			kmem_cache_shrink(ts_global.sample_cache);
+			idle_notifier_unregister(&ts_global.idle_nb);
 		}
 
 		break;
@@ -665,6 +752,10 @@ static int __init ts_init(void)
 		ts = &per_cpu(ts_cpu, i);
 		mutex_init(&ts->cpu_mutex);
 	}
+	ts_global.idle_nb.notifier_call = ts_idle_notify;
+	ts_global.wq = alloc_workqueue("tierservative", WQ_HIGHPRI, NR_CPUS);
+	if (!ts_global.wq)
+		return -ENOMEM;
 	ts_global.sample_cache = KMEM_CACHE(usage_sample_list, 0);
 	if (!ts_global.sample_cache)
 		return -ENOMEM;
@@ -675,6 +766,7 @@ static int __init ts_init(void)
 static void __exit ts_exit(void)
 {
 	int i;
+	destroy_workqueue(ts_global.wq);
 	for_each_possible_cpu(i) {
 		struct ts_cpu_priv *ts;
 		ts = &per_cpu(ts_cpu, i);
