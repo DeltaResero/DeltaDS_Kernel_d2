@@ -33,7 +33,7 @@ static int cpufreq_governor_performance(struct cpufreq_policy *policy,
 	switch (event) {
 	case CPUFREQ_GOV_START:
 		// Wait for apps to finish toggling CPUs
-		schedule_delayed_work(&cpu_up_work, HZ);
+		schedule_delayed_work(&cpu_up_work, 5 * HZ);
 	case CPUFREQ_GOV_LIMITS:
 		pr_debug("setting to %u kHz because of event %u\n",
 						policy->max, event);
