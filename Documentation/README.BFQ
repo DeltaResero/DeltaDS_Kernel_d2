@@ -1,22 +1,29 @@
 Budget Fair Queueing I/O Scheduler
 ==================================
 
-This patchset introduces BFQ-v7r5 into Linux 3.4.0.
+This patchset introduces BFQ-v7r6 into Linux 3.4.0.
 For further information: http://www.algogroup.unimo.it/people/paolo/disk_sched/.
 
 The overall diffstat is the following:
 
  block/Kconfig.iosched         |   33 +
  block/Makefile                |    1 +
- block/bfq-cgroup.c            |  902 ++++++++++++++++++++++++++
- block/bfq-ioc.c               |   36 ++
- block/bfq-iosched.c           | 3903 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- block/bfq-sched.c             | 1179 ++++++++++++++++++++++++++++++++++
- block/bfq.h                   |  768 ++++++++++++++++++++++
+ block/bfq-cgroup.c            |  902 ++++++++++++++++++++++
+ block/bfq-ioc.c               |   36 +
+ block/bfq-iosched.c           | 4185 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ block/bfq-sched.c             | 1179 +++++++++++++++++++++++++++++
+ block/bfq.h                   |  807 ++++++++++++++++++++
  include/linux/cgroup_subsys.h |    6 +
- 8 files changed, 6828 insertions(+)
+ 8 files changed, 7149 insertions(+)
 
 CHANGELOG
+
+v7r6:
+. IMPROVEMENT: Introduced a new mechanism that helps get the job done
+  more quickly with services and applications that create or reactivate
+  many parallel I/O-bound processes. This is the case, for example, with
+  systemd at boot, or with commands like git grep.
+. CODE IMPROVEMENTS: Small code cleanups and improvements.
 
 v7r5:
 . IMPROVEMENT: Improve throughput boosting by idling the device
