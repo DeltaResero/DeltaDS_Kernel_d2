@@ -880,7 +880,7 @@ static const struct memdev {
 	 [7] = { "full", 0666, &full_fops, NULL },
 	 [8] = { "random", 0666, &random_fops, NULL },
 #ifdef CONFIG_ISAAC_RANDOM
-	 [9] = { "urandom", 0444, &isaac_fops, NULL },
+	 [9] = { "urandom", 0666, &isaac_fops, NULL },
 #else
 	 [9] = { "urandom", 0666, &urandom_fops, NULL },
 #endif
@@ -888,10 +888,8 @@ static const struct memdev {
 #ifdef CONFIG_CRASH_DUMP
 	[12] = { "oldmem", 0, &oldmem_fops, NULL },
 #endif
-	[13] = { "erandom", 0666, &urandom_fops, NULL },
-	[14] = { "frandom", 0666, &urandom_fops, NULL },
 #ifdef CONFIG_ISAAC
-	[15] = { "isaac", 0444, &isaac_fops, NULL },
+	[13] = { "isaac", 0444, &isaac_fops, NULL },
 #endif
 };
 

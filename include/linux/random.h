@@ -52,10 +52,8 @@ extern void add_device_randomness(const void *, unsigned int);
 extern void add_input_randomness(unsigned int type, unsigned int code,
 				 unsigned int value);
 
-#ifndef CONFIG_ISAAC_RANDOM
-extern void (*get_random_bytes)(void *buf, int nbytes);
-#else
 extern void get_random_bytes(void *buf, int nbytes);
+#ifdef CONFIG_ISAAC_RANDOM
 extern void isaac_extract_seed(void *buf, int nbytes);
 #endif
 extern void get_random_bytes_arch(void *buf, int nbytes);

@@ -59,8 +59,8 @@ struct isaac_ctx {
 	struct semaphore sem;
 };
 
-/* Private per-CPU seeds.  These are used to initialize per-fd contexts, and
- * will eventually be used for small reads, get_random_long, and so forth.
+/* Private per-CPU seeds.  These are used to initialize per-fd contexts, as
+ * well as small reads, get_random_bytes, etc.
  */
 static DEFINE_PER_CPU(struct isaac_ctx, cpu_seeds);
 
@@ -264,8 +264,8 @@ static ssize_t isaac_read(struct file *filp, char __user *buf, size_t count,
 	if (unlikely(!count))
 		return ret;
 
-	/* Workaround for Dead Trigger 2
-	 * TODO: fix the actual bug that's causing copy_to_user to abort.
+	/* Workaround for Dead Trigger 2:
+	 * This page is not yet mapped, so fault it before calling get_cpu
 	 */
 	if (unlikely(count == 24)) {
 		if (!access_ok(VERIFY_WRITE, buf, count) || put_user(0, buf))
@@ -276,7 +276,7 @@ static ssize_t isaac_read(struct file *filp, char __user *buf, size_t count,
 		ctx = filp->private_data;
 		if (down_interruptible(&ctx->sem))
 			return -ERESTARTSYS;
-	} else if (count > 1024) {
+	} else if (unlikely(count > 1024)) {
 		/* initialized with sem locked */
 		ctx = filp->private_data = isaac_alloc();
 	} else {
@@ -285,12 +285,14 @@ static ssize_t isaac_read(struct file *filp, char __user *buf, size_t count,
 
 	/* Copy out any existing bytes */
 	if (ctx->rem) {
-		cnt = min_t(size_t, count, ctx->rem);
-		if (copy_to_user(buf, ctx->bytes + ctx->rem - cnt, cnt)) {
+		cnt = min_t(size_t, count, ctx->rem * sizeof(ctx->res[0]));
+		if (copy_to_user(buf, ctx->bytes +
+				      (ctx->rem * sizeof(ctx->res[0])) - cnt,
+				 cnt)) {
 			ret = -EFAULT;
 			goto out;
 		}
-		ctx->rem -= cnt;
+		ctx->rem -= DIV_ROUND_UP(cnt, sizeof(ctx->res[0]));
 		buf += cnt;
 		count -= cnt;
 	}
@@ -306,7 +308,7 @@ static ssize_t isaac_read(struct file *filp, char __user *buf, size_t count,
 			buf += cnt;
 			count -= cnt;
 		} while (count);
-		ctx->rem = RANDSIZB - cnt;
+		ctx->rem = RANDSIZ - DIV_ROUND_UP(cnt, sizeof(ctx->res[0]));
 	}
 
 out:
@@ -318,10 +320,15 @@ out:
 	return (ssize_t)ret;
 }
 
+ssize_t random_write(struct file *file, const char __user *buffer,
+		     size_t count, loff_t *ppos);
+long random_ioctl(struct file *f, unsigned int cmd, unsigned long arg);
 const struct file_operations isaac_fops = {
 	.open = isaac_open,
 	.release = isaac_release,
 	.read = isaac_read,
+	.write = random_write,
+	.unlocked_ioctl = random_ioctl,
 };
 
 #ifdef CONFIG_ISAAC_RANDOM
@@ -330,20 +337,24 @@ const struct file_operations isaac_fops = {
  */
 static inline void isaac_copyout(struct isaac_ctx *ctx, void *buf, size_t len)
 {
-	while (len > RANDSIZB) {
-		isaac(ctx, buf);
-		len -= RANDSIZB;
-		buf += RANDSIZB;
+	if (unlikely(len > RANDSIZB)) {
+		while (len > RANDSIZB) {
+			isaac(ctx, buf);
+			len -= RANDSIZB;
+			buf += RANDSIZB;
+		}
 	}
 	while (len) {
-		size_t cnt = ctx->rem;
+		size_t cnt = ctx->rem * sizeof(ctx->res[0]);
 		if (!cnt) {
 			isaac(ctx, ctx->res);
-			cnt = ctx->rem = RANDSIZB;
+			cnt = RANDSIZB;
+			ctx->rem = RANDSIZ;
 		}
 		cnt = min_t(size_t, len, cnt);
-		memcpy(buf, ctx->bytes + ctx->rem - cnt, cnt);
-		ctx->rem -= cnt;
+		memcpy(buf, ctx->bytes + (ctx->rem * sizeof(ctx->res[0])) - cnt,
+			cnt);
+		ctx->rem -= DIV_ROUND_UP(cnt, sizeof(ctx->res[0]));
 		len -= cnt;
 		buf += cnt;
 	}
@@ -353,8 +364,15 @@ static inline void isaac_copyout(struct isaac_ctx *ctx, void *buf, size_t len)
 unsigned int get_random_int(void)
 {
 	unsigned int r;
+	struct isaac_ctx *ctx = &get_cpu_var(cpu_seeds);
 
-	isaac_copyout(&get_cpu_var(cpu_seeds), &r, sizeof(r));
+	if (unlikely(!ctx->rem)) {
+		isaac(ctx, ctx->res);
+		ctx->rem = RANDSIZ;
+	}
+
+	r = ctx->res[--ctx->rem];
+
 	put_cpu_var(cpu_seeds);
 	return r;
 }

@@ -39,21 +39,6 @@
  * DAMAGE.
  */
 
-/* Portions of this code are derived from frandom.c, which is distributed with
- * the following copyright notice:
- *
- * frandom.c:
- * 	Fast pseudo-random generator
- *
- *      (c) Copyright 2003-2011 Eli Billauer
- *      http://www.billauer.co.il
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- */
-
 /*
  * (now, with legal B.S. out of the way.....)
  *
@@ -310,11 +295,6 @@ static int random_read_wakeup_thresh = 256;
 static int random_write_wakeup_thresh = 1536;
 
 /*
- * If the entropy count falls under this number of bits, wake up krngd.
- */
-static int random_krngd_wakeup_thresh = 1024;
-
-/*
  * When the input pool goes over trickle_thresh, start dropping most
  * samples to avoid wasting CPU time and reduce lock contention.
  */
@@ -326,18 +306,6 @@ static int trickle_thresh __read_mostly = INPUT_POOL_WORDS * 14;
  * read, this counter is incremented.
  */
 static int random_depletions = 0;
-
-/* Erandom stuff */
-static void erandom_get_random_bytes(void *buf, int count);
-static void erandom_mix_pool(const unsigned char *buf, ssize_t len);
-static int erandom_eviction_thread(void *nil);
-static DEFINE_SPINLOCK(erandom_lock);
-static u8 erS[256];
-static u8 eri = 255;
-static u8 erj;
-static bool erandom_init;
-static unsigned int erandom_reads;
-static int erandom_stir_thresh __read_mostly = 256;
 
 /*
  * A pool of size .poolwords is stirred with a primitive polynomial
@@ -435,7 +403,6 @@ static struct poolinfo {
  */
 static DECLARE_WAIT_QUEUE_HEAD(random_read_wait);
 static DECLARE_WAIT_QUEUE_HEAD(random_write_wait);
-static DECLARE_WAIT_QUEUE_HEAD(random_krngd_wait);
 static struct fasync_struct *fasync;
 
 #if 0
@@ -481,6 +448,9 @@ struct entropy_store {
 
 static __u32 input_pool_data[INPUT_POOL_WORDS];
 static __u32 blocking_pool_data[OUTPUT_POOL_WORDS];
+#ifndef CONFIG_ISAAC_RANDOM
+static __u32 nonblocking_pool_data[OUTPUT_POOL_WORDS];
+#endif
 
 static struct entropy_store input_pool = {
 	.poolinfo = &poolinfo_table[0],
@@ -498,6 +468,16 @@ static struct entropy_store blocking_pool = {
 	.lock = __SPIN_LOCK_UNLOCKED(&blocking_pool.lock),
 	.pool = blocking_pool_data
 };
+
+#ifndef CONFIG_ISAAC_RANDOM
+static struct entropy_store nonblocking_pool = {
+	.poolinfo = &poolinfo_table[1],
+	.name = "nonblocking",
+	.pull = &input_pool,
+	.lock = __SPIN_LOCK_UNLOCKED(&nonblocking_pool.lock),
+	.pool = nonblocking_pool_data
+};
+#endif
 
 static __u32 const twist_table[8] = {
 	0x00000000, 0x3b6e20c8, 0x76dc4190, 0x4db26158,
@@ -656,9 +636,12 @@ void add_device_randomness(const void *buf, unsigned int size)
 {
 	unsigned long time = get_cycles() ^ jiffies;
 
-	erandom_mix_pool(buf, size);
 	mix_pool_bytes(&input_pool, buf, size, NULL);
 	mix_pool_bytes(&input_pool, &time, sizeof(time), NULL);
+#ifndef CONFIG_ISAAC_RANDOM
+	mix_pool_bytes(&nonblocking_pool, buf, size, NULL);
+	mix_pool_bytes(&nonblocking_pool, &time, sizeof(time), NULL);
+#endif
 }
 EXPORT_SYMBOL(add_device_randomness);
 
@@ -778,10 +761,6 @@ retry:
 				goto retry;
 		}
 
-		if (entropy_count < random_krngd_wakeup_thresh) {
-			wake_up_interruptible(&random_krngd_wait);
-			kill_fasync(&fasync, SIGIO, POLL_OUT);
-		}
 		if (entropy_count < random_write_wakeup_thresh) {
 			wake_up_interruptible(&random_write_wait);
 			kill_fasync(&fasync, SIGIO, POLL_OUT);
@@ -952,7 +931,7 @@ EXPORT_SYMBOL(isaac_extract_seed);
  * TCP sequence numbers, etc.  It does not use the hw random number
  * generator, if available; use get_random_bytes_arch() for that.
  */
-static void dummy_random(void *buf, int nbytes)
+static void get_random_bytes(void *buf, int nbytes)
 {
 	ssize_t i;
 	__u8 tmp[EXTRACT_SIZE];
@@ -964,7 +943,6 @@ static void dummy_random(void *buf, int nbytes)
 		nbytes -= i;
 	}
 }
-void (*get_random_bytes)(void *, int) = dummy_random;
 EXPORT_SYMBOL(get_random_bytes);
 #endif
 
@@ -1045,178 +1023,6 @@ static int rand_initialize(void)
 }
 core_initcall(rand_initialize);
 
-static inline void swap_byte(u8 *a, u8 *b) {
-	u8 swapByte;
-
-	swapByte = *a;
-	*a = *b;
-	*b = swapByte;
-}
-
-/* erandom_iter:
- * Multi-purpose RC4 KSA (seed != 0) and PRGA (seed == 0) iteration step.  The
- * KSA doesn't reset i & j like it should; the first seed is still correct and
- * we can incrementally reseed this way.
- *
- * In theory, incremental reseeding doesn't offer much improved security.  In
- * practice, the reseed interval should be short enough to make theoretical
- * attacks impossible.
- */
-static inline u8 erandom_iter(u8 seed) {
-	eri = (eri + 1) & 0xff;
-	erj = (erj + erS[eri] + seed) & 0xff;
-	swap_byte(&erS[eri], &erS[erj]);
-	return erS[(erS[eri] + erS[erj]) & 0xff];
-}
-
-/* Stir new bytes into the erandom state.  We run the RC4 KSA, drop 256 bytes
- * of output, and run the RC4 PRGA into *buf to seed input_pool.
- */
-static void erandom_mix_pool(const unsigned char *buf, ssize_t len) {
-	unsigned long flags;
-	unsigned int k;
-	bool start_krngd = 0;
-
-	spin_lock_irqsave(&erandom_lock, flags);
-
-	/* The first time we're called, we need a full seed. */
-	if (unlikely(!erandom_init && len < 256)) {
-		spin_unlock_irqrestore(&erandom_lock, flags);
-		pr_warn("%s: refusing to trash RC4 state (%i)\n",
-			__func__, len);
-		return;
-	}
-
-	if (!erandom_init) {
-		start_krngd = 1;
-		erandom_init = 1;
-		for (k=0; k<256; k++)
-			erS[k] = k;
-	}
-
-	for (k = 0; k < len; k++)
-		erandom_iter(buf[k]);
-	for (k = 0; k < 256; k++)
-		erandom_iter(0);
-
-	spin_unlock_irqrestore(&erandom_lock, flags);
-
-	if (start_krngd) {
-		kthread_run(erandom_eviction_thread, NULL, "krngd");
-#ifndef CONFIG_ISAAC_RANDOM
-		get_random_bytes = erandom_get_random_bytes;
-#endif
-	}
-}
-
-static void _erandom_get_random_bytes(u8 *buf, size_t count) {
-	erandom_reads += count;
-	if (erandom_reads - count < erandom_stir_thresh &&
-		erandom_reads >= erandom_stir_thresh)
-		wake_up_interruptible(&random_krngd_wait);
-
-	if (unlikely(count & 3)) {
-		while (count & 3) {
-			*buf++ = erandom_iter(0);
-			count--;
-		}
-	}
-	count /= 4;
-	while (count--) {
-		*buf++ = erandom_iter(0);
-		*buf++ = erandom_iter(0);
-		*buf++ = erandom_iter(0);
-		*buf++ = erandom_iter(0);
-	}
-}
-
-static int erandom_eviction_thread(void *nil) {
-	unsigned long flags;
-	unsigned long in;
-	unsigned long out[16];
-	int i, j;
-
-	set_freezable();
-	set_user_nice(current, 5);
-
-	j = 15;
-
-again:
-	if (unlikely(kthread_should_stop()))
-		return 0;
-	if (unlikely(-ERESTARTSYS == wait_event_freezable(
-		random_krngd_wait, erandom_reads >= erandom_stir_thresh ||
-		input_pool.entropy_count < random_krngd_wakeup_thresh)))
-		goto again;
-
-more:
-	if (unlikely(!arch_get_random_long(&in))) {
-		schedule_timeout_interruptible(msecs_to_jiffies(10));
-		goto again;
-	}
-
-	spin_lock_irqsave(&erandom_lock, flags);
-	for (i = 4; i; i--) {
-		out[j] = ror32(out[j], 8) ^ erandom_iter(in & 0xff);
-		in >>= 8;
-	}
-	erandom_reads = 0;
-	spin_unlock_irqrestore(&erandom_lock, flags);
-
-	if (!j--) {
-		if (input_pool.entropy_count < input_pool.poolinfo->POOLBITS) {
-			mix_pool_bytes(&input_pool, &out, sizeof(out), NULL);
-			credit_entropy_bits(&input_pool, 256);
-		}
-		j = 15;
-	} else if (input_pool.entropy_count < random_krngd_wakeup_thresh) {
-		goto more;
-	}
-	goto again;
-}
-
-static inline void erandom_get_random_bytes(void *buf, int count) {
-	unsigned long flags;
-	spin_lock_irqsave(&erandom_lock, flags);
-	_erandom_get_random_bytes((u8 *)buf, count);
-	spin_unlock_irqrestore(&erandom_lock, flags);
-}
-
-static ssize_t
-random_read(struct file *file, char __user *buf, size_t nbytes, loff_t *ppos);
-
-static ssize_t
-erandom_read(struct file *file, char __user *buf, size_t nbytes, loff_t *ppos) {
-	u8 tmp[64];
-	ssize_t ret = 0;
-
-	while (nbytes) {
-		int m = min(nbytes, sizeof(tmp));
-
-		if (signal_pending(current)) {
-			if (!ret)
-				ret = -ERESTARTSYS;
-			goto out;
-		}
-		cond_resched();
-
-		erandom_get_random_bytes(tmp, m);
-		if (copy_to_user(buf, tmp, m)) {
-			if (!ret)
-				ret = -EFAULT;
-			goto out;
-		}
-
-		nbytes -= m;
-		ret += m;
-		buf += m;
-	}
-
-out:
-	memset(tmp, 0, sizeof(tmp));
-	return ret;
-}
-
 static ssize_t
 random_read(struct file *file, char __user *buf, size_t nbytes, loff_t *ppos)
 {
@@ -1273,6 +1079,14 @@ random_read(struct file *file, char __user *buf, size_t nbytes, loff_t *ppos)
 	return (count ? count : retval);
 }
 
+#ifndef CONFIG_ISAAC_RANDOM
+static ssize_t
+urandom_read(struct file *file, char __user *buf, size_t nbytes, loff_t *ppos)
+{
+	return extract_entropy_user(&nonblocking_pool, buf, nbytes);
+}
+#endif
+
 static unsigned int
 random_poll(struct file *file, poll_table * wait)
 {
@@ -1310,7 +1124,7 @@ write_pool(struct entropy_store *r, const char __user *buffer, size_t count)
 	return 0;
 }
 
-static ssize_t random_write(struct file *file, const char __user *buffer,
+ssize_t random_write(struct file *file, const char __user *buffer,
 			    size_t count, loff_t *ppos)
 {
 	size_t ret;
@@ -1318,11 +1132,16 @@ static ssize_t random_write(struct file *file, const char __user *buffer,
 	ret = write_pool(&blocking_pool, buffer, count);
 	if (ret)
 		return ret;
+#ifndef CONFIG_ISAAC_RANDOM
+	ret = write_pool(&nonblocking_pool, buffer, count);
+	if (ret)
+		return ret;
+#endif
 
 	return (ssize_t)count;
 }
 
-static long random_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
+long random_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 {
 	int size, ent_count;
 	int __user *p = (int __user *)arg;
@@ -1382,13 +1201,15 @@ const struct file_operations random_fops = {
 	.llseek = noop_llseek,
 };
 
+#ifndef CONFIG_ISAAC_RANDOM
 const struct file_operations urandom_fops = {
-	.read  = erandom_read,
+	.read  = urandom_read,
 	.write = random_write,
 	.unlocked_ioctl = random_ioctl,
 	.fasync = random_fasync,
 	.llseek = noop_llseek,
 };
+#endif
 
 /***************************************************************
  * Random UUID interface
@@ -1496,15 +1317,6 @@ ctl_table random_table[] = {
 		.extra2		= &max_write_thresh,
 	},
 	{
-		.procname	= "krngd_wakeup_threshold",
-		.data		= &random_krngd_wakeup_thresh,
-		.maxlen		= sizeof(int),
-		.mode		= 0644,
-		.proc_handler	= proc_dointvec_minmax,
-		.extra1		= &min_write_thresh,
-		.extra2		= &max_write_thresh,
-	},
-	{
 		.procname	= "boot_id",
 		.data		= &sysctl_bootid,
 		.maxlen		= 16,
@@ -1522,13 +1334,6 @@ ctl_table random_table[] = {
 		.data		= &random_depletions,
 		.maxlen		= sizeof(int),
 		.mode		= 0444,
-		.proc_handler	= proc_dointvec,
-	},
-	{
-		.procname	= "erandom_stir_thresh",
-		.data		= &erandom_stir_thresh,
-		.maxlen		= sizeof(int),
-		.mode		= 0644,
 		.proc_handler	= proc_dointvec,
 	},
 	{ }
