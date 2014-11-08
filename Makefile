@@ -339,10 +339,11 @@ LDFINAL		= $(LD)
 CPP		= $(CC) -E
 ifdef CONFIG_LTO_SLIM
 AR		= $(CROSS_COMPILE)gcc-ar
+NM		= $(CROSS_COMPILE)gcc-nm
 else
 AR		= $(CROSS_COMPILE)ar
-endif
 NM		= $(CROSS_COMPILE)nm
+endif
 STRIP		= $(CROSS_COMPILE)strip
 OBJCOPY		= $(CROSS_COMPILE)objcopy
 OBJDUMP		= $(CROSS_COMPILE)objdump
@@ -910,7 +911,7 @@ cmd_ksym_ld = $(cmd_vmlinux__)
 define rule_ksym_ld
 	: 
 	+$(call cmd,vmlinux_version)
-	$(call cmd,vmlinux__)
+	+$(call cmd,vmlinux__)
 	$(Q)echo 'cmd_$@ := $(cmd_vmlinux__)' > $(@D)/.$(@F).cmd
 endef
 
@@ -924,17 +925,17 @@ quiet_cmd_kallsyms = KSYM    $@
 	$(call if_changed_dep,as_o_S)
 
 .tmp_kallsyms%.S: .tmp_vmlinux% $(KALLSYMS)
-	$(call cmd,kallsyms)
+	+$(call cmd,kallsyms)
 
 # .tmp_vmlinux1 must be complete except kallsyms, so update vmlinux version
 .tmp_vmlinux1: $(vmlinux-lds) $(vmlinux-all) FORCE
 	$(call if_changed_rule,ksym_ld)
 
 .tmp_vmlinux2: $(vmlinux-lds) $(vmlinux-all) .tmp_kallsyms1.o FORCE
-	$(call if_changed,vmlinux__)
+	+$(call if_changed,vmlinux__)
 
 .tmp_vmlinux3: $(vmlinux-lds) $(vmlinux-all) .tmp_kallsyms2.o FORCE
-	$(call if_changed,vmlinux__)
+	+$(call if_changed,vmlinux__)
 
 # Needs to visit scripts/ before $(KALLSYMS) can be used.
 $(KALLSYMS): scripts ;
