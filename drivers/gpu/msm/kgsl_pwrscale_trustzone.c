@@ -253,7 +253,7 @@ static const struct freq_tier freq_tier_table[] = {
  *  - Attempts to periodically lower frequency
  *  - Clear stats when lowering GPU frequency
  */
-static bool efficiency_mode = 1;
+static bool efficiency_mode = 0;
 module_param_named(tiered_efficiency_mode, efficiency_mode, bool, 0644);
 
 static bool tiered_logspam = 0;
