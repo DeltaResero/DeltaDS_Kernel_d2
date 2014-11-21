@@ -68,7 +68,7 @@ struct ts_global_priv {
 
 static struct ts_global_priv ts_global __read_mostly = {
 	.tier_count = 8,
-	.extra_mhz = 300,
+	.extra_mhz = 100,
 	.sample_time = MS(16),
 	.max_sample = 333,
 	.active_sample = 100,
@@ -441,10 +441,10 @@ static unsigned long get_usage(struct ts_cpu_priv *ts)
 	idle = get_idle_ktime(ts->policy->cpu);
 
 	samp.nsec = ktime_to_ns(ktime_sub(wall, ts->prev_wall));
-	ts->prev_wall = wall;
-
 	samp.usage = samp.nsec - ktime_to_ns(ktime_sub(idle, ts->prev_idle));
+
 	ts->prev_idle = idle;
+	ts->prev_wall = wall;
 
 	if (samp.usage <= 0)
 		samp.usage = 0;
@@ -559,7 +559,8 @@ static void ts_sample_worker(struct work_struct *work)
 	 */
 	boost_tmp = ts->current_usage_khz * 1000 / ts->policy->cur;
 	boost_tmp = boost_tmp * boost_tmp / 1000;
-	boost_tmp = ts->current_usage_khz + boost_tmp * ts_global.extra_mhz;
+	boost_tmp = ts->current_usage_khz + boost_tmp * ts_global.extra_mhz
+		* min(4, (1 + ilog2(nr_running())));
 	if (usage_khz < boost_tmp)
 		usage_khz = boost_tmp;
 	if (ts->active_tier && usage_khz < ts->tiers[ts->active_tier]->avg_khz)
@@ -574,24 +575,12 @@ out_nosched:
 	mutex_unlock(&ts->cpu_mutex);
 }
 
-/* ktime_add_clamp:
- * Adds two ktimes, clamping them to @clamp as needed.
- */
-static ktime_t ktime_add_clamp(ktime_t lhs, ktime_t rhs, ktime_t clamp)
-{
-	ktime_t ret = ktime_add(lhs, rhs);
-	if (unlikely(ktime_compare(ret, clamp) > 0))
-		return clamp;
-
-	return ret;
-}
-
 /* ts_idle_notify:
  * Handles idle-time logic.
  *
  * We use this callback to filter out long periods of idleness.  This results
  * in more responsive and more "correct" behavior.  Including the idle period
- * in demand sampling in incorrect in the sense that it doesn't predict future
+ * in demand sampling is incorrect in the sense that it doesn't predict future
  * demand well, except in the case of very light load at resume (e.g. a one-off
  * interrupt).
  *
@@ -605,11 +594,12 @@ static int ts_idle_notify(struct notifier_block *nb, unsigned long val,
 {
 	struct ts_cpu_priv *ts = &per_cpu(ts_cpu, smp_processor_id());
 	ktime_t now;
+	s64 idle_ns;
 
 	// Not strictly needed (everything is cpu-bound), but lock anyway.
 	if (unlikely(!mutex_trylock(&ts->cpu_mutex)))
 		return 0;
-	// NB: by default, all cores use the same governor in dkp
+	// By default, all cores use the same governor in dkp
 	if (unlikely(!ts->enabled))
 		goto out;
 
@@ -620,22 +610,16 @@ static int ts_idle_notify(struct notifier_block *nb, unsigned long val,
 		ts->idle_enter = now;
 		break;
 	case IDLE_END:
-		if (ktime_to_us(ktime_sub(now, ts->idle_enter)) <
-		    jiffies_to_usecs(DIV_ROUND_UP(ts_global.sample_time, 2)))
+		idle_ns = ktime_to_ns(ktime_sub(now, ts->idle_enter));
+		idle_ns -= jiffies_to_usecs(1) * 500;
+		if (idle_ns < 0)
 			break;
 
-		ts->prev_wall = ktime_add_clamp(ts->prev_wall,
-			ktime_sub(now, ts->idle_enter),
-			now);
-		ts->prev_idle = ktime_add_clamp(ts->prev_idle,
-			ktime_sub(now, ts->idle_enter),
-			get_idle_ktime(ts->policy->cpu));
+		ts->prev_wall = ktime_add_ns(ts->prev_wall, idle_ns);
+		ts->prev_idle = ktime_add_ns(ts->prev_idle, idle_ns);
 
-		if (delayed_work_pending(&ts->work))
-			cancel_delayed_work(&ts->work);
-		// This should probably be hardcoded to 1 jiffy.
 		queue_delayed_work_on(ts->policy->cpu, ts_global.wq, &ts->work,
-				      DIV_ROUND_UP(ts_global.sample_time, 2));
+				      1);
 		break;
 	}
 
