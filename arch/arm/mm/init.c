@@ -42,7 +42,7 @@
 static unsigned long phys_initrd_start __initdata = 0;
 static unsigned long phys_initrd_size __initdata = 0;
 #ifdef CONFIG_MSM_KRAIT_WFE_FIXUP
-int msm_krait_need_wfe_fixup;
+int msm_krait_need_wfe_fixup __read_mostly;
 EXPORT_SYMBOL(msm_krait_need_wfe_fixup);
 #endif
 

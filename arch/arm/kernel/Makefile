@@ -86,3 +86,6 @@ obj-$(CONFIG_DEBUG_LL)	+= debug.o
 obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
 
 extra-y := $(head-y) init_task.o vmlinux.lds
+
+obj-$(CONFIG_ARM_TICKET_LOCKS) += spin_slowpath.o
+obj-y += read_slowpath.o write_slowpath.o
