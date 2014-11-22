@@ -18,7 +18,6 @@
 #include <linux/workqueue.h>
 #include <linux/cpu.h>
 
-static struct work_struct cpu_up_work;
 static void __ref do_cpu_up(struct work_struct *work) {
 	int j;
 	for_each_possible_cpu(j) {
@@ -26,14 +25,15 @@ static void __ref do_cpu_up(struct work_struct *work) {
 			cpu_up(j);
 	}
 }
+static DECLARE_DELAYED_WORK(cpu_up_work, do_cpu_up);
 
 static int cpufreq_governor_performance(struct cpufreq_policy *policy,
 					unsigned int event)
 {
 	switch (event) {
 	case CPUFREQ_GOV_START:
-		INIT_WORK(&cpu_up_work, do_cpu_up);
-		schedule_work(&cpu_up_work);
+		// Wait for apps to finish toggling CPUs
+		schedule_delayed_work(&cpu_up_work, 5 * HZ);
 	case CPUFREQ_GOV_LIMITS:
 		pr_debug("setting to %u kHz because of event %u\n",
 						policy->max, event);

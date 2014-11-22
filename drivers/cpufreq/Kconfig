@@ -234,6 +234,12 @@ config CPU_FREQ_GOV_INTELLIDEMAND
 	tristate "'intellidemand' cpufreq policy governor"
 	select CPU_FREQ_TABLE
 
+config CPU_FREQ_GOV_TIERSERVATIVE
+	tristate "'tierservative' cpufreq governor"
+	depends on CPU_FREQ
+	help
+	  Here be dragons.
+
 menu "Intellidemand configuration"
 depends on CPU_FREQ_GOV_INTELLIDEMAND
 

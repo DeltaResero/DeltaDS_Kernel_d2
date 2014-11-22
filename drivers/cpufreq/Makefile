@@ -14,6 +14,7 @@ obj-$(CONFIG_CPU_FREQ_GOV_FREELUNCH)	+= cpufreq_freelunch.o
 obj-$(CONFIG_CPU_FREQ_GOV_ASSWAX)	+= cpufreq_asswax.o
 obj-$(CONFIG_CPU_FREQ_GOV_INTELLIACTIVE)+= cpufreq_intelliactive.o
 obj-$(CONFIG_CPU_FREQ_GOV_INTELLIDEMAND)+= cpufreq_intellidemand.o
+obj-$(CONFIG_CPU_FREQ_GOV_TIERSERVATIVE)+= cpufreq_tierservative.o
 
 # CPUfreq cross-arch helpers
 obj-$(CONFIG_CPU_FREQ_TABLE)		+= freq_table.o
