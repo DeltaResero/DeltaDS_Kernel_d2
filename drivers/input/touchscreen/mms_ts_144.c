@@ -187,6 +187,8 @@ enum {
 #define ISC_CHAR_2_BCD(num)	(((num/10)<<4) + (num%10))
 #define ISC_MAX(x, y)		(((x) > (y)) ? (x) : (y))
 
+bool screen_on = true;
+
 bool display_on = true;
 
 bool is_display_on()
@@ -3140,6 +3142,8 @@ static int mms_ts_suspend(struct device *dev)
            (power_suspended);
         };
 
+	screen_on = false;
+
 out:
 	mutex_unlock(&info->input_dev->mutex);
 	return 0;
@@ -3187,6 +3191,8 @@ static int mms_ts_resume(struct device *dev)
         } else if (display_on) {
            (!power_suspended);
         };
+
+	screen_on = true;
 
 	return ret;
 }
