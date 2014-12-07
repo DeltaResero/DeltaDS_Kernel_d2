@@ -10,6 +10,8 @@
  * any later version.
  */
 
+/* __arch_XXX_lock_slowpath(*lockp, unused, saved_lr) */
+
 #ifndef CONFIG_MSM_KRAIT_WFE_FIXUP
 
 	stmdb	sp!, {r2, lr}
@@ -19,7 +21,7 @@
 #ifdef CONFIG_CPU_32v6K
 	wfe
 #endif
-	spintest	1b
+	spintest 1b
 
 	spintail
 	ldmia	sp!, {lr, pc}
@@ -29,11 +31,13 @@
 	stmdb	sp!, {r2, lr}
 	spinhead
 
-	ldr	r3, =msm_krait_need_wfe_fixup
-	ldr	r3, [r3]
-	teq	r3, #0
+	/* Check whether WFE fixup is needed */
+	ldr	r2, =msm_krait_need_wfe_fixup
+	ldr	r2, [r2]
+	teq	r2, #0
 	beq	11f
 
+	/* Fixup needed, set it up. */
 	mrs	r2, cpsr
 	cpsid	f
 	mrc	p15, 7, lr, c15, c0, 5
@@ -42,7 +46,7 @@
 	isb
 
 1:	wfe
-	spintest	1b
+	spintest 1b
 
 	orr	lr, lr, #0x10000
 	mcr	p15, 7, lr, c15, c0, 5
@@ -52,8 +56,9 @@
 	spintail
 	ldmia	sp!, {lr, pc}
 
+	/* No fixup needed, just call WFE. */
 11:	wfe
-	spintest	11b
+	spintest 11b
 
 	spintail
 	ldmia	sp!, {lr, pc}
