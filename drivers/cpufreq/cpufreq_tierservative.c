@@ -68,7 +68,7 @@ struct ts_global_priv {
 
 static struct ts_global_priv ts_global __read_mostly = {
 	.tier_count = 8,
-	.extra_mhz = 100,
+	.extra_mhz = 75,
 	.sample_time = MS(16),
 	.max_sample = 333,
 	.active_sample = 100,
@@ -100,7 +100,7 @@ const char *buf, size_t count)				\
 define_one_global_rw(fn);
 
 KNOB(tier_count, tier_count, 2, MAX_TIER, 1, 1);
-KNOB(extra_mhz, extra_mhz, 75, 500, 1, 0);
+KNOB(extra_mhz, extra_mhz, 25, 500, 1, 0);
 KNOB(sample_time_ms, sample_time, 1, MS(100), jiffies_to_msecs(1), 0);
 KNOB(max_sample_ms, max_sample, 10, 1000, 1, 1);
 KNOB(active_sample_ms, active_sample, 1, 1000, 1, 1);
@@ -560,7 +560,7 @@ static void ts_sample_worker(struct work_struct *work)
 	boost_tmp = ts->current_usage_khz * 1000 / ts->policy->cur;
 	boost_tmp = boost_tmp * boost_tmp / 1000;
 	boost_tmp = ts->current_usage_khz + boost_tmp * ts_global.extra_mhz
-		* min(4, (1 + ilog2(nr_running())));
+		* min(6, (2 + ilog2(nr_running())));
 	if (usage_khz < boost_tmp)
 		usage_khz = boost_tmp;
 	if (ts->active_tier && usage_khz < ts->tiers[ts->active_tier]->avg_khz)
