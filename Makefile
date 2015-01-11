@@ -5,8 +5,8 @@ EXTRAVERSION =
 NAME = Saber-toothed Squirrel
 
 # Build script hints
-DKP_LABEL = dkp for AOSP 4.4.x
-DKP_NAME = dkp-aosp44
+DKP_LABEL = dkp for AOSP 5.0.x
+DKP_NAME = dkp-aosp50
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
