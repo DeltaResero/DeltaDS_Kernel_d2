@@ -121,6 +121,10 @@ enum kgsl_ctx_reset_stat {
 #define KGSL_CONVERT_TO_MBPS(val) \
 	(val*1000*1000U)
 
+#ifdef CONFIG_CPU_FREQ_GOV_ELEMENTALX
+extern int graphics_boost;
+#endif
+
 /* device id */
 enum kgsl_deviceid {
 	KGSL_DEVICE_3D0		= 0x00000000,
