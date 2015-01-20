@@ -11,6 +11,7 @@ obj-$(CONFIG_BRICKED_HOTPLUG)           += bricked_hotplug.o
 obj-$(CONFIG_DYNAMIC_HOTPLUG)           += dynamic_hotplug.o
 obj-$(CONFIG_INTELLI_PLUG)              += intelli_plug.o
 obj-$(CONFIG_LAZYPLUG)                  += lazy_plug.o
+obj-$(CONFIG_MSM_SLEEPER)		+= msm_sleeper.o
 obj-$(CONFIG_SKATER_HOTPLUG)		+= skater_hotplug.o
 obj-$(CONFIG_STATE_HELPER)		+= state_helper.o
 obj-$(CONFIG_THUNDER_PLUG)              += thunder_plug.o

@@ -48,6 +48,12 @@ config LAZYPLUG
 	  This enables the conservative hotplugging, lazyplug by arter97
 	  based on intelli_plug. Refer to the comments for more info.
 
+config MSM_SLEEPER
+	bool "CPU hotplug driver"
+	default y
+	help
+	  CPU hotplug driver
+
 config SKATER_HOTPLUG
 	bool "A highly customizable hotplug, built for battery & performance"
 	default n
