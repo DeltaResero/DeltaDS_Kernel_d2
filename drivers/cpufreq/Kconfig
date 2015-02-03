@@ -500,6 +500,12 @@ config CPU_FREQ_GOV_POWERSAVE
 
 	  If in doubt, say Y.
 
+config CPU_FREQ_GOV_PRESERVATIVE
+	tristate "'preservative' cpufreq governor"
+	help
+	  'preservative' - this driver is good in cakes
+ 	  If in doubt, say N.
+
 config CPU_FREQ_GOV_RELAXED
 	tristate "'relaxed' cpufreq governor"
 	depends on CPU_FREQ
