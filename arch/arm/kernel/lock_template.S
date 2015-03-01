@@ -31,34 +31,49 @@
 	stmdb	sp!, {r2, lr}
 	spinhead
 
+	/* Check whether optimistic spinning makes sense */
+	spinskipoptim 2f
+
+	/* Optimistic spinning */
+	mov	r2, #256
+1:	subs	r2, r2, #1
+	ble	2f
+	dmb
+	spintest	1b
+
+	spintail
+	ldmia	sp!, {lr, pc}
+
 	/* Check whether WFE fixup is needed */
-	ldr	r2, =msm_krait_need_wfe_fixup
+2:	ldr	r2, =msm_krait_need_wfe_fixup
 	ldr	r2, [r2]
 	teq	r2, #0
-	beq	11f
+	beq	21f
+	b	12f
 
-	/* Fixup needed, set it up. */
-	mrs	r2, cpsr
+	/* Fixup needed, set it up */
+11:	mrs	r2, cpsr
 	cpsid	f
 	mrc	p15, 7, lr, c15, c0, 5
 	bic	lr, lr, #0x10000
 	mcr	p15, 7, lr, c15, c0, 5
 	isb
 
-1:	wfe
-	spintest 1b
+	wfe
 
 	orr	lr, lr, #0x10000
 	mcr	p15, 7, lr, c15, c0, 5
 	isb
 	msr	cpsr_cf, r2
 
+12:	spintest 11b
+
 	spintail
 	ldmia	sp!, {lr, pc}
 
-	/* No fixup needed, just call WFE. */
-11:	wfe
-	spintest 11b
+	/* No fixup needed, just call WFE */
+21:	wfe
+	spintest 21b
 
 	spintail
 	ldmia	sp!, {lr, pc}
