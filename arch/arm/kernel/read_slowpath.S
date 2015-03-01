@@ -13,6 +13,9 @@
 .macro spintail
 .endm
 
+.macro spinskipoptim skip
+.endm
+
 ENTRY(__arch_read_lock_slowpath)
 
 #include "lock_template.S"

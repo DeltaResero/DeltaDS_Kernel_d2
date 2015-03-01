@@ -1130,9 +1130,12 @@ vector_\name:
 	cmp	r0, #0
 	beq	10f
 	mrc	p15, 7, r0, c15, c0, 5
+	tst	r0, #0x10000
+	bne	10f
 	orr	r0, r0, #0x10000
 	mcr	p15, 7, r0, c15, c0, 5
-10:	isb
+	isb
+10:
 #endif
 	.endif
 	mov	r0, sp
