@@ -1,22 +1,42 @@
 Budget Fair Queueing I/O Scheduler
 ==================================
 
-This patchset introduces BFQ-v7r6 into Linux 3.4.0.
+This patchset introduces BFQ-v7r7 into Linux 3.4.0.
 For further information: http://www.algogroup.unimo.it/people/paolo/disk_sched/.
 
 The overall diffstat is the following:
 
  block/Kconfig.iosched         |   33 +
  block/Makefile                |    1 +
- block/bfq-cgroup.c            |  902 ++++++++++++++++++++++
+ block/bfq-cgroup.c            |  908 +++++++++++++++++++++++
  block/bfq-ioc.c               |   36 +
- block/bfq-iosched.c           | 4185 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- block/bfq-sched.c             | 1179 +++++++++++++++++++++++++++++
- block/bfq.h                   |  807 ++++++++++++++++++++
+ block/bfq-iosched.c           | 4208 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ block/bfq-sched.c             | 1186 +++++++++++++++++++++++++++++
+ block/bfq.h                   |  809 ++++++++++++++++++++
  include/linux/cgroup_subsys.h |    6 +
- 8 files changed, 7149 insertions(+)
+ 8 files changed, 7187 insertions(+)
 
 CHANGELOG
+
+v7r7:
+. BUGFIX: Prevent the OOM queue from being involved in the queue
+  cooperation mechanism. In fact, since the requests temporarily
+  redirected to the OOM queue could be redirected again to dedicated
+  queues at any time, the state needed to correctly handle merging
+  with the OOM queue would be quite complex and expensive to
+  maintain. Besides, in such a critical condition as an out of
+  memory, the benefits of queue merging may be little relevant, or
+  even negligible.
+. IMPROVEMENT: Let the OOM queue be initialized only once. Previously,
+  the OOM queue was reinitialized, at each request enqueue, with the
+  parameters related to the process that issued that request.
+  Depending on the parameters of the processes doing I/O, this could
+  easily cause the OOM queue to be moved continuously across service
+  trees, or even across groups. It also caused the parameters of the
+  OOM queue to be continuously reset in any case.
+. CODE IMPROVEMENT. Performed some minor code cleanups, and added some
+  BUG_ON()s that, if the weight of an entity becomes inconsistent,
+  should better help understand why.
 
 v7r6:
 . IMPROVEMENT: Introduced a new mechanism that helps get the job done
