@@ -152,6 +152,8 @@ static spinlock_t cpumask_lock;
 
 static unsigned int asswax_state = 1; // 0 = suspend, 1 = awake, 2 = interactive, 3 = touched
 
+static struct early_suspend asswax_power_suspend;
+
 //#define DEBUG
 #ifndef DEBUG
 #define dprintk(x...) do { } while (0)
@@ -801,6 +803,7 @@ static int cpufreq_governor_asswax(struct cpufreq_policy *new_policy,
 				return rc;
 
 			idle_notifier_register(&cpufreq_idle_nb);
+			register_early_suspend(&asswax_power_suspend);
 		}
 
 		//if (this_asswax->cur_policy->cur < new_policy->max && !timer_pending(&this_asswax->timer))
@@ -838,6 +841,7 @@ static int cpufreq_governor_asswax(struct cpufreq_policy *new_policy,
 			sysfs_remove_group(cpufreq_global_kobject,
 					   &asswax_attr_group);
 			idle_notifier_unregister(&cpufreq_idle_nb);
+			unregister_early_suspend(&asswax_power_suspend);
 		}
 		break;
 
@@ -945,8 +949,6 @@ static int __init cpufreq_asswax_init(void)
 		return -ENOMEM;
 
 	INIT_WORK(&freq_scale_work, cpufreq_asswax_freq_change_time_work);
-
-	register_early_suspend(&asswax_power_suspend);
 
 	return cpufreq_register_governor(&cpufreq_gov_asswax);
 }
