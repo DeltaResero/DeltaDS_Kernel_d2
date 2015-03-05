@@ -1807,6 +1807,9 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 	struct cpu_dbs_info_s *this_dbs_info;
 	unsigned int j;
 	int rc;
+#ifdef CONFIG_EARLYSUSPEND
+	int do_early_suspend = 0;
+#endif
 
 	this_dbs_info = &per_cpu(id_cpu_dbs_info, cpu);
 
@@ -1868,12 +1871,17 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 				dbs_tuners_ins.sync_freq = policy->min;
 
 #ifdef CONFIG_EARLYSUSPEND
-			register_early_suspend(&cpufreq_intellidemand_early_suspend_info);
+			do_early_suspend = 1;
 #endif
 		}
 		if (!cpu)
 			rc = input_register_handler(&dbs_input_handler);
 		mutex_unlock(&dbs_mutex);
+
+#ifdef CONFIG_EARLYSUSPEND
+		if (do_early_suspend)
+			register_early_suspend(&cpufreq_intellidemand_early_suspend_info);
+#endif
 
 		if (!intellidemand_powersave_bias_setspeed(
 					this_dbs_info->cur_policy,
@@ -1896,10 +1904,15 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 			sysfs_remove_group(cpufreq_global_kobject,
 					   &dbs_attr_group);
 #ifdef CONFIG_EARLYSUSPEND
-			unregister_early_suspend(&cpufreq_intellidemand_early_suspend_info);
+			do_early_suspend = 1;
 #endif
 		}
 		mutex_unlock(&dbs_mutex);
+
+#ifdef CONFIG_EARLYSUSPEND
+		if (do_early_suspend)
+			unregister_early_suspend(&cpufreq_intellidemand_early_suspend_info);
+#endif
 
 		break;
 
