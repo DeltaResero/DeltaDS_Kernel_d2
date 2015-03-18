@@ -264,14 +264,6 @@ static ssize_t isaac_read(struct file *filp, char __user *buf, size_t count,
 	if (unlikely(!count))
 		return ret;
 
-	/* Workaround for Dead Trigger 2:
-	 * This page is not yet mapped, so fault it before calling get_cpu
-	 */
-	if (unlikely(count == 24)) {
-		if (!access_ok(VERIFY_WRITE, buf, count) || put_user(0, buf))
-			return -EFAULT;
-	}
-
 	if (filp->private_data) {
 		ctx = filp->private_data;
 		if (down_interruptible(&ctx->sem))
@@ -280,6 +272,9 @@ static ssize_t isaac_read(struct file *filp, char __user *buf, size_t count,
 		/* initialized with sem locked */
 		ctx = filp->private_data = isaac_alloc();
 	} else {
+		/* Hack: Fault pages now.  Once we get_cpu(), we can't fault them. */
+		if (unlikely(put_user((char)0, buf)))
+			return -EFAULT;
 		ctx = &get_cpu_var(cpu_seeds);
 	}
 
