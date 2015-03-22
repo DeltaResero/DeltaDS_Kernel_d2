@@ -113,7 +113,7 @@ struct menu_device {
 	int		last_state_idx;
 	int             needs_update;
 
-	unsigned int	expected_us;
+	int		expected_us;
 	u64		predicted_us;
 	unsigned int	exit_us;
 	unsigned int	bucket;
@@ -254,7 +254,11 @@ static int menu_select(struct cpuidle_driver *drv, struct cpuidle_device *dev)
 	t = ktime_to_timespec(tick_nohz_get_sleep_length());
 	data->expected_us =
 		t.tv_sec * USEC_PER_SEC + t.tv_nsec / NSEC_PER_USEC;
-
+	if (unlikely(data->expected_us <= 0)) {
+		data->expected_us = 0;
+		data->bucket = which_bucket(0);
+		return 0;
+	}
 
 	data->bucket = which_bucket(data->expected_us);
 
