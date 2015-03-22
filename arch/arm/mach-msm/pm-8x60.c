@@ -790,6 +790,9 @@ int msm_pm_idle_prepare(struct cpuidle_device *dev,
 	uint32_t modified_time_us = 0;
 	struct msm_pm_time_params time_param;
 
+	if (index == CPUIDLE_DRIVER_STATE_START)
+		return (int)cpuidle_get_statedata(&dev->states_usage[index]);
+
 	time_param.latency_us =
 		(uint32_t) pm_qos_request(PM_QOS_CPU_DMA_LATENCY);
 	time_param.sleep_us =
@@ -804,7 +807,7 @@ int msm_pm_idle_prepare(struct cpuidle_device *dev,
 	else
 		time_param.next_event_us = 0;
 
-	for (i = 0; i < dev->state_count; i++) {
+	for (i = CPUIDLE_DRIVER_STATE_START; i <= index; i++) {
 		struct cpuidle_state *state = &drv->states[i];
 		struct cpuidle_state_usage *st_usage = &dev->states_usage[i];
 		enum msm_pm_sleep_mode mode;
