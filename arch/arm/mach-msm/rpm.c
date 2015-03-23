@@ -582,7 +582,9 @@ int msm_rpm_local_request_is_outstanding(void)
 	unsigned long flags;
 	int outstanding;
 
-	spin_lock_irqsave(&msm_rpm_irq_lock, flags);
+	if (!spin_trylock_irqsave(&msm_rpm_irq_lock, flags))
+		return 1;
+
 	outstanding = msm_rpm_request != NULL;
 	spin_unlock_irqrestore(&msm_rpm_irq_lock, flags);
 
