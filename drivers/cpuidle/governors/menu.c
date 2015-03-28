@@ -170,8 +170,8 @@ static inline int performance_multiplier(void)
 {
 	int mult = 1;
 
-	/* for IO wait tasks (per cpu!) we add 5x each */
-	mult += 10 * nr_iowait_cpu(smp_processor_id());
+	/* for IO wait tasks (per cpu!) we add 2x each */
+	mult += 2 * nr_iowait_cpu(smp_processor_id());
 
 	return mult;
 }
