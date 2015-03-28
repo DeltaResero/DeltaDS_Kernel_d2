@@ -325,6 +325,7 @@ int cpuidle_enable_device(struct cpuidle_device *dev)
 		dev->states_usage[i].time = 0;
 	}
 	dev->last_residency = 0;
+	dev->est_residency = -1;
 
 	smp_wmb();
 

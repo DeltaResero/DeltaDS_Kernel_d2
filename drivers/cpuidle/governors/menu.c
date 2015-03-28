@@ -276,6 +276,8 @@ static int menu_select(struct cpuidle_driver *drv, struct cpuidle_device *dev)
 	data->last_state_idx = 0;
 	data->exit_us = 0;
 
+	dev->est_residency = 0;
+
 	/* Special case when user has set very strict latency requirement */
 	if (unlikely(latency_req == 0))
 		return 0;
@@ -306,6 +308,8 @@ static int menu_select(struct cpuidle_driver *drv, struct cpuidle_device *dev)
 					 RESOLUTION * DECAY);
 
 	repeat = detect_repeating_patterns(data);
+
+	dev->est_residency = data->predicted_us;
 
 	/*
 	 * We want to default to C1 (hlt), not to busy polling
