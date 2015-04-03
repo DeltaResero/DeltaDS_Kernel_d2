@@ -778,7 +778,7 @@ static void msm_pm_set_timer(uint32_t modified_time_us)
 
 void arch_idle(void)
 {
-	return;
+	msm_pm_swfi();
 }
 
 static inline uint32_t clamp_ktime_us(ktime_t kt)
