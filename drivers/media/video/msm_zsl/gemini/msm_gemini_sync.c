@@ -23,6 +23,7 @@
 
 #include <linux/delay.h>
 
+#define UINT32_MAX    (4294967295U)
 static int release_buf;
 
 /*************** queue helper ****************/
@@ -230,8 +231,6 @@ int msm_gemini_evt_get(struct msm_gemini_device *pgmn_dev,
 	ctrl_cmd.type = buf_p->vbuf.type;
 	kfree(buf_p);
 
-	GMN_DBG("%s:%d] 0x%08x %d\n", __func__, __LINE__,
-		(int) ctrl_cmd.value, ctrl_cmd.len);
 
 	if (copy_to_user(to, &ctrl_cmd, sizeof(ctrl_cmd))) {
 		GMN_PR_ERR("%s:%d]\n", __func__, __LINE__);
@@ -297,12 +296,14 @@ int msm_gemini_we_pingpong_irq(struct msm_gemini_device *pgmn_dev,
 	if (buf_out) {
 		rc = msm_gemini_core_we_buf_update(buf_out);
 		kfree(buf_out);
-	} else {
-		msm_gemini_core_we_buf_reset(buf_in);
-		GMN_DBG("%s:%d] no output buffer\n", __func__, __LINE__);
-		rc = -2;
-	}
-
+	}else{
+                 if(buf_in)
+                 {
+                     msm_gemini_core_we_buf_reset(buf_in);
+                     GMN_DBG("%s:%d] no output buffer\n", __func__, __LINE__);
+                     rc = -2;
+                 }
+        }
 	if (buf_in)
 		rc = msm_gemini_q_wakeup(&pgmn_dev->output_rtn_q);
 
@@ -679,7 +680,7 @@ int msm_gemini_ioctl_hw_cmds(struct msm_gemini_device *pgmn_dev,
 	void * __user arg)
 {
 	int is_copy_to_user;
-	int len;
+	uint32_t len;
 	uint32_t m;
 	struct msm_gemini_hw_cmds *hw_cmds_p;
 	struct msm_gemini_hw_cmd *hw_cmd_p;
@@ -687,6 +688,12 @@ int msm_gemini_ioctl_hw_cmds(struct msm_gemini_device *pgmn_dev,
 	if (copy_from_user(&m, arg, sizeof(m))) {
 		GMN_PR_ERR("%s:%d] failed\n", __func__, __LINE__);
 		return -EFAULT;
+	}
+	if ((m == 0) || (m > ((UINT32_MAX-sizeof(struct msm_gemini_hw_cmds))/
+		sizeof(struct msm_gemini_hw_cmd)))) {
+		GMN_PR_ERR("%s:%d] outof range of hwcmds\n",
+			 __func__, __LINE__);
+		return -EINVAL;
 	}
 
 	len = sizeof(struct msm_gemini_hw_cmds) +

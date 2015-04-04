@@ -11,17 +11,19 @@
  */
 
 #include <linux/delay.h>
-#include <linux/module.h>
 #include <linux/clk.h>
 #include <linux/io.h>
+#include <linux/module.h>
 /*[[ aswoogi_zsl*/
 #include <linux/atomic.h>
 #include <mach/irqs.h>
 /*]]*/
 #include <mach/gpio.h>
 #include <mach/camera.h>
+#include "../msm.h"
 #include "msm_ispif.h"
-#include "msm.h"
+
+
 
 #define QC_TEST
 #define V4L2_IDENT_ISPIF			50001
@@ -402,6 +404,7 @@ static int msm_ispif_abort_intf_transfer(uint8_t intf)
 #ifdef QC_TEST				/*aswoogi_zsl */
 static int msm_ispif_start_intf_transfer(uint8_t intfmask)
 {
+	/*uint32_t data;*/
 	uint8_t intf_cmd_mask = 0x55;
 	int rc = 0;
 
@@ -817,17 +820,16 @@ static void msm_ispif_release(struct v4l2_subdev *sd)
 	struct ispif_device *ispif =
 	    (struct ispif_device *)v4l2_get_subdevdata(sd);
 
-	CDBG("%s, free_irq\n", __func__);
-	free_irq(ispif->irq->start, 0);
-	tasklet_kill(&ispif_tasklet);
-
 	if (ispif->csid_version == CSID_VERSION_V2)
 		msm_cam_clk_enable(&ispif->pdev->dev, ispif_clk_info,
 				   ispif->ispif_clk, ARRAY_SIZE(ispif_clk_info),
 				   0);
 	else
 		msm_cam_clk_enable(&ispif->pdev->dev, ispif_clk_info,
-			ispif->ispif_clk, 2, 0);
+				   ispif->ispif_clk, 2, 0);
+
+	CDBG("%s, free_irq\n", __func__);
+	free_irq(ispif->irq->start, 0);
 }
 #endif
 

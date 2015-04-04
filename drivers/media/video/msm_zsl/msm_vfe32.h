@@ -975,7 +975,12 @@ struct vfe32_ctrl_type {
 	struct platform_device *pdev;
 	struct clk *vfe_clk[3];
 	spinlock_t  sd_notify_lock;
-	struct tasklet_struct vfe32_tasklet;
+	uint32_t hfr_mode;
+	uint32_t frame_skip_cnt;
+	uint32_t frame_skip_pattern;
+	uint32_t snapshot_frame_cnt;
+        struct device *iommu_ctx_imgwr;
+        struct device *iommu_ctx_misc;
 	uint32_t simultaneous_sof_frame;
 	uint32_t simultaneous_sof_stat;
 };

@@ -311,7 +311,7 @@ static int msm_pmem_table_add(struct hlist_head *ptype,
 	region = kmalloc(sizeof(struct msm_pmem_region), GFP_KERNEL);
 	if (!region)
 		goto out;
-#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
+#if 0 //CONFIG_MSM_MULTIMEDIA_USE_ION
 		region->handle = ion_import_fd(client_for_ion, info->fd);
 		if (IS_ERR_OR_NULL(region->handle))
 			goto out1;
@@ -1023,7 +1023,7 @@ static int msm_control(struct msm_control_device *ctrl_pmsm,
 		qcmd_resp = __msm_control_nb(sync, qcmd);
 		goto end;
 	}
-	msm_queue_drain(&ctrl_pmsm->ctrl_q, list_control);
+
 	qcmd_resp = __msm_control(sync,
 				  &ctrl_pmsm->ctrl_q,
 				  qcmd, msecs_to_jiffies(10000));

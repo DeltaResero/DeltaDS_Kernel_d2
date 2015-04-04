@@ -11,8 +11,8 @@
  *
  */
 
-#include "msm_sensor.h"
 #include <linux/module.h>
+#include "msm_sensor.h"
 #define SENSOR_NAME "s5k6a3yx"
 #define PLATFORM_DRIVER_NAME "msm_camera_s5k6a3yx"
 
@@ -364,7 +364,7 @@ uint8_t msb_gain, lsb_gain;
 
 	s_ctrl->func_tbl->sensor_group_hold_off(s_ctrl);
 }
-#if 0
+#ifndef CONFIG_S5C73M3
 static void s5k6a3yx_write_fl_lines(
 	struct msm_sensor_ctrl_t *s_ctrl,
 	uint32_t gain,
@@ -408,6 +408,7 @@ static void s5k6a3yx_write_fl_lines(
 
 	s_ctrl->func_tbl->sensor_group_hold_off(s_ctrl);
 }
+
 static void s5k6a3yx_write_gain(
 	struct msm_sensor_ctrl_t *s_ctrl,
 	uint32_t gain,
@@ -438,7 +439,6 @@ static void s5k6a3yx_write_gain(
 
 	s_ctrl->func_tbl->sensor_group_hold_off(s_ctrl);
 }
-
 #endif
 static int32_t s5k6a3yx_write_exp_gain(
 	struct msm_sensor_ctrl_t *s_ctrl,
