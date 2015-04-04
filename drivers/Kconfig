@@ -137,7 +137,7 @@ source "drivers/platform/Kconfig"
 
 source "drivers/clk/Kconfig"
 
-source "drivers/sensors/Kconfig"
+source "drivers/sensors_samsung/Kconfig"
 
 source "drivers/battery/Kconfig"
 
@@ -160,5 +160,7 @@ source "drivers/devfreq/Kconfig"
 source "drivers/gud/Kconfig"
 
 source "drivers/coresight/Kconfig"
+
+source "drivers/sensors/Kconfig"
 
 endmenu
