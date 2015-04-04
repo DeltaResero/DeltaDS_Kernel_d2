@@ -175,6 +175,8 @@ int32_t msm_sensor_get_output_info(struct msm_sensor_ctrl_t *,
 		struct sensor_output_info_t *);
 int32_t msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl,
 			void __user *argp);
+int32_t msm_sensor_power_up(const struct msm_camera_sensor_info *data);
+int32_t msm_sensor_power_down(const struct msm_camera_sensor_info *data);
 
 int32_t msm_sensor_match_id(struct msm_sensor_ctrl_t *s_ctrl);
 int msm_sensor_i2c_probe(struct i2c_client *client,

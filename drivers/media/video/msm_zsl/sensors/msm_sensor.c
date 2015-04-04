@@ -335,14 +335,18 @@ int32_t msm_sensor_get_output_info(struct msm_sensor_ctrl_t *s_ctrl,
 
 int32_t msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl, void __user *argp)
 {
-	/* Dynamically allocate this structure to avoid nuking stack-protectors
-	 * on GCC 4.8.0.
-	 */
-	struct sensor_cfg_data *cdata = kmalloc(sizeof(struct sensor_cfg_data), GFP_KERNEL);
-	long   rc = -ENOMEM;
-	if (cdata)
-		rc = copy_from_user(cdata, (void *)argp, sizeof(struct sensor_cfg_data));
-	if (!rc) {
+	struct sensor_cfg_data *cdata =
+		kmalloc(sizeof(struct sensor_cfg_data), GFP_KERNEL);
+	long   rc = 0;
+
+	if (!cdata)
+		return -ENOMEM;
+
+	if (copy_from_user(cdata,
+		(void *)argp,
+		sizeof(struct sensor_cfg_data)))
+		return -EFAULT;
+	mutex_lock(s_ctrl->msm_sensor_mutex);
 	CDBG("msm_sensor_config: cfgtype = %d\n",
 	cdata->cfgtype);
 		switch (cdata->cfgtype) {
@@ -428,7 +432,7 @@ int32_t msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl, void __user *argp)
 				&cdata->cfg.output_info);
 
 			if (copy_to_user((void *)argp,
-				cdata,
+				&cdata,
 				sizeof(struct sensor_cfg_data)))
 				rc = -EFAULT;
 			break;
@@ -446,7 +450,7 @@ int32_t msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl, void __user *argp)
 				&cdata->cfg.eeprom_data);
 
 			if (copy_to_user((void *)argp,
-				cdata,
+				&cdata,
 				sizeof(struct sensor_eeprom_data_t)))
 				rc = -EFAULT;
 			break;
@@ -455,13 +459,44 @@ int32_t msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl, void __user *argp)
 			rc = -EFAULT;
 			break;
 		}
-	}
 
-	if (cdata)
-		kfree(cdata);
+	mutex_unlock(s_ctrl->msm_sensor_mutex);
+
+	kfree(cdata);
 
 	return rc;
 }
+
+int32_t msm_sensor_power_up(const struct msm_camera_sensor_info *data)
+{
+	int32_t rc = 0;
+	CDBG("%s: %d\n", __func__, __LINE__);
+	msm_camio_clk_rate_set(MSM_SENSOR_MCLK_24HZ);
+	rc = gpio_request(data->sensor_platform_info->sensor_reset,
+		"SENSOR_NAME");
+	if (!rc) {
+		CDBG("%s: reset sensor\n", __func__);
+		gpio_direction_output(data->sensor_platform_info->sensor_reset,
+			 0);
+		usleep_range(1000, 2000);
+		gpio_set_value_cansleep(data->sensor_platform_info->
+			sensor_reset, 1);
+		usleep_range(4000, 5000);
+	} else {
+		CDBG("%s: gpio request fail", __func__);
+	}
+	return rc;
+}
+
+int32_t msm_sensor_power_down(const struct msm_camera_sensor_info *data)
+{
+	CDBG("%s\n", __func__);
+	gpio_set_value_cansleep(data->sensor_platform_info->sensor_reset, 0);
+	usleep_range(1000, 2000);
+	gpio_free(data->sensor_platform_info->sensor_reset);
+	return 0;
+}
+
 
 int32_t msm_sensor_match_id(struct msm_sensor_ctrl_t *s_ctrl)
 {
@@ -512,7 +547,13 @@ probe_failure:
 }
 
 int32_t msm_sensor_release(struct msm_sensor_ctrl_t *s_ctrl)
-{ return 0; }
+{
+	mutex_lock(s_ctrl->msm_sensor_mutex);
+	s_ctrl->func_tbl->sensor_power_down(s_ctrl->sensordata);
+	mutex_unlock(s_ctrl->msm_sensor_mutex);
+	CDBG("%s completed\n", __func__);
+	return 0;
+}
 
 int32_t msm_sensor_open_init(struct msm_sensor_ctrl_t *s_ctrl,
 				const struct msm_camera_sensor_info *data)
