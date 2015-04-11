@@ -778,7 +778,17 @@ static void msm_pm_set_timer(uint32_t modified_time_us)
 
 void arch_idle(void)
 {
-	return;
+	msm_pm_swfi();
+}
+
+static inline uint32_t clamp_ktime_us(ktime_t kt)
+{
+	s64 time = ktime_to_us(kt);
+	if (time < 0)
+		time = 0;
+	else if (time > INT_MAX)
+		time = INT_MAX;
+	return time;
 }
 
 int msm_pm_idle_prepare(struct cpuidle_device *dev,
@@ -786,29 +796,33 @@ int msm_pm_idle_prepare(struct cpuidle_device *dev,
 {
 	int i;
 	unsigned int power_usage = -1;
-	int ret = 0;
+	int ret = MSM_PM_SLEEP_MODE_WAIT_FOR_INTERRUPT;
 	uint32_t modified_time_us = 0;
 	struct msm_pm_time_params time_param;
+	int other_cpus;
+
+	if (index == CPUIDLE_DRIVER_STATE_START)
+		return (int)cpuidle_get_statedata(&dev->states_usage[index]);
 
 	time_param.latency_us =
-		(uint32_t) pm_qos_request(PM_QOS_CPU_DMA_LATENCY);
-	time_param.sleep_us =
-		(uint32_t) (ktime_to_us(tick_nohz_get_sleep_length())
-								& UINT_MAX);
+		(uint32_t)pm_qos_request(PM_QOS_CPU_DMA_LATENCY);
+	if (dev->est_residency == -1)
+		time_param.sleep_us =
+			clamp_ktime_us(tick_nohz_get_sleep_length());
+	else
+		time_param.sleep_us = dev->est_residency;
 	time_param.modified_time_us = 0;
 
 	if (!dev->cpu)
-		time_param.next_event_us =
-			(uint32_t) (ktime_to_us(get_next_event_time())
-								& UINT_MAX);
+		time_param.next_event_us = clamp_ktime_us(get_next_event_time());
 	else
 		time_param.next_event_us = 0;
 
-	for (i = 0; i < dev->state_count; i++) {
-		struct cpuidle_state *state = &drv->states[i];
+	other_cpus = num_online_cpus() > 1 || cpu_maps_is_updating();
+
+	for (i = CPUIDLE_DRIVER_STATE_START; i <= index; i++) {
 		struct cpuidle_state_usage *st_usage = &dev->states_usage[i];
 		enum msm_pm_sleep_mode mode;
-		bool allow;
 		void *rs_limits = NULL;
 		uint32_t power;
 		int idx;
@@ -816,75 +830,28 @@ int msm_pm_idle_prepare(struct cpuidle_device *dev,
 		mode = (enum msm_pm_sleep_mode) cpuidle_get_statedata(st_usage);
 		idx = MSM_PM_MODE(dev->cpu, mode);
 
-		allow = msm_pm_sleep_modes[idx].idle_supported;
+		if (!msm_pm_sleep_modes[idx].idle_supported)
+			continue;
+		if (mode == MSM_PM_SLEEP_MODE_POWER_COLLAPSE && other_cpus)
+			continue;
+		if (mode == MSM_PM_SLEEP_MODE_RETENTION &&
+		    msm_pm_retention_tz_call && other_cpus)
+			continue;
 
-		switch (mode) {
-		case MSM_PM_SLEEP_MODE_POWER_COLLAPSE:
-			if (num_online_cpus() > 1 || cpu_maps_is_updating()) {
-				allow = false;
-				break;
-			}
-			/* fall through */
-		case MSM_PM_SLEEP_MODE_RETENTION:
-			if (!allow)
-				break;
+		if (pm_sleep_ops.lowest_limits)
+			rs_limits = pm_sleep_ops.lowest_limits(true,
+				mode, &time_param, &power);
+		if (!rs_limits)
+			continue;
 
-			if (msm_pm_retention_tz_call &&
-				num_online_cpus() > 1) {
-				allow = false;
-				break;
-			}
-			/* fall through */
-
-		case MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE:
-			if (!allow)
-				break;
-
-			if (!dev->cpu && msm_rpm_local_request_is_outstanding()) {
-				allow = false;
-				break;
-			}
-			/* fall through */
-
-		case MSM_PM_SLEEP_MODE_WAIT_FOR_INTERRUPT:
-			if (!allow)
-				break;
-			/* fall through */
-
-			if (pm_sleep_ops.lowest_limits)
-				rs_limits = pm_sleep_ops.lowest_limits(true,
-						mode, &time_param, &power);
-
-			if (MSM_PM_DEBUG_IDLE & msm_pm_debug_mask)
-				pr_info("CPU%u: %s: %s, latency %uus, "
-					"sleep %uus, limit %p\n",
-					dev->cpu, __func__, state->desc,
-					time_param.latency_us,
-					time_param.sleep_us, rs_limits);
-
-			if (!rs_limits)
-				allow = false;
-			break;
-
-		default:
-			allow = false;
-			break;
+		if (power < power_usage) {
+			power_usage = power;
+			modified_time_us = time_param.modified_time_us;
+			ret = mode;
 		}
 
-		if (MSM_PM_DEBUG_IDLE & msm_pm_debug_mask)
-			pr_info("CPU%u: %s: allow %s: %d\n",
-				dev->cpu, __func__, state->desc, (int)allow);
-
-		if (allow) {
-			if (power < power_usage) {
-				power_usage = power;
-				modified_time_us = time_param.modified_time_us;
-				ret = mode;
-			}
-
-			if (MSM_PM_SLEEP_MODE_POWER_COLLAPSE == mode)
-				msm_pm_idle_rs_limits = rs_limits;
-		}
+		if (mode == MSM_PM_SLEEP_MODE_POWER_COLLAPSE)
+			msm_pm_idle_rs_limits = rs_limits;
 	}
 
 	if (modified_time_us && !dev->cpu)
@@ -1342,7 +1309,6 @@ static int __init msm_pm_init(void)
 				msm_cpu_status_driver.driver.name);
 		return rc;
 	}
-
 
 	return 0;
 }

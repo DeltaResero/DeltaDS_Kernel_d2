@@ -44,6 +44,15 @@ struct tz_priv {
 };
 static spinlock_t tz_lock;
 
+#ifdef CONFIG_MSM_KGSL_SIMPLE_GOV
+int simple_gpu_active;
+
+static int saved_governor = TZ_GOVERNOR_ONDEMAND;
+static struct kgsl_device *saved_gpu_dev;
+static struct kgsl_pwrscale *saved_gpu_pwrscale;
+#endif
+
+
 /* FLOOR is 5msec to capture up to 3 re-draws
  * per frame for 60fps content.
  */
@@ -127,6 +136,15 @@ static ssize_t tz_governor_store(struct kgsl_device *device,
 	if (priv->governor == TZ_GOVERNOR_PERFORMANCE)
 		kgsl_pwrctrl_pwrlevel_change(device, pwr->max_pwrlevel);
 
+#ifdef CONFIG_MSM_KGSL_SIMPLE_GOV
+	if (priv->governor == TZ_GOVERNOR_SIMPLE) {
+		simple_gpu_active = 1;
+	} else {
+		saved_governor = priv->governor;
+		simple_gpu_active = 0;
+	}
+#endif
+
 	mutex_unlock(&device->mutex);
 	return count;
 }
@@ -159,11 +177,11 @@ static void tz_wake(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 }
 
 #ifdef CONFIG_MSM_KGSL_SIMPLE_GOV
-static int default_laziness = 3;
-module_param_named(simple_laziness, default_laziness, int, 0664);
+int simple_gpu_default_laziness __read_mostly = 3;
+module_param_named(simple_laziness, simple_gpu_default_laziness, int, 0664);
 
-static int ramp_up_threshold = 6000;
-module_param_named(simple_ramp_threshold, ramp_up_threshold, int, 0664);
+int simple_gpu_ramp_up_threshold __read_mostly = 6000;
+module_param_named(simple_ramp_threshold, simple_gpu_ramp_up_threshold, int, 0664);
 
 static int laziness;
 
@@ -171,32 +189,50 @@ static int simple_governor(struct kgsl_device *device, int idle_stat)
 {
 	struct kgsl_pwrctrl *pwr = &device->pwrctrl;
 
-	if (idle_stat < ramp_up_threshold)
+	if (idle_stat < simple_gpu_ramp_up_threshold)
 	{
-		if (laziness > -default_laziness / 2)
+		if (laziness > -simple_gpu_default_laziness / 2)
 			laziness--;
 
 		if (pwr->active_pwrlevel <= pwr->thermal_pwrlevel)
 			return 0;
 
-		if (laziness <= -default_laziness / 2) {
+		if (laziness <= -simple_gpu_default_laziness / 2) {
 			laziness = 0;
 			return -1;
 		}
 	} else {
-		if (laziness < default_laziness)
+		if (laziness < simple_gpu_default_laziness)
 			laziness++;
 
 		if (pwr->active_pwrlevel >= pwr->num_pwrlevels - 1)
 			return 0;
 
-		if (laziness >= default_laziness) {
+		if (laziness >= simple_gpu_default_laziness) {
 			laziness = 0;
 			return 1;
 		}
 	}
 
 	return 0;
+}
+
+void simple_gpu_activate(void)
+{
+	struct tz_priv *priv;
+
+	if (!saved_gpu_dev)
+		return;
+	if (!saved_gpu_pwrscale || !saved_gpu_pwrscale->priv)
+		return;
+	priv = saved_gpu_pwrscale->priv;
+
+	mutex_lock(&saved_gpu_dev->mutex);
+	if (simple_gpu_active)
+		priv->governor = TZ_GOVERNOR_SIMPLE;
+	else
+		priv->governor = saved_governor;
+	mutex_unlock(&saved_gpu_dev->mutex);
 }
 #endif
 
@@ -486,6 +522,11 @@ static int tz_init(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 	priv->governor = TZ_GOVERNOR_ONDEMAND;
 	spin_lock_init(&tz_lock);
 	kgsl_pwrscale_policy_add_files(device, pwrscale, &tz_attr_group);
+
+#ifdef CONFIG_MSM_KGSL_SIMPLE_GOV
+	saved_gpu_dev = device;
+	saved_gpu_pwrscale = pwrscale;
+#endif
 
 	return 0;
 }
