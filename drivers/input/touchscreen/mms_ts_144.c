@@ -25,6 +25,7 @@
 #include <linux/slab.h>
 #include <linux/cpufreq.h>
 #include <linux/workqueue.h>
+#include <linux/tswake.h>
 
 #include <linux/platform_data/mms_ts.h>
 
@@ -50,6 +51,7 @@ struct mms_ts_info {
 	bool	enabled;
 	bool	ta_status;
 	bool	noise_mode;
+	bool	tswake;
 
 	struct mms_ts_platform_data *pdata;
 	struct early_suspend early_suspend;
@@ -69,6 +71,8 @@ static void release_all_fingers(struct mms_ts_info *info)
 	int i;
 
 	for (i = 0; i < MAX_FINGERS; i++) {
+		if (!(info->finger_state & (1 << i)))
+			continue;
 		input_mt_slot(info->input_dev, i);
 		input_mt_report_slot_state(info->input_dev, MT_TOOL_FINGER,
 					   false);
@@ -147,6 +151,32 @@ static void melfas_ta_cb(struct tsp_callbacks *cb, bool ta_status)
 		mms_set_noise_mode(info);
 }
 
+static void mms_ts_tswake(struct mms_ts_info *info, u8 len, u8 *buf)
+{
+	int i;
+	for (i = 0; i < len; i += FINGER_EVENT_SZ) {
+		u8 *tmp = &buf[i];
+		int id = (tmp[0] & 0xf) - 1;
+
+		if (unlikely(id >= MAX_FINGERS)) {
+			reset_mms_ts(info);
+			return;
+		}
+
+		// Only worry about id 0.
+		if (id)
+			continue;
+
+		if ((tmp[0] & 0x80) == 0) {
+			tswake_touch_event(-1, -1);
+		} else {
+			tswake_touch_event(
+				(tmp[2] | ((tmp[1] & 0x0f) << 8)),
+				(tmp[3] | ((tmp[1] & 0xf0) << 4)));
+		}
+	}
+}
+
 static irqreturn_t mms_ts_interrupt(int irq, void *dev_id)
 {
 	struct mms_ts_info *info = dev_id;
@@ -194,6 +224,9 @@ static irqreturn_t mms_ts_interrupt(int irq, void *dev_id)
 		},
 	};
 
+	if (unlikely(info->tswake))
+		tswake_i2c_enable();
+
 	i = i2c_transfer(client->adapter, msg, ARRAY_SIZE(msg));
 	if (unlikely(i != ARRAY_SIZE(msg) || !msg[3].len)) {
 		dev_err(&client->dev,
@@ -215,6 +248,11 @@ static irqreturn_t mms_ts_interrupt(int irq, void *dev_id)
 		goto out;
 	}
 
+	if (unlikely(info->tswake)) {
+		mms_ts_tswake(info, msg[3].len, buf);
+		return IRQ_HANDLED;
+	}
+
 	for (i = 0; i < msg[3].len; i += FINGER_EVENT_SZ) {
 		u8 *tmp = &buf[i];
 		int id = (tmp[0] & 0xf) - 1;
@@ -225,7 +263,6 @@ static irqreturn_t mms_ts_interrupt(int irq, void *dev_id)
 		}
 
 		if ((tmp[0] & 0x80) == 0) {
-			// XXX is this even needed?
 			if (!(info->finger_state & (1 << id)))
 				continue;
 			input_mt_slot(info->input_dev, id);
@@ -334,7 +371,7 @@ static int __devinit mms_ts_probe(struct i2c_client *client,
 	}
 
 	ret = request_threaded_irq(client->irq, NULL, mms_ts_interrupt,
-				   IRQF_TRIGGER_LOW | IRQF_ONESHOT,
+				   IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
 				   "mms_ts", info);
 	if (ret < 0) {
 		dev_err(&client->dev, "Failed to register interrupt\n");
@@ -342,6 +379,7 @@ static int __devinit mms_ts_probe(struct i2c_client *client,
 	}
 	info->irq = client->irq;
 	info->enabled = true;
+	info->tswake = false;
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	info->early_suspend.suspend = mms_ts_early_suspend;
@@ -349,6 +387,7 @@ static int __devinit mms_ts_probe(struct i2c_client *client,
 	INIT_DELAYED_WORK(&info->finish_resume, mms_ts_finish_resume);
 	register_early_suspend(&info->early_suspend);
 #endif
+	tswake_notify_resolution(max_x, max_y);
 
 	return 0;
 
@@ -380,20 +419,22 @@ static int mms_ts_suspend(struct device *dev)
 
 	cancel_delayed_work_sync(&info->finish_resume);
 
-	dev_notice(&info->client->dev, "%s: users=%d\n", __func__,
-			info->input_dev->users);
 	mutex_lock(&info->input_dev->mutex);
-	if (!info->input_dev->users)
-		goto out;
 
-	if (info->input_dev->users) {
+	if (tswake_active()) {
+		info->tswake = true;
+		if (!info->enabled)
+			enable_irq(info->irq);
+		info->enabled = true;
+		enable_irq_wake(info->irq);
+	} else {
+		if (info->enabled)
+			disable_irq(info->irq);
 		info->enabled = false;
-		disable_irq(info->irq);
+		info->pdata->vdd_on(0);
 	}
 	release_all_fingers(info);
-	info->pdata->vdd_on(0);
 
-out:
 	mutex_unlock(&info->input_dev->mutex);
 	return 0;
 }
@@ -403,10 +444,13 @@ static int mms_ts_resume(struct device *dev)
 	struct i2c_client *client = to_i2c_client(dev);
 	struct mms_ts_info *info = i2c_get_clientdata(client);
 
-	dev_notice(&info->client->dev, "%s: users=%d\n", __func__,
-			info->input_dev->users);
-	info->pdata->vdd_on(1);
-	schedule_delayed_work(&info->finish_resume, msecs_to_jiffies(120));
+	if (!info->tswake) {
+		info->pdata->vdd_on(1);
+		schedule_delayed_work(&info->finish_resume,
+			msecs_to_jiffies(120));
+	} else {
+		schedule_delayed_work(&info->finish_resume, 0);
+	}
 
 	return 0;
 }
@@ -414,11 +458,15 @@ static int mms_ts_resume(struct device *dev)
 static void mms_ts_finish_resume(struct work_struct *work) {
 	struct mms_ts_info *info =
 		container_of(work, struct mms_ts_info, finish_resume.work);
-	mms_set_noise_mode(info);
 	mutex_lock(&info->input_dev->mutex);
-	if (info->input_dev->users) {
-		info->enabled = true;
+	if (info->tswake) {
+		info->tswake = false;
+		disable_irq_wake(info->irq);
+	}
+	if (!info->enabled) {
+		mms_set_noise_mode(info);
 		enable_irq(info->irq);
+		info->enabled = true;
 	}
 	mutex_unlock(&info->input_dev->mutex);
 }
