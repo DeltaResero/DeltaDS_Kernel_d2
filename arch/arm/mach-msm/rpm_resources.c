@@ -701,8 +701,17 @@ static void *msm_rpmrs_lowest_limits(bool from_idle,
 	bool gpio_detectable = false;
 	int i;
 	uint32_t pwr;
-	uint32_t next_wakeup_us = time_param->sleep_us;
+	uint32_t next_wakeup_us;
 	bool modify_event_timer;
+
+	if ((MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE == sleep_mode)
+		|| (MSM_PM_SLEEP_MODE_POWER_COLLAPSE == sleep_mode)) {
+		if (!cpu && msm_rpm_local_request_is_outstanding()) {
+			if (MSM_RPMRS_DEBUG_OUTPUT & msm_rpmrs_debug_mask)
+				pr_info(" RPM Request is outstanding\n");
+			return NULL;
+		}
+	}
 
 	if (sleep_mode == MSM_PM_SLEEP_MODE_POWER_COLLAPSE) {
 		irqs_detectable = msm_mpm_irqs_detectable(from_idle);
@@ -712,12 +721,10 @@ static void *msm_rpmrs_lowest_limits(bool from_idle,
 	for (i = 0; i < msm_rpmrs_level_count; i++) {
 		struct msm_rpmrs_level *level = &msm_rpmrs_levels[i];
 
-		modify_event_timer = false;
-
-		if (!level->available)
+		if (sleep_mode != level->sleep_mode)
 			continue;
 
-		if (sleep_mode != level->sleep_mode)
+		if (!level->available)
 			continue;
 
 		if (time_param->latency_us < level->latency_us)
@@ -727,45 +734,33 @@ static void *msm_rpmrs_lowest_limits(bool from_idle,
 				time_param->next_event_us < level->latency_us)
 			continue;
 
-		if (time_param->next_event_us) {
-			if ((time_param->next_event_us < time_param->sleep_us)
-			|| ((time_param->next_event_us - level->latency_us) <
-				time_param->sleep_us)) {
-				modify_event_timer = true;
-				next_wakeup_us = time_param->next_event_us -
-						level->latency_us;
-			}
+		if (!msm_rpmrs_irqs_detectable(&level->rs_limits,
+					irqs_detectable, gpio_detectable))
+			continue;
+
+		if (time_param->next_event_us &&
+		    time_param->next_event_us < time_param->sleep_us +
+		                                level->latency_us) {
+			modify_event_timer = (level->latency_us > 100);
+			next_wakeup_us = time_param->next_event_us;
+		} else {
+			modify_event_timer = false;
+			next_wakeup_us = time_param->sleep_us;
 		}
 
 		if (next_wakeup_us <= level->time_overhead_us)
 			continue;
 
-		if (!msm_rpmrs_irqs_detectable(&level->rs_limits,
-					irqs_detectable, gpio_detectable))
-			continue;
-
-		if ((MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE == sleep_mode)
-			|| (MSM_PM_SLEEP_MODE_POWER_COLLAPSE == sleep_mode))
-			if (!cpu && msm_rpm_local_request_is_outstanding()) {
-				if (MSM_RPMRS_DEBUG_OUTPUT & msm_rpmrs_debug_mask)
-					pr_info(" RPM Request is outstanding\n");
-				break;
-			}
-		if (next_wakeup_us <= 1) {
-			pwr = level->energy_overhead;
-		} else if (next_wakeup_us <= level->time_overhead_us) {
-			pwr = level->energy_overhead / next_wakeup_us;
-		} else if ((next_wakeup_us >> 10) > level->time_overhead_us) {
+		if (next_wakeup_us >> 20) {
 			pwr = level->steady_state_power;
 		} else {
-			pwr = level->steady_state_power;
-			pwr -= (level->time_overhead_us *
-				level->steady_state_power)/next_wakeup_us;
-			pwr += level->energy_overhead / next_wakeup_us;
+			pwr = level->energy_overhead +
+				level->steady_state_power *
+				(next_wakeup_us - level->time_overhead_us);
+			pwr /= next_wakeup_us;
 		}
 
-		if (!best_level ||
-				best_level->rs_limits.power[cpu] >= pwr) {
+		if (!best_level || best_level->rs_limits.power[cpu] >= pwr) {
 			level->rs_limits.latency_us[cpu] = level->latency_us;
 			level->rs_limits.power[cpu] = pwr;
 			best_level = level;
@@ -773,8 +768,7 @@ static void *msm_rpmrs_lowest_limits(bool from_idle,
 				*power = pwr;
 			if (modify_event_timer && best_level->latency_us > 1)
 				time_param->modified_time_us =
-					time_param->next_event_us -
-							best_level->latency_us;
+					next_wakeup_us - level->latency_us;
 			else
 				time_param->modified_time_us = 0;
 		}
