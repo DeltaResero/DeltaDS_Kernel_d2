@@ -181,8 +181,6 @@
 #include <asm/kexec.h>
 #endif
 
-#include <linux/tswake.h>
-
 extern unsigned int system_rev;
 #ifdef CONFIG_TOUCHSCREEN_MMS144
 struct tsp_callbacks *charger_callbacks;

@@ -110,13 +110,6 @@ config TOUCHSCREEN_MMS144
 	  To compile this driver as a module, choose M here: the
 	  module will be called mms_ts.
 
-config TSWAKE
-	bool "Support for touchscreen wakeup events"
-	depends on TOUCHSCREEN_MMS144
-	help
-	  Say Y here to get fancy configurable wakeup events via the
-	  touchscreen.  Double-tap and sweep are supported.
-
 config TOUCHSCREEN_MMS136
 	tristate "Melfas MMS136 Touchscreen"
 	depends on I2C
