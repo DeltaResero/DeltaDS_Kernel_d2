@@ -5121,11 +5121,13 @@ static void __init gpio_rev_init(void)
 		opt_gp2a_data.p_out = gpio_rev(ALS_INT);
 #endif
 #endif
+#ifdef CONFIG_VP_A2220
 	a2220_i2c_gpio_data.sda_pin = gpio_rev(A2220_SDA);
 	a2220_i2c_gpio_data.scl_pin = gpio_rev(A2220_SCL);
 	a2220_data.gpio_wakeup = gpio_rev(A2220_WAKEUP);
 	msm8960_a2220_configs[0].gpio = gpio_rev(A2220_SDA);
 	msm8960_a2220_configs[1].gpio = gpio_rev(A2220_SCL);
+#endif
 #ifdef CONFIG_VIBETONZ
 	if (system_rev >= BOARD_REV09) {
 		msm_8960_vibrator_pdata.vib_en_gpio = PMIC_GPIO_VIB_ON;
