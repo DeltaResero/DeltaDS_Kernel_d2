@@ -95,6 +95,11 @@ static inline bool aca_enabled(void)
 #endif
 }
 
+int __devinit msm_otg_is_probed(void)
+{
+	return the_msm_otg != NULL;
+}
+
 #ifdef CONFIG_USB_HOST_NOTIFY
 static void msm_otg_set_id_state_pbatest(int id, struct host_notify_dev *ndev)
 {
