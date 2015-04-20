@@ -2292,7 +2292,7 @@ static void do_interactivity(struct work_struct *work) {
                 if (lock_policy_rwsem_read(j))
                         continue;
                 pol = per_cpu(cpufreq_cpu_data, j);
-                if (unlikely(pol == NULL)) {
+                if (unlikely(pol == NULL || pol->governor == NULL)) {
                         printk(KERN_DEBUG "%s: policy for cpu %u is null\n", __func__, j);
                 } else {
                         pol->governor->governor(pol,
