@@ -140,6 +140,9 @@
 #define	ADC_CARDOCK		0x1d
 #define	ADC_OPEN		0x1f
 
+// msm_otg must be probed first
+extern int __devinit msm_otg_is_probed(void);
+
 /* (1 = enabled) | (2 = state_usb) | (4 = state_fast) */
 static int force_fast_charge;
 static int fast_charge_setting;
@@ -1246,6 +1249,11 @@ static int __devinit fsa9485_probe(struct i2c_client *client,
 	int ret = 0;
 	struct input_dev *input;
 	struct device *switch_dev;
+
+	if (!msm_otg_is_probed()) {
+		pr_err("%s: msm_otg not probed yet, defer\n", __func__);
+		return -EPROBE_DEFER;
+	}
 
 	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA))
 		return -EIO;
