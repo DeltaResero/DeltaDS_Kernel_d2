@@ -4654,7 +4654,6 @@ static void __init samsung_m2_init(void)
 	else
 		platform_device_register(&msm8960_device_acpuclk);
 	platform_add_devices(common_devices, ARRAY_SIZE(common_devices));
-	tswake_notify_i2c(&msm8960_device_qup_i2c_gsbi3.dev);
 	msm8960_pm8921_gpio_mpp_init();
 	platform_add_devices(m2_devices, ARRAY_SIZE(m2_devices));
 #ifdef CONFIG_USB_EHCI_MSM_HSIC
