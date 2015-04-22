@@ -947,7 +947,9 @@ static int __devinit cypress_touchkey_probe(struct i2c_client *client,
 		goto err_input_dev_alloc;
 	}
 
+#ifdef CONFIG_INTERACTION_HINTS
 	current_pressed = 0;
+#endif
 
 	info->client = client;
 	info->input_dev = input_dev;

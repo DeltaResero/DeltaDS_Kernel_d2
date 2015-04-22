@@ -854,8 +854,8 @@ static int cpufreq_governor_asswax(struct cpufreq_policy *new_policy,
 	case CPUFREQ_GOV_NOINTERACT:
 		asswax_state = 2;
 		break;
-	}
 #endif
+	}
 
 	return 0;
 }
