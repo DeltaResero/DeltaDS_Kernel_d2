@@ -236,8 +236,8 @@ enum {
 #define MSM_HDMI_PRIM_PMEM_SIZE 0x4000000 /* 64 Mbytes */
 
 #ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
-#define HOLE_SIZE	0x20000
-#define MSM_CONTIG_MEM_SIZE  0x65000
+#define HOLE_SIZE	0x100000 /* 1 MB */
+#define MSM_CONTIG_MEM_SIZE  0x280000 /* 2.5MB */
 #ifdef CONFIG_MSM_IOMMU
 #define MSM_ION_MM_SIZE            0x6000000
 #define MSM_ION_SF_SIZE            0x0
@@ -256,8 +256,8 @@ enum {
 #else
 #define MSM_ION_HEAP_NUM	8
 #endif
-#endif // MSM_IOMMU
-#define MSM_ION_MM_FW_SIZE	(0x200000 - HOLE_SIZE) /* 128kb */
+#endif
+#define MSM_ION_MM_FW_SIZE	0x200000 /* 2 MB */
 #define MSM_ION_MFC_SIZE	SZ_8K
 #define MSM_ION_AUDIO_SIZE	MSM_PMEM_AUDIO_SIZE
 
@@ -265,12 +265,11 @@ enum {
 #define MSM_LIQUID_ION_SF_SIZE MSM_LIQUID_PMEM_SIZE
 #define MSM_HDMI_PRIM_ION_SF_SIZE MSM_HDMI_PRIM_PMEM_SIZE
 
-#define MSM_MM_FW_SIZE      (0x200000 - HOLE_SIZE) /* 2mb -128kb*/
-#define MSM8960_FIXED_AREA_START (0xa0000000 - (MSM_ION_MM_FW_SIZE + \
-                            HOLE_SIZE))
-#define MAX_FIXED_AREA_SIZE 0x10000000
-#define MSM8960_FW_START    MSM8960_FIXED_AREA_START
-#define MSM_ION_ADSP_SIZE   SZ_8M
+#define MSM_MM_FW_SIZE		(0x200000) /* 2mb */
+#define MSM8960_FIXED_AREA_START (0xb0000000 - MSM_ION_MM_FW_SIZE)
+#define MAX_FIXED_AREA_SIZE	0x10000000
+#define MSM8960_FW_START	MSM8960_FIXED_AREA_START
+#define MSM_ION_ADSP_SIZE	SZ_8M
 
 #else
 #define MSM_CONTIG_MEM_SIZE  0x110C000
@@ -588,6 +587,9 @@ static void __init msm8960_reserve_fixed_area(unsigned long fixed_area_size)
 
 	ret = memblock_remove(reserve_info->fixed_area_start,
 		reserve_info->fixed_area_size);
+	pr_info("mem_map: fixed_area reserved at 0x%lx with size 0x%lx\n",
+			reserve_info->fixed_area_start,
+			reserve_info->fixed_area_size);
 	BUG_ON(ret);
 #endif
 }
@@ -695,7 +697,7 @@ static void __init reserve_ion_memory(void)
 					heap->priv,
 					heap->size,
 					0,
-					0xa0000000);
+					0xb0000000);
 			}
 		}
 	}
@@ -717,7 +719,10 @@ static void __init reserve_ion_memory(void)
 	} else {
 		BUG_ON(!IS_ALIGNED(fixed_low_size + HOLE_SIZE, SECTION_SIZE));
 		ret = memblock_remove(fixed_low_start,
-					  fixed_low_size + HOLE_SIZE);
+				      fixed_low_size + HOLE_SIZE);
+		pr_info("mem_map: fixed_low_area reserved at 0x%lx with size \
+				0x%x\n", fixed_low_start,
+				fixed_low_size + HOLE_SIZE);
 		BUG_ON(ret);
 	}
 
@@ -728,6 +733,9 @@ static void __init reserve_ion_memory(void)
 	} else {
 		BUG_ON(!IS_ALIGNED(fixed_middle_size, SECTION_SIZE));
 		ret = memblock_remove(fixed_middle_start, fixed_middle_size);
+		pr_info("mem_map: fixed_middle_area reserved at 0x%lx with \
+				size 0x%x\n", fixed_middle_start,
+				fixed_middle_size);
 		BUG_ON(ret);
 	}
 
@@ -739,6 +747,9 @@ static void __init reserve_ion_memory(void)
 		/* This is the end of the fixed area so it's okay to round up */
 		fixed_high_size = ALIGN(fixed_high_size, SECTION_SIZE);
 		ret = memblock_remove(fixed_high_start, fixed_high_size);
+		pr_info("mem_map: fixed_high_area reserved at 0x%lx with size \
+				0x%x\n", fixed_high_start,
+				fixed_high_size);
 		BUG_ON(ret);
 	}
 
@@ -852,6 +863,8 @@ static void reserve_cache_dump_memory(void)
 
 	msm8960_reserve_table[MEMTYPE_EBI1].size += total;
 	msm_cache_dump_pdata.l1_size = l1_size;
+	pr_info("mem_map: cache_dump reserved with size 0x%x in pool\n",
+			total);
 }
 #else
 static inline void reserve_cache_dump_memory(void) { }
