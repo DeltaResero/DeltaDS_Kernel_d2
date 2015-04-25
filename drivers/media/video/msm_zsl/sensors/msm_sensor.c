@@ -450,7 +450,7 @@ int32_t msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl, void __user *argp)
 				&cdata->cfg.eeprom_data);
 
 			if (copy_to_user((void *)argp,
-				&cdata,
+				cdata,
 				sizeof(struct sensor_eeprom_data_t)))
 				rc = -EFAULT;
 			break;
