@@ -432,7 +432,7 @@ int32_t msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl, void __user *argp)
 				&cdata->cfg.output_info);
 
 			if (copy_to_user((void *)argp,
-				&cdata,
+				cdata,
 				sizeof(struct sensor_cfg_data)))
 				rc = -EFAULT;
 			break;
