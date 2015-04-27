@@ -850,7 +850,9 @@ no_policy:
 	return ret;
 }
 
+#ifdef CONFIG_MSM_RUN_QUEUE_STATS
 extern void msm_rq_stats_enable(int enable);
+#endif
 
 static ssize_t store(struct kobject *kobj, struct attribute *attr,
 		     const char *buf, size_t count)
@@ -858,7 +860,6 @@ static ssize_t store(struct kobject *kobj, struct attribute *attr,
 	struct cpufreq_policy *policy = to_policy(kobj);
 	struct freq_attr *fattr = to_attr(attr);
 	ssize_t ret = count;
-	char *govname;
 
 	int j, iter = 0, cpu = policy->cpu;
 
@@ -894,11 +895,11 @@ static ssize_t store(struct kobject *kobj, struct attribute *attr,
 				}
 			}
 
+#ifdef CONFIG_MSM_RUN_QUEUE_STATS
 			// If cpu0 can't enable cpu1, we need mpdecision
-			if (cpu == 0) {
+			if (cpu == 0)
 				msm_rq_stats_enable(!(t->flags & BIT(GOVFLAGS_HOTPLUG)));
-				govname = t->name;
-			}
+#endif
 		} else if (fattr->store == store_scaling_max_freq ||
 			   fattr->store == store_scaling_min_freq) {
 			iter = 1;
