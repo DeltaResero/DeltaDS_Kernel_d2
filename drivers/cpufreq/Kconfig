@@ -46,6 +46,13 @@ config CPU_FREQ_STAT_DETAILS
 
 	  If in doubt, say N.
 
+config CPU_BOOST_DRIVER
+	bool "CPU frequency boost driver"
+	help
+	  A battery-hungry hydra: cut one touch booster off, two more grow back
+	  in its place.  This one is particularly vicious: it's even more
+	  aggressive, and it breaks CPU hotplugging.
+
 choice
 	prompt "Default CPUFreq governor"
 	default CPU_FREQ_DEFAULT_GOV_USERSPACE if CPU_FREQ_SA1100 || CPU_FREQ_SA1110
