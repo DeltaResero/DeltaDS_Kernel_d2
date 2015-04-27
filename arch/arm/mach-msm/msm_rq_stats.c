@@ -430,6 +430,11 @@ static ssize_t store_def_timer_ms(struct kobject *kobj,
 {
 	unsigned int val = 0;
 
+	if (unlikely(!rq_info.init && hotplug_enable != HP_DISABLE)) {
+		printk(KERN_DEBUG "rq-stats: here comes mpdecision! stopping auto-hotplug\n");
+		rq_hotplug_enable(HP_MPDEC);
+	}
+
 	sscanf(buf, "%u", &val);
 	rq_info.def_timer_jiffies = msecs_to_jiffies(val);
 
