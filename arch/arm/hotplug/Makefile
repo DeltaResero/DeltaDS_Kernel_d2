@@ -16,3 +16,4 @@ obj-$(CONFIG_MSM_SLEEPER)		+= msm_sleeper.o
 obj-$(CONFIG_SKATER_HOTPLUG)		+= skater_hotplug.o
 obj-$(CONFIG_STATE_HELPER)		+= state_helper.o
 obj-$(CONFIG_THUNDER_PLUG)              += thunder_plug.o
+obj-$(CONFIG_ZEN_DECISION)		+= zen_decision.o
