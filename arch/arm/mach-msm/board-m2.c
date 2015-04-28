@@ -2927,7 +2927,7 @@ static struct msm_otg_platform_data msm_otg_pdata;
 #else
 static bool vbus_is_on;
 #ifdef CONFIG_CHARGER_SMB347
-static void msm_hsusb_vbus_power_smb347s(bool on)
+static int msm_hsusb_vbus_power_smb347s(bool on)
 {
 	struct power_supply *psy = power_supply_get_by_name("battery");
 	union power_supply_propval value;
@@ -2937,7 +2937,7 @@ static void msm_hsusb_vbus_power_smb347s(bool on)
 
 	/* If VBUS is already on (or off), do nothing. */
 	if (vbus_is_on == on)
-		return;
+		return 0;
 
 	if (on)
 		value.intval = POWER_SUPPLY_CAPACITY_OTG_ENABLE;
@@ -2958,6 +2958,8 @@ static void msm_hsusb_vbus_power_smb347s(bool on)
 	} else {
 		pr_err("%s : psy is null!\n", __func__);
 	}
+
+	return ret;
 }
 #endif
 

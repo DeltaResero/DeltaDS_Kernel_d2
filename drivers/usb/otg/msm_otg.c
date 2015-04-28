@@ -1391,7 +1391,7 @@ static void msm_hsusb_vbus_power(struct msm_otg *motg, bool on)
 
 	if (motg->pdata->vbus_power) {
 		if (!motg->smartdock) {
-			ret = motg->pdata->vbus_power(on);
+			int ret = motg->pdata->vbus_power(on);
 			if (!ret)
 				vbus_is_on = on;
 #ifdef CONFIG_USB_HOST_NOTIFY
