@@ -582,34 +582,6 @@ static ssize_t show_scaling_governor(struct cpufreq_policy *policy, char *buf)
 }
 
 /**
- * auto-hotplug tuners, to be merged into governor settings as needed
- */
-int hotplug_intpulse = 0;
-int hotplug_sampling_periods = 15;
-int hotplug_sampling_rate = 2000 / HZ;
-int __used hotplug_enable_all_threshold = 1000;
-int hotplug_enable_one_threshold = 250;
-int hotplug_disable_one_threshold = 125;
-static __GATTR(hotplug_intpulse, 0, 1, NULL);
-static __GATTR(hotplug_sampling_periods, 2, 15, NULL);
-static __GATTR(hotplug_sampling_rate, 1, 10, NULL);
-//static __GATTR(hotplug_enable_all_threshold, 100, 1000, NULL);
-static __GATTR(hotplug_enable_one_threshold, 100, 1000, NULL);
-static __GATTR(hotplug_disable_one_threshold, 0, 1000, NULL);
-static struct attribute *hotplug_attrs[] = {
-	&gen_attr(hotplug_intpulse),
-	&gen_attr(hotplug_sampling_periods),
-	&gen_attr(hotplug_sampling_rate),
-	//&gen_attr(hotplug_enable_all_threshold),
-	&gen_attr(hotplug_enable_one_threshold),
-	&gen_attr(hotplug_disable_one_threshold),
-	NULL
-};
-static struct attribute_group hotplug_attr_grp = {
-	.attrs = hotplug_attrs,
-};
-
-/**
  * store_scaling_governor - store policy for the specified CPU
  */
 
@@ -638,12 +610,6 @@ static ssize_t store_scaling_governor(struct cpufreq_policy *policy,
 
 	policy->user_policy.policy = policy->policy;
 	policy->user_policy.governor = policy->governor;
-
-#ifdef CONFIG_ARM_AUTO_HOTPLUG
-	hotplug_attr_grp.name = policy->governor->name;
-	if (!policy->cpu)
-		sysfs_merge_group(cpufreq_global_kobject, &hotplug_attr_grp);
-#endif
 
 	sysfs_notify(&policy->kobj, NULL, "scaling_governor");
 

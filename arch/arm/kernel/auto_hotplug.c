@@ -33,18 +33,45 @@
 #include <linux/cpu.h>
 #include <linux/workqueue.h>
 #include <linux/sched.h>
+#include <linux/dkp.h>
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
 #endif
 
-// in cpufreq.c
-extern int hotplug_intpulse;
-extern int hotplug_sampling_periods;
-extern int hotplug_sampling_rate;
-extern int hotplug_enable_all_threshold;
-extern int hotplug_enable_one_threshold;
-extern int hotplug_disable_one_threshold;
+static int hotplug_intpulse = 0;
+static int hotplug_sampling_periods = 15;
+static int hotplug_sampling_rate = 2000 / HZ;
+static int __used hotplug_enable_all_threshold = 1000;
+static int hotplug_enable_one_threshold = 250;
+static int hotplug_disable_one_threshold = 125;
+static __GATTR_NAME(hotplug_intpulse,
+	intpulse,0, 1, NULL);
+static __GATTR_NAME(hotplug_sampling_periods,
+	sampling_periods, 2, 15, NULL);
+static __GATTR_NAME(hotplug_sampling_rate,
+	sampling_rate, 1, 10, NULL);
+/*
+static __GATTR_NAME(hotplug_enable_all_threshold,
+	enable_all_threshold, 100, 1000, NULL);
+*/
+static __GATTR_NAME(hotplug_enable_one_threshold,
+	enable_one_threshold, 100, 1000, NULL);
+static __GATTR_NAME(hotplug_disable_one_threshold,
+	disable_one_threshold, 0, 1000, NULL);
+static struct attribute *hotplug_attrs[] = {
+	&gen_attr(intpulse),
+	&gen_attr(sampling_periods),
+	&gen_attr(sampling_rate),
+	//&gen_attr(enable_all_threshold),
+	&gen_attr(enable_one_threshold),
+	&gen_attr(disable_one_threshold),
+	NULL
+};
+static struct attribute_group hotplug_attr_grp = {
+	.attrs = hotplug_attrs,
+};
+static struct kobject *hotplug_kobject;
 
 /*
  * Enable debug output to dump the average
@@ -371,6 +398,14 @@ static int __init auto_hotplug_init(void)
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	register_early_suspend(&auto_hotplug_suspend);
 #endif
+
+	hotplug_kobject = kobject_create_and_add("auto_hotplug",
+		dkp_global_kobject);
+	if (hotplug_kobject) {
+		if (sysfs_create_group(hotplug_kobject, &hotplug_attr_grp))
+			printk(KERN_ERR "%s: can't create group\n", __func__);
+	}
+
 	return 0;
 }
 late_initcall(auto_hotplug_init);
