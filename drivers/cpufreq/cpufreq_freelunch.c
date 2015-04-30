@@ -529,7 +529,6 @@ struct cpufreq_governor cpufreq_gov_freelunch = {
 	.governor		= cpufreq_governor_dbs,
 	.max_transition_latency	= 10000000,
 	.owner			= THIS_MODULE,
-	.flags			= BIT(GOVFLAGS_HOTPLUG) | BIT(GOVFLAGS_ALLCPUS),
 };
 
 static int __init cpufreq_gov_dbs_init(void)

@@ -53,7 +53,6 @@ struct cpufreq_governor cpufreq_gov_performance = {
 	.name		= "performance",
 	.governor	= cpufreq_governor_performance,
 	.owner		= THIS_MODULE,
-	.flags		= BIT(GOVFLAGS_HOTPLUG) | BIT(GOVFLAGS_ALLCPUS),
 };
 
 

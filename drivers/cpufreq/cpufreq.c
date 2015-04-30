@@ -619,7 +619,6 @@ static ssize_t store_scaling_governor(struct cpufreq_policy *policy,
 	unsigned int ret = -EINVAL;
 	char	str_governor[16];
 	struct cpufreq_policy new_policy;
-	bool need_hotplug = 0;
 
 	ret = cpufreq_get_policy(&new_policy, policy->cpu);
 	if (ret)
@@ -633,11 +632,6 @@ static ssize_t store_scaling_governor(struct cpufreq_policy *policy,
 						&new_policy.governor))
 		return -EINVAL;
 
-	if (!policy->cpu &&
-	    policy->governor != new_policy.governor &&
-	    !(new_policy.governor->flags & BIT(GOVFLAGS_HOTPLUG)))
-		need_hotplug = 1;
-
 	/* Do not use cpufreq_set_policy here or the user_policy.max
 	   will be wrongly overridden */
 	ret = __cpufreq_set_policy(policy, &new_policy);
@@ -645,11 +639,11 @@ static ssize_t store_scaling_governor(struct cpufreq_policy *policy,
 	policy->user_policy.policy = policy->policy;
 	policy->user_policy.governor = policy->governor;
 
-	// Add auto-hotplug tuners if governor doesn't hotplug
-	if (need_hotplug) {
-		hotplug_attr_grp.name = policy->governor->name;
+#ifdef CONFIG_ARM_AUTO_HOTPLUG
+	hotplug_attr_grp.name = policy->governor->name;
+	if (!policy->cpu)
 		sysfs_merge_group(cpufreq_global_kobject, &hotplug_attr_grp);
-	}
+#endif
 
 	sysfs_notify(&policy->kobj, NULL, "scaling_governor");
 
@@ -850,10 +844,6 @@ no_policy:
 	return ret;
 }
 
-#ifdef CONFIG_MSM_RUN_QUEUE_STATS
-extern void msm_rq_stats_enable(int enable);
-#endif
-
 static ssize_t store(struct kobject *kobj, struct attribute *attr,
 		     const char *buf, size_t count)
 {
@@ -863,14 +853,6 @@ static ssize_t store(struct kobject *kobj, struct attribute *attr,
 
 	int j, iter = 0, cpu = policy->cpu;
 
-	/* This is a pain, but it's easier to handle shared settings here.  If
-	 * we're setting governor, we check flags and toggle mpdecision and
-	 * possibly assign to all cores.  If we're setting minimum or maxiumum
-	 * frequency, we assign to all cores.
-	 *
-	 * GOVFLAGS_ALLCPUS: all cpus must use this governor
-	 * GOVFLAGS_HOTPLUG: this governor hotplugs and doesn't need mpdecision
-	 */
 	if (link_core_settings) {
 		if (fattr->store == store_scaling_governor) {
 			char name[16];
@@ -883,23 +865,7 @@ static ssize_t store(struct kobject *kobj, struct attribute *attr,
 			}
 			name[p] = 0;
 			cpufreq_parse_governor(name, &p, &t);
-			if (!t)
-				return -EINVAL;
-			if (t->flags & BIT(GOVFLAGS_ALLCPUS)) {
-				iter = 1;
-			} else {
-				// If cpu0 has ALLCPUS, they all do.
-				if (per_cpu(cpufreq_cpu_data, 0)->governor->flags &
-					BIT(GOVFLAGS_ALLCPUS)) {
-					iter = 1;
-				}
-			}
-
-#ifdef CONFIG_MSM_RUN_QUEUE_STATS
-			// If cpu0 can't enable cpu1, we need mpdecision
-			if (cpu == 0)
-				msm_rq_stats_enable(!(t->flags & BIT(GOVFLAGS_HOTPLUG)));
-#endif
+			iter = 1;
 		} else if (fattr->store == store_scaling_max_freq ||
 			   fattr->store == store_scaling_min_freq) {
 			iter = 1;
