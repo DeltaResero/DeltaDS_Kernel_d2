@@ -816,6 +816,7 @@ static ssize_t store(struct kobject *kobj, struct attribute *attr,
 	struct cpufreq_policy *policy = to_policy(kobj);
 	struct freq_attr *fattr = to_attr(attr);
 	ssize_t ret = count;
+	struct cpufreq_governor *gov = NULL;
 
 	int j, iter = 0, cpu = policy->cpu;
 
@@ -823,14 +824,16 @@ static ssize_t store(struct kobject *kobj, struct attribute *attr,
 		if (fattr->store == store_scaling_governor) {
 			char name[16];
 			unsigned int p = 0;
-			struct cpufreq_governor *t = NULL;
 			for (p = 0; p < 16; p++) {
 				if (buf[p] == 0 || buf[p] == '\n')
 					break;
 				name[p] = buf[p];
 			}
 			name[p] = 0;
-			cpufreq_parse_governor(name, &p, &t);
+			if (cpufreq_parse_governor(name, &p, &gov))
+				return -EINVAL;
+			if (!gov)
+				return -EINVAL;
 			iter = 1;
 		} else if (fattr->store == store_scaling_max_freq ||
 			   fattr->store == store_scaling_min_freq) {
@@ -847,7 +850,7 @@ static ssize_t store(struct kobject *kobj, struct attribute *attr,
 			// store won't work, so adjust saved values
 			if (fattr->store == store_scaling_governor)
 				strncpy(per_cpu(cpufreq_policy_save, j).gov,
-					buf, CPUFREQ_NAME_LEN);
+					gov->name, CPUFREQ_NAME_LEN);
 			else if (fattr->store == store_scaling_max_freq)
 				ret = sscanf(buf, "%u",
 					&per_cpu(cpufreq_policy_save, j).max) ?
