@@ -33,6 +33,7 @@
 #include <linux/cpu.h>
 #include <linux/workqueue.h>
 #include <linux/sched.h>
+#include <linux/hotplug_mgmt.h>
 #include <linux/dkp.h>
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
@@ -97,7 +98,7 @@ static struct kobject *hotplug_kobject;
 #define HOTPLUG_PAUSED		(1 << 1)
 #define BOOSTPULSE_ACTIVE	(1 << 2)
 #define EARLYSUSPEND_ACTIVE	(1 << 3)
-unsigned char flags = HOTPLUG_DISABLED | HOTPLUG_PAUSED;
+static unsigned char flags = HOTPLUG_DISABLED | HOTPLUG_PAUSED;
 
 struct delayed_work hotplug_decision_work;
 struct delayed_work hotplug_unpause_work;
@@ -286,14 +287,14 @@ static void hotplug_unpause_work_fn(struct work_struct *work)
 	flags &= ~HOTPLUG_PAUSED;
 }
 
-void hotplug_disable(bool flag)
+static void hotplug_enable(bool flag)
 {
-	if (flags & HOTPLUG_DISABLED && !flag) {
+	if (flags & HOTPLUG_DISABLED && flag) {
 		flags &= ~HOTPLUG_DISABLED;
 		flags &= ~HOTPLUG_PAUSED;
 		pr_info("auto_hotplug: Clearing disable flag\n");
 		schedule_delayed_work_on(0, &hotplug_decision_work, 0);
-	} else if (flag && (!(flags & HOTPLUG_DISABLED))) {
+	} else if (!flag && (!(flags & HOTPLUG_DISABLED))) {
 		flags |= HOTPLUG_DISABLED;
 		pr_info("auto_hotplug: Setting disable flag\n");
 		cancel_delayed_work_sync(&hotplug_offline_work);
@@ -302,11 +303,7 @@ void hotplug_disable(bool flag)
 	}
 }
 
-int hotplug_enabled(void) {
-	return !(flags & HOTPLUG_DISABLED);
-}
-
-inline void hotplug_boostpulse(void)
+static inline void hotplug_boostpulse(void)
 {
 	if (unlikely(flags & (EARLYSUSPEND_ACTIVE
 		| HOTPLUG_DISABLED)))
@@ -370,6 +367,18 @@ static struct early_suspend auto_hotplug_suspend = {
 };
 #endif /* CONFIG_HAS_EARLYSUSPEND */
 
+static struct hotplug_alg autohp_alg = {
+	.name = "auto_hotplug",
+	.prio = HP_ALG_KERNEL,
+	.init_cb = hotplug_enable,
+};
+
+static int enable_autohp = 0;
+static void enable_autohp_cb(void) {
+	hotplug_alg_available(&autohp_alg, !!enable_autohp);
+}
+__GATTR(enable_autohp, 0, 1, enable_autohp_cb);
+
 static int __init auto_hotplug_init(void)
 {
 	pr_info("auto_hotplug: v0.220 by _thalamus\n");
@@ -398,6 +407,8 @@ static int __init auto_hotplug_init(void)
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	register_early_suspend(&auto_hotplug_suspend);
 #endif
+	hotplug_register_alg(&autohp_alg);
+	dkp_register(enable_autohp);
 
 	hotplug_kobject = kobject_create_and_add("auto_hotplug",
 		dkp_global_kobject);
