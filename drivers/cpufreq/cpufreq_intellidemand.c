@@ -31,6 +31,7 @@
 #include <linux/earlysuspend.h>
 #endif
 #include <linux/rq_stats.h>
+#include <linux/hotplug_mgmt.h>
 
 #include <linux/syscalls.h>
 #include <linux/highuid.h>
@@ -117,6 +118,8 @@ struct cpufreq_governor cpufreq_gov_intellidemand = {
 #ifdef CONFIG_EARLYSUSPEND
 static struct early_suspend cpufreq_intellidemand_early_suspend_info;
 #endif
+
+extern struct hotplug_alg intellidemand_mpdec_alg;
 
 /* Sampling types */
 enum {DBS_NORMAL_SAMPLE, DBS_SUB_SAMPLE};
@@ -1870,6 +1873,8 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 			if (dbs_tuners_ins.sync_freq == 0)
 				dbs_tuners_ins.sync_freq = policy->min;
 
+			hotplug_alg_available(&intellidemand_mpdec_alg, 1);
+
 #ifdef CONFIG_EARLYSUSPEND
 			do_early_suspend = 1;
 #endif
@@ -1903,6 +1908,9 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		if (!dbs_enable) {
 			sysfs_remove_group(cpufreq_global_kobject,
 					   &dbs_attr_group);
+
+			hotplug_alg_available(&intellidemand_mpdec_alg, 0);
+
 #ifdef CONFIG_EARLYSUSPEND
 			do_early_suspend = 1;
 #endif
@@ -2002,6 +2010,8 @@ static int __init cpufreq_gov_dbs_init(void)
 		INIT_WORK(&dbs_work->work, dbs_refresh_callback);
 		dbs_work->cpu = i;
 	}
+
+	hotplug_register_alg(&intellidemand_mpdec_alg);
 
 	return cpufreq_register_governor(&cpufreq_gov_intellidemand);
 }
