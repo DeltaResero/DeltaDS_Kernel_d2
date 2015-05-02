@@ -63,11 +63,29 @@ extern void __init mms_tsp_input_init(void);
 	_GPAIR(i,12,80)	_GPAIR(i,13,35)	_GPAIR(i,14,36)	_GPAIR(i,15,37) \
 	_GPAIR(i,16,10)	_GPAIR(i,17,79)	_GPAIR(i,18,82)	(~0) )
 
+#if defined(CONFIG_MACH_ESPRESSO_VZW)
+extern void __init usb_switch_init(void);
+#endif
+
+#define PLATFORM_IS_CHARM25() \
+	(machine_is_msm8960_cdp() && \
+		(socinfo_get_platform_subtype() == 1) \
+	)
+
 #ifdef CONFIG_SAMSUNG_CMC624
 extern int samsung_cmc624_on(int enable);
 extern int samsung_has_cmc624(void);
 #endif
 
+enum {
+	SX150X_CAM,
+	SX150X_LIQUID,
+};
+
+#ifdef CONFIG_CAMERON_HEALTH
+extern bool is_cameron_health_connected;
+extern void msm_otg_set_cameronhealth_state(bool enable);
+#endif
 extern struct sx150x_platform_data msm8960_sx150x_data[];
 extern struct msm_camera_board_info msm8960_camera_board_info;
 

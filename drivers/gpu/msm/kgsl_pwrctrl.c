@@ -1067,6 +1067,12 @@ void kgsl_timer(unsigned long data)
 	}
 }
 
+bool kgsl_pwrctrl_isenabled(struct kgsl_device *device)
+{
+	struct kgsl_pwrctrl *pwr = &device->pwrctrl;
+	return (test_bit(KGSL_PWRFLAGS_CLK_ON, &pwr->power_flags) != 0);
+}
+
 /**
  * kgsl_pre_hwaccess - Enforce preconditions for touching registers
  * @device: The device
@@ -1279,13 +1285,6 @@ int kgsl_pwrctrl_wake(struct kgsl_device *device)
 	return status;
 }
 EXPORT_SYMBOL(kgsl_pwrctrl_wake);
-
-bool kgsl_pwrctrl_isenabled(struct kgsl_device *device)
-{
-	struct kgsl_pwrctrl *pwr = &device->pwrctrl;
-	return (test_bit(KGSL_PWRFLAGS_CLK_ON, &pwr->power_flags) != 0);
-}
-EXPORT_SYMBOL(kgsl_pwrctrl_isenabled);
 
 void kgsl_pwrctrl_enable(struct kgsl_device *device)
 {
