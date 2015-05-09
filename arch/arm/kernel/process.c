@@ -230,7 +230,17 @@ EXPORT_SYMBOL_GPL(cpu_idle_wait);
  */
 
 extern void arch_idle(void);
-void (*arm_pm_idle)(void) = arch_idle;
+static void __init early_boot_idle(void)
+{
+	return;
+}
+void (*arm_pm_idle)(void) = early_boot_idle;
+static int __init enable_arch_idle(void)
+{
+	arm_pm_idle = arch_idle;
+	return 0;
+}
+late_initcall(enable_arch_idle);
 
 static void default_idle(void)
 {
