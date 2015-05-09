@@ -1991,7 +1991,6 @@ static struct i2c_board_info sns_i2c_borad_info[] = {
 
 #if defined(CONFIG_MPU_SENSORS_MPU6050B1) || \
 	defined(CONFIG_MPU_SENSORS_MPU6050B1_411)
-
 /* Hack: L710T needs I535 sensor data, but identifies as BOARD_REV14 (L710).
  * Use samsung.hardware param to handle this.
  */
