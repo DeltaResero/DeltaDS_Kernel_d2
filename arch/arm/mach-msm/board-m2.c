@@ -3679,26 +3679,26 @@ static struct platform_device msm_rpm_log_device = {
 static struct sec_jack_zone jack_zones[] = {
 	[0] = {
 		.adc_high	= 3,
-		.delay_us	= 5000,
-		.check_count	= 5,
+		.delay_us	= 10000,
+		.check_count	= 10,
 		.jack_type	= SEC_HEADSET_3POLE,
 	},
 	[1] = {
 		.adc_high	= 630,
-		.delay_us	= 5000,
-		.check_count	= 5,
+		.delay_us	= 10000,
+		.check_count	= 10,
 		.jack_type	= SEC_HEADSET_3POLE,
 	},
 	[2] = {
 		.adc_high	= 1720,
-		.delay_us	= 5000,
-		.check_count	= 5,
+		.delay_us	= 10000,
+		.check_count	= 10,
 		.jack_type	= SEC_HEADSET_4POLE,
 	},
 	[3] = {
 		.adc_high	= 9999,
-		.delay_us	= 5000,
-		.check_count	= 5,
+		.delay_us	= 10000,
+		.check_count	= 10,
 		.jack_type	= SEC_HEADSET_4POLE,
 	},
 };
