@@ -5,10 +5,11 @@
 #include <linux/cache.h>
 
 enum hotplug_prio {
-	HP_ALG_CPUFREQ, // CPUFreq govs get max priority
-	HP_ALG_KERNEL,  // In-kernel hotplug (Thalamus, etc.)
-	HP_ALG_USER,    // Userspace hotplug (mpdecision, etc.)
-	HP_ALG_NONE,    // No hotplug, for internal use
+	HP_ALG_CPUFREQ,  // CPUFreq govs get max priority
+	HP_ALG_KERNEL,   // In-kernel hotplug (Thalamus, etc.)
+	HP_ALG_USER,     // Userspace hotplug (mpdecision, etc.)
+	HP_ALG_FALLBACK, // Last-resort if user hotplug fails
+	HP_ALG_NONE,     // No hotplug, for internal use
 	HP_ALG_COUNT,
 };
 
