@@ -14,8 +14,13 @@ struct kobject *dkp_global_kobject;
 EXPORT_SYMBOL(dkp_global_kobject);
 
 void _dkp_register(struct attribute *gattr) {
-        if (sysfs_create_file(dkp_global_kobject, gattr))
-                printk(KERN_ERR "Couldn't register dkp entry: %s\n", gattr->name);
+	if (!dkp_global_kobject) {
+		printk(KERN_ERR "%s: called before kobject initialized (%s)!\n",
+			__func__, gattr->name);
+		return;
+	}
+	if (sysfs_create_file(dkp_global_kobject, gattr))
+		printk(KERN_ERR "Couldn't register dkp entry: %s\n", gattr->name);
 }
 EXPORT_SYMBOL(_dkp_register);
 
@@ -26,6 +31,6 @@ static int __init register_dkp_kobject(void) {
         if (kobject_add(dkp_global_kobject, kernel_kobj, "dkp"))
                 return -ENOMEM;
 
-        return 0;
+	return 0;
 }
 core_initcall(register_dkp_kobject);

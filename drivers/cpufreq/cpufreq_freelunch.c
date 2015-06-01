@@ -26,6 +26,8 @@
 #include <linux/sched.h>
 #include <linux/err.h>
 #include <linux/slab.h>
+#include <linux/atomic.h>
+#include <linux/hotplug_mgmt.h>
 
 //#define FL_STATS
 
@@ -73,6 +75,11 @@ static unsigned int dbs_enable;	/* number of CPUs using this policy */
 /* Hotplug stuff */
 static struct work_struct cpu_up_work;
 static struct work_struct cpu_down_work;
+
+static struct hotplug_alg fl_alg = {
+	.name = "freelunch",
+	.prio = HP_ALG_CPUFREQ
+};
 
 /*
  * dbs_mutex protects dbs_enable in governor start/stop.
@@ -475,6 +482,7 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		if (dbs_enable == 1) {
 			rc = sysfs_create_group(cpufreq_global_kobject,
 						&dbs_attr_group);
+			hotplug_alg_available(&fl_alg, 1);
 			if (rc) {
 				mutex_unlock(&dbs_mutex);
 				return rc;
@@ -498,9 +506,11 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		 * is used for first time
 		 */
 		mutex_unlock(&dbs_mutex);
-		if (!dbs_enable)
+		if (!dbs_enable) {
 			sysfs_remove_group(cpufreq_global_kobject,
 					   &dbs_attr_group);
+			hotplug_alg_available(&fl_alg, 0);
+		}
 
 		break;
 
@@ -529,11 +539,11 @@ struct cpufreq_governor cpufreq_gov_freelunch = {
 	.governor		= cpufreq_governor_dbs,
 	.max_transition_latency	= 10000000,
 	.owner			= THIS_MODULE,
-	.flags			= BIT(GOVFLAGS_HOTPLUG) | BIT(GOVFLAGS_ALLCPUS),
 };
 
 static int __init cpufreq_gov_dbs_init(void)
 {
+	hotplug_register_alg(&fl_alg);
 	INIT_WORK(&cpu_up_work, do_cpu_up);
 	INIT_WORK(&cpu_down_work, do_cpu_down);
 	return cpufreq_register_governor(&cpufreq_gov_freelunch);
@@ -541,6 +551,7 @@ static int __init cpufreq_gov_dbs_init(void)
 
 static void __exit cpufreq_gov_dbs_exit(void)
 {
+	hotplug_unregister_alg(&fl_alg);
 	cpufreq_unregister_governor(&cpufreq_gov_freelunch);
 }
 
