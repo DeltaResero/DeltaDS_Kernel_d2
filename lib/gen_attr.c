@@ -56,7 +56,7 @@ ssize_t gattr_generic_show(struct kobject *kobj, struct attribute *attr, char *b
 	struct gen_attr *gattr = (struct gen_attr *)attr;
 	if (gattr->show && gattr->show != gattr_generic_show)
 		return gattr->show(kobj, attr, buf);
-	fmt = gattr->fmt ? : "%i ";
+	fmt = gattr->fmt ? : "%i";
 	p = gattr->ptr;
 	for (i = 0, l = 0; i < gattr->cnt; i++) {
 		if (gattr->get)
@@ -66,6 +66,7 @@ ssize_t gattr_generic_show(struct kobject *kobj, struct attribute *attr, char *b
 		if (gattr->divisor > 1)
 			v /= gattr->divisor;
 		l += sprintf(buf + l, fmt, v);
+		buf[l++] = ' ';
 		p += gattr->stride;
 	}
 	buf[l-1] = '\n';
