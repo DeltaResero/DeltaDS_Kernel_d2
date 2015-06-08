@@ -264,12 +264,12 @@ static struct platform_driver pmic8xxx_pwrkey_driver = {
 	},
 };
 
-static int __devinit pmic8xxx_pwrkey_init(void)
+static int __init pmic8xxx_pwrkey_init(void)
 {
 	return platform_driver_register(&pmic8xxx_pwrkey_driver);
 }
 
-late_initcall(pmic8xxx_pwrkey_init);
+subsys_initcall(pmic8xxx_pwrkey_init);
 
 MODULE_ALIAS("platform:pmic8xxx_pwrkey");
 MODULE_DESCRIPTION("PMIC8XXX Power Key driver");
