@@ -269,7 +269,7 @@ static int __devinit pmic8xxx_pwrkey_init(void)
 	return platform_driver_register(&pmic8xxx_pwrkey_driver);
 }
 
-subsys_initcall(pmic8xxx_pwrkey_init);
+late_initcall(pmic8xxx_pwrkey_init);
 
 MODULE_ALIAS("platform:pmic8xxx_pwrkey");
 MODULE_DESCRIPTION("PMIC8XXX Power Key driver");
