@@ -28,7 +28,6 @@
 /*
  * TODO: consider moving to a timer rather than workqueue?
  * TODO: add support for multi-CPU cpufreq policies (no longer possible?)
- * TODO: increase accuracy of usage_sample accessors
  */
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -42,6 +41,7 @@
 #include <linux/ktime.h>
 #include <linux/sched.h>
 #include <linux/list.h>
+#include <linux/wmavg.h>
 
 // Fixed maximum tier count
 #define MAX_TIER	(16)
@@ -54,7 +54,6 @@
 struct ts_global_priv {
 	struct mutex		global_mutex;
 	unsigned int		enabled;
-	struct kmem_cache	*sample_cache;
 	struct workqueue_struct	*wq;
 	struct notifier_block	idle_nb;
 
@@ -119,163 +118,6 @@ static struct attribute_group ts_attr_grp = {
 	.name = "tierservative"
 };
 
-/* struct usage_sample:
- * Holds the KHz usage & duration for a sample.  Usage is stored as KHz * nsec
- * to allow easier accumulation of time-weighted averages: this is robust to
- * both uneven sample sizes and mid-sample frequency changes.
- */
-struct usage_sample {
-	s64			usage;
-	s64			nsec;
-};
-
-/* calc_sample_usage:
- * Calculates average KHz of a usage_sample, shifting by a few bits to avoid
- * overflowing the (32-bit) do_div divisor.
- */
-static unsigned long calc_sample_usage(struct usage_sample *usage)
-{
-	s64 sum, div;
-	sum = usage->usage >> 8;
-	div = usage->nsec >> 8;
-	if (unlikely(!div))
-		return 0;
-	div++;
-	do_div(sum, div);
-	return sum;
-}
-
-/* sample_reduce:
- * Scales a sample to a given length in nsec.
- */
-static void sample_reduce(struct usage_sample *usage, s64 len)
-{
-	s64 num, den;
-	num = usage->usage;
-	den = usage->nsec >> 8;
-	if (unlikely(!den || len < NSEC_PER_MSEC)) {
-		usage->usage = usage->nsec = 0;
-		return;
-	}
-	den++;
-	do_div(num, den);
-
-	den = len >> 8;
-	den++;
-	usage->usage = num * (len >> 8);
-	usage->nsec = len;
-}
-
-/* struct usage_sample_list:
- * A usage_sample with a list_head.  I'm sure there's a more efficient way to
- * do this.
- */
-struct usage_sample_list {
-	struct list_head	list;
-	struct usage_sample	sample;
-};
-
-/* struct usage_average:
- * A time-weighted usage average.  The sample list is automatically maintained
- * by the insertion function.
- */
-struct usage_average {
-	u64			max_sample;
-	struct usage_sample	avg;
-	unsigned long		avg_khz;
-	struct list_head	samples;
-};
-
-/* alloc_usage_average:
- * Allocate and initialize a usage_average.
- */
-static struct usage_average *alloc_usage_average(void)
-{
-	struct usage_average *ua;
-	ua = kzalloc(sizeof(struct usage_average), GFP_KERNEL);
-
-	if (!ua)
-		return NULL;
-
-	INIT_LIST_HEAD(&ua->samples);
-
-	return ua;
-}
-
-/* free_usage_average:
- * Free a usage_average and all its samples.
- */
-static void free_usage_average(struct usage_average *ua)
-{
-	struct usage_sample_list *samp, *tmp;
-	list_for_each_entry_safe(samp, tmp, &ua->samples, list) {
-		list_del(&samp->list);
-		kmem_cache_free(ts_global.sample_cache, samp);
-	}
-	kfree(ua);
-}
-
-/* __usage_average_insert:
- * Directly inserts a usage_sample_list.  Does not execute usage_average_trim
- * or recalculate average usage.
- */
-static void __usage_average_insert(struct usage_average *ua,
-				   struct usage_sample_list *usage)
-{
-	ua->avg.usage += usage->sample.usage;
-	ua->avg.nsec += usage->sample.nsec;
-	list_add_tail(&usage->list, &ua->samples);
-}
-
-/* usage_average_trim:
- * Reduces the samples to at most max_samples nsec, freeing as needed.
- */
-static void usage_average_trim(struct usage_average *ua)
-{
-	struct usage_sample_list *samp, *tmp;
-	s64 rem;
-
-	rem = ua->avg.nsec - ua->max_sample;
-	if (rem < 0)
-		return;
-
-	list_for_each_entry_safe(samp, tmp, &ua->samples, list) {
-		ua->avg.usage -= samp->sample.usage;
-		ua->avg.nsec -= samp->sample.nsec;
-		rem -= samp->sample.nsec;
-
-		if (rem <= 0) {
-			sample_reduce(&samp->sample, -rem);
-			ua->avg.usage += samp->sample.usage;
-			ua->avg.nsec += samp->sample.nsec;
-			break;
-		} else {
-			list_del(&samp->list);
-			kmem_cache_free(ts_global.sample_cache, samp);
-		}
-	}
-}
-
-/* usage_average_insert:
- * Copies a sample into the average, removes stale samples, and recalculates
- * the average usage.
- */
-static void usage_average_insert(struct usage_average *ua,
-				 struct usage_sample *usage)
-{
-	struct usage_sample_list *samp;
-
-	samp = kmem_cache_alloc(ts_global.sample_cache, GFP_KERNEL);
-	if (!samp)
-		return;
-
-	samp->sample = *usage;
-	__usage_average_insert(ua, samp);
-
-	usage_average_trim(ua);
-	ua->avg_khz = calc_sample_usage(&ua->avg);
-}
-
 /* ts_cpu_priv:
  * Per-CPU state information.
  */
@@ -289,11 +131,11 @@ struct ts_cpu_priv {
 	ktime_t			prev_wall;
 	ktime_t			prev_idle;
 	ktime_t			idle_enter;
-	struct usage_sample	current_usage;
+	struct wmavg_sample	current_usage;
 	unsigned long		current_usage_khz;
 
-	struct usage_average	*usage;
-	struct usage_average	*tiers[MAX_TIER];
+	struct wmavg_average	*usage;
+	struct wmavg_average	*tiers[MAX_TIER];
 	unsigned int		active_tier;
 	unsigned int		saved_tier;
 	unsigned int		max_tier;
@@ -304,41 +146,38 @@ struct ts_cpu_priv {
 static DEFINE_PER_CPU(struct ts_cpu_priv, ts_cpu);
 
 /* rebuild_priv:
- * Rebuilds ts, including creating/destroying usage_averages, adjusting tier
+ * Rebuilds ts, including creating/destroying wmavg_averages, adjusting tier
  * parameters, and creating ->usage if necessary.  Locking is performed by the
  * caller.
  */
 static void rebuild_priv(struct ts_cpu_priv *ts)
 {
 	int i;
-	struct usage_average *ua;
-	struct usage_sample samp = { 0, 50 * NSEC_PER_MSEC };
 
 	// Allocate and initialize usage average
 	if (!ts->usage) {
-		ts->usage = alloc_usage_average();
+		ts->usage = wmavg_alloc();
 		if (!ts->usage)
 			return;
 	}
-	ts->usage->max_sample = ts_global.active_sample;
-	ts->usage->max_sample *= NSEC_PER_MSEC;
-	usage_average_trim(ts->usage);
-	ts->usage->avg_khz = calc_sample_usage(&ts->usage->avg);
+	wmavg_set_max_weight(ts->usage,
+		ts_global.active_sample * NSEC_PER_MSEC >> 8);
+	wmavg_set_min_weight(ts->usage, NSEC_PER_MSEC >> 8);
 
 	// Add/remove new tiers as needed
 	for (i = 0; i < MAX_TIER; i++) {
 		if (i < ts_global.tier_count && !ts->tiers[i]) {
-			ts->tiers[i] = alloc_usage_average();
+			ts->tiers[i] = wmavg_alloc();
 			if (!ts->tiers[i]) {
 				ts->max_tier = i - 1;
 				goto alloc_fail;
 			}
 			// Pre-populate a small sample into new tiers
-			samp.usage = ts->policy->max * i / ts_global.tier_count;
-			samp.usage *= samp.nsec;
-			usage_average_insert(ts->tiers[i], &samp);
+			wmavg_insert(ts->tiers[i],
+				ts->policy->max * i / ts_global.tier_count,
+				50000);
 		} else if (i >= ts_global.tier_count && ts->tiers[i]) {
-			free_usage_average(ts->tiers[i]);
+			wmavg_free(ts->tiers[i]);
 			ts->tiers[i] = NULL;
 		}
 	}
@@ -351,11 +190,9 @@ static void rebuild_priv(struct ts_cpu_priv *ts)
 alloc_fail:
 	// Update max_sample and trim tiers
 	for (i = 0; i <= ts->max_tier; i++) {
-		ua = ts->tiers[i];
-		ua->max_sample = ts_global.max_sample;
-		ua->max_sample *= NSEC_PER_MSEC;
-		usage_average_trim(ua);
-		ua->avg_khz = calc_sample_usage(&ua->avg);
+		wmavg_set_max_weight(ts->tiers[i],
+			ts_global.active_sample * NSEC_PER_MSEC >> 8);
+		wmavg_set_min_weight(ts->usage, NSEC_PER_MSEC >> 8);
 	}
 }
 
@@ -370,19 +207,18 @@ static void destroy_priv(struct ts_cpu_priv *ts)
 		if (!ts->tiers[i])
 			break;
 
-		free_usage_average(ts->tiers[i]);
+		wmavg_free(ts->tiers[i]);
 		ts->tiers[i] = NULL;
 	}
 	ts->max_tier = 0;
 
 	if (ts->usage)
-		free_usage_average(ts->usage);
+		wmavg_free(ts->usage);
 	ts->usage = NULL;
 }
 
 /* rebuild_all_privs:
- * Calls rebuild_all_tiers on each priv.  Locking is performed by
- * the caller.
+ * Calls rebuild_priv on each priv.  Locking is performed by the caller.
  */
 static void rebuild_all_privs(void)
 {
@@ -404,10 +240,10 @@ static void rebuild_all_privs(void)
 static void insert_current_sample(struct ts_cpu_priv *ts)
 {
 	int i;
-	struct usage_sample samp = ts->current_usage;
+	struct wmavg_sample samp = ts->current_usage;
 
 	if (!ts->active_tier) {
-		usage_average_insert(ts->tiers[0], &samp);
+		wmavg_insert_sample(ts->tiers[0], &samp);
 		return;
 	}
 
@@ -420,9 +256,9 @@ static void insert_current_sample(struct ts_cpu_priv *ts)
 		i = DIV_ROUND_UP(ts->max_tier + 1, 4);
 
 	for (; i >= 0; i--) {
-		usage_average_insert(ts->tiers[i], &samp);
-		samp.usage >>= 1;
-		samp.nsec >>= 1;
+		wmavg_insert_sample(ts->tiers[i], &samp);
+		samp.value >>= 1;
+		samp.weight >>= 1;
 	}
 }
 
@@ -434,26 +270,38 @@ static void insert_current_sample(struct ts_cpu_priv *ts)
  */
 static unsigned long get_usage(struct ts_cpu_priv *ts)
 {
-	struct usage_sample samp;
+	struct wmavg_sample samp;
 	ktime_t idle, wall;
+	s64 delta;
 
 	wall = ktime_get();
 	idle = get_idle_ktime(ts->policy->cpu);
 
-	samp.nsec = ktime_to_ns(ktime_sub(wall, ts->prev_wall));
-	samp.usage = samp.nsec - ktime_to_ns(ktime_sub(idle, ts->prev_idle));
-
-	ts->prev_idle = idle;
+	delta = ktime_to_ns(ktime_sub(wall, ts->prev_wall));
 	ts->prev_wall = wall;
+	if (delta < 0)
+		delta = 0;
+	samp.weight = delta;
 
-	if (samp.usage <= 0)
-		samp.usage = 0;
-	else
-		samp.usage *= ts->policy->cur;
+	delta = ktime_to_ns(ktime_sub(idle, ts->prev_idle));
+	ts->prev_idle = idle;
+	if (delta < 0)
+		delta = 0;
+	samp.value = delta;
+
+	samp.value >>= 8;
+	samp.weight >>= 8;
+	if (likely(samp.value < samp.weight)) {
+		samp.value = samp.weight - samp.value;
+		samp.value *= ts->policy->cur;
+	} else {
+		samp.value = 0;
+	}
 
 	// Save the current sample for insert_current_sample
-	ts->current_usage = samp;
-	ts->current_usage_khz = calc_sample_usage(&samp);
+	ts->current_usage.value += samp.value;
+	ts->current_usage.weight += samp.weight;
+	ts->current_usage_khz = wmavg_sample_calc(&samp);
 
 	/* Allow no-demand conditions to bypass the long-term average to reduce
 	 * frequency more quickly.  Also, don't pollute the average with low
@@ -461,8 +309,8 @@ static unsigned long get_usage(struct ts_cpu_priv *ts)
 	 */
 	if (ts->active_tier &&
 	    ts->current_usage_khz > ts->policy->min * 2 / 3) {
-		usage_average_insert(ts->usage, &samp);
-		return ts->usage->avg_khz;
+		wmavg_insert_sample(ts->usage, &samp);
+		return ts->usage->avg;
 	}
 
 	return ts->current_usage_khz;
@@ -473,7 +321,7 @@ static unsigned long get_usage(struct ts_cpu_priv *ts)
  * tier to switch to.
  */
 #define usage_suitable(tier, usage) \
-	(ts->tiers[tier]->avg_khz >= usage)
+	(ts->tiers[tier]->avg >= usage)
 static int find_tier_up(struct ts_cpu_priv *ts, unsigned long usage)
 {
 	int i;
@@ -529,7 +377,7 @@ static void ts_sample_worker(struct work_struct *work)
 
 	mutex_lock(&ts->cpu_mutex);
 
-	if (!ts->enabled)
+	if (unlikely(!ts->enabled))
 		goto out_nosched;
 
 	usage_khz = get_usage(ts);
@@ -541,7 +389,7 @@ static void ts_sample_worker(struct work_struct *work)
 
 	if (ts->saved_tier > 0 &&
 	    time_after_eq(jiffies, ts->saved_timeout) &&
-	    usage_khz < ts->tiers[ts->saved_tier]->avg_khz) {
+	    usage_khz < ts->tiers[ts->saved_tier]->avg) {
 		ts->saved_tier--;
 		ts->saved_timeout = jiffies + ts_global.saved_timeout;
 	}
@@ -563,13 +411,15 @@ static void ts_sample_worker(struct work_struct *work)
 		* min(6, (2 + ilog2(nr_running())));
 	if (usage_khz < boost_tmp)
 		usage_khz = boost_tmp;
-	if (ts->active_tier && usage_khz < ts->tiers[ts->active_tier]->avg_khz)
-		usage_khz = ts->tiers[ts->active_tier]->avg_khz;
+	if (ts->active_tier && usage_khz < ts->tiers[ts->active_tier]->avg)
+		usage_khz = ts->tiers[ts->active_tier]->avg;
 
 	__cpufreq_driver_target(ts->policy, usage_khz, CPUFREQ_RELATION_L);
 
 	queue_delayed_work_on(ts->policy->cpu, ts_global.wq, &ts->work,
 		ts_global.sample_time);
+
+	ts->current_usage.value = ts->current_usage.weight = 0;
 
 out_nosched:
 	mutex_unlock(&ts->cpu_mutex);
@@ -691,7 +541,6 @@ static int ts_governor(struct cpufreq_policy *policy, unsigned int event)
 		if (!--ts_global.enabled) {
 			sysfs_remove_group(cpufreq_global_kobject,
 				&ts_attr_grp);
-			kmem_cache_shrink(ts_global.sample_cache);
 			idle_notifier_unregister(&ts_global.idle_nb);
 		}
 
@@ -726,7 +575,6 @@ static struct cpufreq_governor ts_gov_info = {
 	.governor		= ts_governor,
 	.max_transition_latency = 10000000,
 	.owner			= THIS_MODULE,
-	.flags			= BIT(GOVFLAGS_ALLCPUS),
 };
 
 static int __init ts_init(void)
@@ -742,10 +590,6 @@ static int __init ts_init(void)
 	ts_global.wq = alloc_workqueue("tierservative", WQ_HIGHPRI, NR_CPUS);
 	if (!ts_global.wq)
 		return -ENOMEM;
-	ts_global.sample_cache = KMEM_CACHE(usage_sample_list, 0);
-	if (!ts_global.sample_cache)
-		return -ENOMEM;
-
 	return cpufreq_register_governor(&ts_gov_info);
 }
 
@@ -759,7 +603,6 @@ static void __exit ts_exit(void)
 		destroy_priv(ts);
 		mutex_destroy(&ts->cpu_mutex);
 	}
-	kmem_cache_destroy(ts_global.sample_cache);
 	cpufreq_unregister_governor(&ts_gov_info);
 }
 

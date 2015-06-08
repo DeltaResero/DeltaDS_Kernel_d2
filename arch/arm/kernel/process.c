@@ -43,7 +43,7 @@
 
 #ifdef CONFIG_CC_STACKPROTECTOR
 #include <linux/stackprotector.h>
-unsigned long __stack_chk_guard __read_mostly;
+unsigned long __stack_chk_guard __read_mostly __used;
 EXPORT_SYMBOL(__stack_chk_guard);
 #endif
 
@@ -234,7 +234,7 @@ static void __init early_boot_idle(void)
 {
 	return;
 }
-void (*arm_pm_idle)(void) = early_boot_idle;
+void (*arm_pm_idle)(void) __refdata = early_boot_idle;
 static int __init enable_arch_idle(void)
 {
 	arm_pm_idle = arch_idle;

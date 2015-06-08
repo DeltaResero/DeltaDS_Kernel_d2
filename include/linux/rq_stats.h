@@ -19,14 +19,12 @@ struct rq_data {
 	unsigned long rq_poll_total_jiffies;
 	unsigned long def_timer_last_jiffy;
 	unsigned int hotplug_disabled;
-	unsigned long mpdec_timeout;
 	int64_t def_start_time;
 	struct attribute_group *attr_group;
 	struct kobject *kobj;
 	struct work_struct def_timer_work;
-	volatile int init;
 };
 
-extern spinlock_t rq_lock;
+//extern spinlock_t rq_lock;
 extern struct rq_data rq_info;
-extern struct workqueue_struct *rq_wq;
+//extern struct workqueue_struct *rq_wq;
