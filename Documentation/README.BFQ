@@ -1,22 +1,57 @@
 Budget Fair Queueing I/O Scheduler
 ==================================
 
-This patchset introduces BFQ-v7r7 into Linux 3.4.0.
+This patchset introduces BFQ-v7r8 into Linux 3.4.0.
 For further information: http://www.algogroup.unimo.it/people/paolo/disk_sched/.
 
 The overall diffstat is the following:
 
- block/Kconfig.iosched         |   33 +
+ block/Kconfig.iosched         |   33 ++
  block/Makefile                |    1 +
- block/bfq-cgroup.c            |  908 +++++++++++++++++++++++
- block/bfq-ioc.c               |   36 +
- block/bfq-iosched.c           | 4208 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- block/bfq-sched.c             | 1186 +++++++++++++++++++++++++++++
- block/bfq.h                   |  809 ++++++++++++++++++++
+ block/bfq-cgroup.c            |  908 ++++++++++++++++++++++++++++++++++++
+ block/bfq-ioc.c               |   36 ++
+ block/bfq-iosched.c           | 4207 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ block/bfq-sched.c             | 1180 +++++++++++++++++++++++++++++++++++++++++++++++
+ block/bfq.h                   |  806 ++++++++++++++++++++++++++++++++
  include/linux/cgroup_subsys.h |    6 +
- 8 files changed, 7187 insertions(+)
+ 8 files changed, 7177 insertions(+)
 
 CHANGELOG
+
+v7r8:
+. BUGFIX: Let weight-related fields of a bfq_entity be correctly initialized
+  (also) when the I/O priority of the entity is changed before the first
+  request is inserted into the bfq_queue associated to the entity.
+. BUGFIX: When merging requests belonging to different bfq_queues, avoid
+  repositioning the surviving request. In fact, in this case the repositioning
+  may result in the surviving request being moved across bfq_queues, which
+  would ultimately cause bfq_queues' data structures to become inconsistent.
+. BUGFIX: When merging requests belonging to the same bfq_queue, reposition
+  the surviving request so that it gets in the correct position, namely the
+  position of the dropped request, instead of always being moved to the head
+  of the FIFO of the bfq_queue (which means to let the request be considered
+  the eldest one).
+. BUGFIX: Reduce the idling slice for seeky queues only if the scenario is
+  symmetric. This guarantees that also processes associated to seeky queues
+  do receive their reserved share of the throughput.
+  Contributed by Riccardo Pizzetti and Samuele Zecchini.
+. IMPROVEMENT: Always perform device idling if the scenario is asymmetric in
+  terms of throughput distribution among processes.
+  This extends throughput-distribution guarantees to any process, regardless
+  of the properties of its request pattern and of the request patterns of the
+  other processes, and regardless of whether the device is NCQ-capable.
+. IMPROVEMENT: Remove the current limitation on the maximum number of in-flight
+  requests allowed for a sync queue (limitation set in place for fairness
+  issues in CFQ, inherited by the first version of BFQ, but made unnecessary
+  by the latest accurate fairness strategies added to BFQ). Removing this
+  limitation enables devices with long internal queues to fill their queues
+  as much as they deem appropriate, also with sync requests. This avoids
+  throughput losses on these devices, because, to achieve a high throughput,
+  they often need to have a high number of requests queued internally.
+. CODE IMPROVEMENT: Simplify I/O priority change logic by turning it into a
+  single-step procedure instead of a two-step one; improve readability by
+  rethinking the names of the functions involved in changing the I/O priority
+  of a bfq_queue.
 
 v7r7:
 . BUGFIX: Prevent the OOM queue from being involved in the queue
