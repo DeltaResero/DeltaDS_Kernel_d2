@@ -483,9 +483,6 @@ static int ts_governor(struct cpufreq_policy *policy, unsigned int event)
 	struct ts_cpu_priv *ts = &per_cpu(ts_cpu, policy->cpu);
 	int ret = 0;
 
-	if (likely(event & CPUFREQ_GOV_NOINTERACT))
-		return 0;
-
 	mutex_lock(&ts_global.global_mutex);
 
 	switch (event) {
