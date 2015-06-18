@@ -11,6 +11,7 @@
  */
 #include <linux/module.h>
 #include <linux/slab.h>
+#include <linux/skatter.h>
 
 #include "pm.h"
 
@@ -177,3 +178,21 @@ void msm_pm_retention_mode_enable(bool enable)
 	msm_pm_sleep_mode_enable(MSM_PM_SLEEP_MODE_RETENTION, enable);
 }
 EXPORT_SYMBOL(msm_pm_retention_mode_enable);
+
+static int spc_enabled = 1;
+static void update_spc(void)
+{
+	int i;
+	for (i = 0; i < 3; i++)
+		msm_pm_sleep_modes[MSM_PM_MODE(i,
+			MSM_PM_SLEEP_MODE_POWER_COLLAPSE_STANDALONE)].idle_supported =
+			spc_enabled;
+}
+static __GATTR(spc_enabled, 0, 1, update_spc);
+
+static int __init register_spc(void)
+{
+	skatter_register(spc_enabled);
+	return 0;
+}
+late_initcall(register_spc);
