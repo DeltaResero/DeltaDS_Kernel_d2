@@ -166,7 +166,7 @@ extern bool initcall_debug;
 
 #ifndef __ASSEMBLY__
 
-#ifdef CONFIG_LTO
+#ifdef CONFIG_LTO_INITCALL_WORKAROUND
 /* Work around a LTO gcc problem: when there is no reference to a variable
  * in a module it will be moved to the end of the program. This causes
  * reordering of initcalls which the kernel does not like.

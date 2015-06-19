@@ -990,6 +990,17 @@ config LTO
 	default y
 	depends on LTO_MENU && !LTO_DISABLE
 
+config LTO_INITCALL_WORKAROUND
+	bool "Workaround LTO initcall reordering"
+	depends on LTO
+	default y
+	help
+	  Without either modified GCC or workarounds, initcalls may be
+	  reordered.  This is a Bad Thing, and may result in unbootable
+	  kernels.
+
+	  Say Y here.
+
 config LTO_DEBUG
 	bool "Enable LTO compile time debugging"
 	depends on LTO
