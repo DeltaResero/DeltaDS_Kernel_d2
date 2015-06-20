@@ -68,3 +68,8 @@
 #endif /* CONFIG_ARCH_USE_BUILTIN_BSWAP */
 
 #define KASAN_ABI_VERSION 4
+
+#if __GNUC_MINOR__ >= 1
+#define HAVE_NO_REORDER
+#define __no_reorder __attribute__((no_reorder))
+#endif
