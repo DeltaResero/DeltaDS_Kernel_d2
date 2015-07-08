@@ -802,6 +802,9 @@ static int cpufreq_governor_asswax(struct cpufreq_policy *new_policy,
 			if (rc)
 				return rc;
 
+#ifdef CONFIG_INTERACTION_HINTS
+			cpufreq_want_interact_hints(1);
+#endif
 			idle_notifier_register(&cpufreq_idle_nb);
 			register_early_suspend(&asswax_power_suspend);
 		}
@@ -840,6 +843,9 @@ static int cpufreq_governor_asswax(struct cpufreq_policy *new_policy,
 		if (atomic_dec_return(&active_count) < 1) {
 			sysfs_remove_group(cpufreq_global_kobject,
 					   &asswax_attr_group);
+#ifdef CONFIG_INTERACTION_HINTS
+			cpufreq_want_interact_hints(0);
+#endif
 			idle_notifier_unregister(&cpufreq_idle_nb);
 			unregister_early_suspend(&asswax_power_suspend);
 		}

@@ -215,21 +215,14 @@ BE("	ror	r1, r1, #16\n")
 	:
 	: "r" (lockp)
 	: "r1", "r2", "r3", "cc");
+
+	smp_mb();
 }
 
 static inline int arch_spin_is_locked(arch_spinlock_t *lock);
 static inline int arch_spin_trylock(arch_spinlock_t *lock)
 {
 	unsigned long tmp, ticket;
-
-	/* Assuming that trylock is used to avoid long delays on contended
-	 * locks, it makes sense to avoid expensive cache operations where
-	 * possible.  While not technically correct, checking the lock in
-	 * advance makes trylock a very lightweight operation in the locked
-	 * case.
-	 */
-	if (arch_spin_is_locked(lock))
-		return 0;
 
 	/* Grab lock if now_serving == next_ticket and access is exclusive */
 	__asm__ __volatile__(
@@ -243,6 +236,7 @@ BE("	lsr	%[ticket], %[ticket], #16\n")
 	: [ticket]"=&r" (ticket), [tmp]"=&r" (tmp)
 	: [lockaddr]"r" (&lock->lock)
 	: "cc");
+
 	if (!tmp)
 		smp_mb();
 	return !tmp;
@@ -325,12 +319,9 @@ static inline int arch_write_trylock(arch_rwlock_t *rw)
 	: "r" (&rw->lock), "r" (0x80000000)
 	: "cc");
 
-	if (tmp == 0) {
+	if (!tmp)
 		smp_mb();
-		return 1;
-	} else {
-		return 0;
-	}
+	return !tmp;
 }
 
 static inline void arch_write_unlock(arch_rwlock_t *rw)
@@ -407,7 +398,7 @@ static inline void arch_read_unlock(arch_rwlock_t *rw)
 	: "r" (&rw->lock)
 	: "cc");
 
-	if (tmp == 0)
+	if (!tmp)
 		dsb_sev();
 }
 
@@ -423,12 +414,9 @@ static inline int arch_read_trylock(arch_rwlock_t *rw)
 	: "r" (&rw->lock)
 	: "cc");
 
-	if (tmp2 == 0) {
+	if (!tmp2)
 		smp_mb();
-		return 1;
-	} else {
-		return 0;
-	}
+	return !tmp2;
 }
 
 /* read_can_lock - would read_trylock() succeed? */

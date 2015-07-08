@@ -482,6 +482,7 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		if (dbs_enable == 1) {
 			rc = sysfs_create_group(cpufreq_global_kobject,
 						&dbs_attr_group);
+			cpufreq_want_interact_hints(1);
 			hotplug_alg_available(&fl_alg, 1);
 			if (rc) {
 				mutex_unlock(&dbs_mutex);
@@ -510,6 +511,7 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 			sysfs_remove_group(cpufreq_global_kobject,
 					   &dbs_attr_group);
 			hotplug_alg_available(&fl_alg, 0);
+			cpufreq_want_interact_hints(0);
 		}
 
 		break;

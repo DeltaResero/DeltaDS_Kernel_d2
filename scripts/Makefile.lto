@@ -37,6 +37,9 @@ endif
 ifdef CONFIG_LTO_PARTITIONS
 	LTO_FINAL_CFLAGS += --param lto-partitions=${CONFIG_LTO_PARTITIONS}
 endif
+ifdef CONFIG_LTO_INITCALL_WORKAROUND
+	LTO_FINAL_CFLAGS += -fno-toplevel-reorder
+endif
 
 	# In principle gcc should pass through options in the object files,
 	# but it doesn't always work. So do it here manually

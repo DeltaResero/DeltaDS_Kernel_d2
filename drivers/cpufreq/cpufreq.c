@@ -2214,7 +2214,17 @@ static struct notifier_block __refdata cpufreq_cpu_notifier = {
 };
 
 #ifdef CONFIG_INTERACTION_HINTS
-static atomic_t interactivity_state;
+static atomic_t want_interact_hints = ATOMIC_INIT(0);
+static atomic_t interactivity_state = ATOMIC_INIT(0);
+
+void cpufreq_want_interact_hints(int enable)
+{
+	if (enable)
+		atomic_inc(&want_interact_hints);
+	else
+		if (!atomic_dec_return(&want_interact_hints))
+			atomic_set(&interactivity_state, 0);
+}
 
 static void do_interactivity(struct work_struct *work);
 static DECLARE_WORK(interactivity_on_work, do_interactivity);
@@ -2242,6 +2252,10 @@ static void do_interactivity(struct work_struct *work) {
 void cpufreq_set_interactivity(int on, int idbit) {
         unsigned int mask = 1 << idbit;
         int old, new;
+
+	if (!atomic_read(&want_interact_hints))
+		return;
+
         {
         register unsigned long tmp;
         __asm__ __volatile__(

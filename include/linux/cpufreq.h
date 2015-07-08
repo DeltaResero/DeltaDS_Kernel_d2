@@ -184,6 +184,7 @@ enum {
 	INTERACT_ID_OTHER,
 };
 
+void cpufreq_want_interact_hints(int enable);
 void cpufreq_set_interactivity(int on, int idbit);
 #endif /* CONFIG_INTERACTION_HINTS */
 
