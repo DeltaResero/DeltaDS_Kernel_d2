@@ -1,4 +1,4 @@
-/* Copyright (c) 2009-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2009-2015, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -65,6 +65,7 @@ static struct vsycn_ctrl {
 	struct vsync_update vlist[2];
 	int vsync_irq_enabled;
 	ktime_t vsync_time;
+	wait_queue_head_t wait_queue_internal;
 	wait_queue_head_t wait_queue;
 } vsync_ctrl_db[MAX_CONTROLLER];
 
@@ -302,10 +303,6 @@ int mdp4_lcdc_pipe_commit(int cndx, int wait)
 		vctrl->ov_koff++;
 		/* kickoff overlay engine */
 		outpdw(MDP_BASE + 0x0004, 0);
-	} else {
-		/* schedule second phase update  at dmap */
-		INIT_COMPLETION(vctrl->dmap_comp);
-		vsync_irq_enable(INTR_DMA_P_DONE, MDP_DMAP_TERM);
 	}
 	spin_unlock_irqrestore(&vctrl->spin_lock, flags);
 
@@ -313,7 +310,7 @@ int mdp4_lcdc_pipe_commit(int cndx, int wait)
 		if (pipe->ov_blt_addr)
 			mdp4_lcdc_wait4ov(0);
 		else
-			mdp4_lcdc_wait4dmap(0);
+			mdp4_lcdc_wait4vsync(0);
 	}
 
 	return cnt;
@@ -365,7 +362,8 @@ void mdp4_lcdc_vsync_ctrl(struct fb_info *info, int enable)
 void mdp4_lcdc_wait4vsync(int cndx)
 {
 	struct vsycn_ctrl *vctrl;
-	struct mdp4_overlay_pipe *pipe;
+	ktime_t timestamp;
+	unsigned long flags;
 
 	if (cndx >= MAX_CONTROLLER) {
 		pr_err("%s: out or range: cndx=%d\n", __func__, cndx);
@@ -373,14 +371,18 @@ void mdp4_lcdc_wait4vsync(int cndx)
 	}
 
 	vctrl = &vsync_ctrl_db[cndx];
-	pipe = vctrl->base_pipe;
 
 	if (atomic_read(&vctrl->suspend) > 0)
 		return;
 
+	spin_lock_irqsave(&vctrl->spin_lock, flags);
+	timestamp = vctrl->vsync_time;
+	spin_unlock_irqrestore(&vctrl->spin_lock, flags);
+
 	mdp4_lcdc_vsync_irq_ctrl(cndx, 1);
 
-	wait_event_interruptible_timeout(vctrl->wait_queue, 1,
+	wait_event_timeout(vctrl->wait_queue_internal,
+			!ktime_equal(timestamp, vctrl->vsync_time),
 			msecs_to_jiffies(VSYNC_PERIOD * 8));
 
 	mdp4_lcdc_vsync_irq_ctrl(cndx, 0);
@@ -446,10 +448,14 @@ ssize_t mdp4_lcdc_show_event(struct device *dev,
 	ssize_t ret = 0;
 	u64 vsync_tick;
 	ktime_t timestamp;
+	unsigned long flags;
 
 	cndx = 0;
 	vctrl = &vsync_ctrl_db[0];
+
+	spin_lock_irqsave(&vctrl->spin_lock, flags);
 	timestamp = vctrl->vsync_time;
+	spin_unlock_irqrestore(&vctrl->spin_lock, flags);
 
 	ret = wait_event_interruptible(vctrl->wait_queue,
 			!ktime_equal(timestamp, vctrl->vsync_time) &&
@@ -457,7 +463,10 @@ ssize_t mdp4_lcdc_show_event(struct device *dev,
 	if (ret == -ERESTARTSYS)
 		return ret;
 
+	spin_lock_irqsave(&vctrl->spin_lock, flags);
 	vsync_tick = ktime_to_ns(vctrl->vsync_time);
+	spin_unlock_irqrestore(&vctrl->spin_lock, flags);
+
 	ret = scnprintf(buf, PAGE_SIZE, "VSYNC=%llu", vsync_tick);
 	buf[strlen(buf) + 1] = '\0';
 	return ret;
@@ -485,6 +494,7 @@ void mdp4_lcdc_vsync_init(int cndx)
 	init_completion(&vctrl->ov_comp);
 	atomic_set(&vctrl->suspend, 1);
 	spin_lock_init(&vctrl->spin_lock);
+	init_waitqueue_head(&vctrl->wait_queue_internal);
 	init_waitqueue_head(&vctrl->wait_queue);
 }
 
@@ -906,6 +916,7 @@ void mdp4_primary_vsync_lcdc(void)
 
 	spin_lock(&vctrl->spin_lock);
 	vctrl->vsync_time = ktime_get();
+	wake_up_all(&vctrl->wait_queue_internal);
 	wake_up_interruptible_all(&vctrl->wait_queue);
 	spin_unlock(&vctrl->spin_lock);
 }
@@ -1052,7 +1063,7 @@ void mdp4_lcdc_overlay(struct msm_fb_data_type *mfd)
 	vctrl = &vsync_ctrl_db[cndx];
 	pipe = vctrl->base_pipe;
 
-	if (!pipe || !mfd->panel_power_on) {
+	if (!pipe || mdp_fb_is_power_off(mfd)) {
 		mutex_unlock(&mfd->dma->ov_mutex);
 		return;
 	}
@@ -1079,7 +1090,7 @@ void mdp4_lcdc_overlay(struct msm_fb_data_type *mfd)
 		if (pipe->ov_blt_addr)
 			mdp4_lcdc_wait4ov(cndx);
 		else
-			mdp4_lcdc_wait4dmap(cndx);
+			mdp4_lcdc_wait4vsync(cndx);
 	}
 
 	mdp4_overlay_mdp_perf_upd(mfd, 0);
