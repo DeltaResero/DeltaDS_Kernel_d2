@@ -587,7 +587,7 @@ KBUILD_CFLAGS	+= -fgraphite-identity -ftree-loop-distribution -floop-block -ftre
 KBUILD_CFLAGS	+= -fmodulo-sched -fmodulo-sched-allow-regmoves
 # GCC extras
 KBUILD_CFLAGS	+= -fgcse-sm -fgcse-las -fsched-spec-load -fsched-pressure \
-		   -fsched-stalled-insns=0 -fipa-pta
+		   -fsched-stalled-insns=0
 # GCC params
 KBUILD_CFLAGS	+= --param max-gcse-memory=0 \
 		   --param max-gcse-insertion-ratio=50 \
@@ -608,7 +608,7 @@ KBUILD_CFLAGS	+= -fgraphite-identity -ftree-loop-distribution -floop-block -ftre
 KBUILD_CFLAGS	+= -fmodulo-sched -fmodulo-sched-allow-regmoves
 # GCC extras
 KBUILD_CFLAGS	+= -fgcse-sm -fgcse-las -fsched-spec-load -fsched-pressure \
-		   -fsched-stalled-insns=0 -fipa-pta -fipa-matrix-reorg
+		   -fsched-stalled-insns=0
 # GCC params
 KBUILD_CFLAGS	+= --param max-gcse-memory=0 \
 		   --param max-gcse-insertion-ratio=50 \
