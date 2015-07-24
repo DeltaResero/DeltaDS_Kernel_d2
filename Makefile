@@ -616,6 +616,11 @@ KBUILD_CFLAGS	+= --param max-gcse-memory=0 \
 		   --param max-tail-merge-iterations=4 \
 		   --param l1-cache-size=32 \
 		   --param l2-cache-size=1024
+
+# New in GCC5
+ifeq ($(call cc-ifversion, -ge, 0501,y),y)
+KBUILD_CFLAGS	+= -flra-remat -fipa-ra
+endif
 endif
 
 include $(srctree)/arch/$(SRCARCH)/Makefile
