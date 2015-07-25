@@ -1011,7 +1011,7 @@ config LTO_INITCALL_WORKAROUND
 	depends on LTO
 	default y
 	help
-	  Without either modified GCC or workarounds, initcalls may be
+	  Without either GCC 5+, modified GCC, or workarounds, initcalls may be
 	  reordered.  This is a Bad Thing, and may result in unbootable
 	  kernels.
 
