@@ -6,8 +6,8 @@
 
 .macro spintest loop
 	ldr	r1, [r0]
-	cmp	r1, #0
-	bmi	\loop
+	tst	r1, #0x80000000
+	bne	\loop
 .endm
 
 .macro spintail

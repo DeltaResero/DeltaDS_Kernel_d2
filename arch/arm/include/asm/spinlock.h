@@ -200,8 +200,9 @@ static inline void arch_spin_lock(arch_spinlock_t *lock)
 	__asm__ __volatile__(
 "1:	ldrex	r1, [r0]\n"
 BE("	ror	r1, r1, #16\n")
-"	add	r3, r1, #1\n"
-"	strexh	r2, r3, [r0]\n"
+"	add	r1, r1, #1\n"
+"	strexh	r2, r1, [r0]\n"
+"	sub	r1, r1, #1\n"
 "	teq	r2, #0\n"
 "	bne	1b\n"
 
@@ -214,7 +215,7 @@ BE("	ror	r1, r1, #16\n")
 "5:\n"
 	:
 	: "r" (lockp)
-	: "r1", "r2", "r3", "cc");
+	: "r1", "r2", "cc");
 
 	smp_mb();
 }
