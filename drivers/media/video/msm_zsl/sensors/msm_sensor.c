@@ -569,11 +569,18 @@ int32_t msm_sensor_probe(struct msm_sensor_ctrl_t *s_ctrl,
 		struct msm_sensor_ctrl *s)
 {
 	int rc = 0;
-	rc = i2c_add_driver(s_ctrl->sensor_i2c_driver);
-	if (rc < 0 || s_ctrl->sensor_i2c_client->client == NULL) {
-		rc = -ENOTSUPP;
-		CDBG("I2C add driver failed");
-		goto probe_fail;
+	if (!s_ctrl->sensor_i2c_client->client) {
+		if (s_ctrl->sensor_i2c_driver)
+			rc = i2c_add_driver(s_ctrl->sensor_i2c_driver);
+		if (rc < 0 && rc != -EBUSY) {
+			rc = -ENOTSUPP;
+			CDBG("I2C add driver failed");
+			return rc;
+		}
+		if (!s_ctrl->sensor_i2c_client->client) {
+			pr_warn("%s: still no i2c client, defer\n", __func__);
+			return -EPROBE_DEFER;
+		}
 	}
 
 #if !defined(CONFIG_S5C73M3) && !defined(CONFIG_S5K6A3YX)
@@ -614,14 +621,18 @@ int32_t msm_sensor_probe(struct msm_sensor_ctrl_t *s_ctrl,
 	else
 		s->s_mount_angle = 0;
 
-	goto power_down;
-probe_fail:
-	i2c_del_driver(s_ctrl->sensor_i2c_driver);
-power_down:
 #if !defined(CONFIG_S5C73M3) && !defined(CONFIG_S5K6A3YX)
 	s_ctrl->func_tbl->sensor_power_down(info);
 #endif
 	return rc;
+
+#if !defined(CONFIG_S5C73M3) && !defined(CONFIG_S5K6A3YX)
+probe_fail:
+	s_ctrl->func_tbl->sensor_power_down(info);
+	if (s_ctrl->sensor_i2c_driver)
+		i2c_del_driver(s_ctrl->sensor_i2c_driver);
+	return rc;
+#endif
 }
 
 int32_t msm_sensor_v4l2_probe(struct msm_sensor_ctrl_t *s_ctrl,

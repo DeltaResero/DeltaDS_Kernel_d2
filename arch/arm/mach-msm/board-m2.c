@@ -4642,9 +4642,6 @@ static void __init samsung_m2_init(void)
 #endif
 	msm8960_init_gpiomux();
 
-#ifndef CONFIG_S5C73M3
-	spi_register_board_info(spi_board_info, ARRAY_SIZE(spi_board_info));
-#endif
 #ifdef CONFIG_S5C73M3
 	msm8960_device_qup_spi_gsbi11.dev.platform_data =
 				&msm8960_qup_spi_gsbi11_pdata;

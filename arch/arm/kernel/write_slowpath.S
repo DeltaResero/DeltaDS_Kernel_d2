@@ -1,10 +1,7 @@
 #include <linux/linkage.h>
 #include <asm/assembler.h>
 
-// FIXME: str after stmdb is awful.
-
 .macro spinhead
-	str	r3, [sp, #-4]!
 .endm
 
 .macro spintest loop
@@ -12,17 +9,17 @@
 	teq	r1, #0
 	bne	\loop
 
-	orr	r1, r1, #0x80000000
-	strex	r3, r1, [r0]
-	teq	r3, #0
+	mov	r1, #0x80000000
+	strex	r2, r1, [r0]
+	teq	r2, #0
 	bne	\loop
 .endm
 
 .macro spintail
-	ldr	r3, [sp], #4
 .endm
 
 .macro spinskipoptim skip
+	ldr	r1, [r0]
 	bics	r1, r1, #0x80000001
 	bne	\skip
 .endm
