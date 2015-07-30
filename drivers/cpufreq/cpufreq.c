@@ -453,39 +453,39 @@ static ssize_t show_##file_name				\
 show_one(cpuinfo_min_freq, cpuinfo.min_freq);
 show_one(cpuinfo_max_freq, cpuinfo.max_freq);
 show_one(cpuinfo_transition_latency, cpuinfo.transition_latency);
-show_one(scaling_min_freq, min);
+show_one(scaling_min_freq, user_policy.min);
 //show_one(scaling_max_freq, max);
 show_one(scaling_cur_freq, cur);
 show_one(cpu_utilization, util);
 
 static struct task_struct *thermald;
 static int check_current_is_thermald(void) {
-        int ret = 0;
-        if (current != thermald) {
-                if (!strcmp(current->comm, "thermald")) {
-                        printk(KERN_DEBUG "%s: found thermald (pid %u)!\n",
-                                __func__, current->pid);
-                        thermald = current;
-                        ret = 1;
-                }
-        } else {
-                ret = 1;
-        }
-        return ret;
+	int ret = 0;
+	if (current != thermald) {
+		if (!strcmp(current->comm, "thermald")) {
+			printk(KERN_DEBUG "%s: found thermald (pid %u)!\n",
+				__func__, current->pid);
+			thermald = current;
+			ret = 1;
+		}
+	} else {
+		ret = 1;
+	}
+	return ret;
 }
 
 static ssize_t show_scaling_max_freq(struct cpufreq_policy *policy, char *buf)
 {
-        int val = 0;
-        if (check_current_is_thermald()) {
-                if (policy->max >= policy->user_policy.max)
-                        val = 1512000;
-                else
-                        val = policy->max;
-        } else {
-                val = policy->max;
-        }
-        return sprintf(buf, "%u\n", val);
+	int val = 0;
+	if (check_current_is_thermald()) {
+		if (policy->max >= policy->user_policy.max)
+			val = 1512000;
+		else
+			val = policy->max;
+	} else {
+		val = policy->user_policy.max;
+	}
+	return sprintf(buf, "%u\n", val);
 }
 
 static int __cpufreq_set_policy(struct cpufreq_policy *data,
@@ -496,33 +496,27 @@ static int __cpufreq_set_policy(struct cpufreq_policy *data,
  */
 struct freq_work_struct {
 	struct work_struct work;
-	unsigned int freq;
 	struct cpufreq_policy *policy;
 };
 void acpuclk_enable_oc_freqs(unsigned int freq);
-extern int msm_thermal_get_freq_table(void);
 
 static void do_enable_oc(struct work_struct *work) {
 	int ret;
-	unsigned int new_max = ((struct freq_work_struct *) work)->freq;
 	struct cpufreq_policy new_policy;
-	struct cpufreq_policy *policy =
-		((struct freq_work_struct *) work)->policy;
-	acpuclk_enable_oc_freqs(new_max);
+	struct freq_work_struct *fw =
+		container_of(work, struct freq_work_struct, work);
+	struct cpufreq_policy *policy = fw->policy;
+
+	acpuclk_enable_oc_freqs(policy->user_policy.max);
 	if (ret = cpufreq_get_policy(&new_policy, policy->cpu)) {
-                printk(KERN_ERR "%s: can't get policy (%i)!\n", __func__, ret);
-                goto out;
+		printk(KERN_ERR "%s: can't get policy (%i)!\n", __func__, ret);
+		goto out;
 	}
-	policy->cpuinfo.max_freq = new_policy.max = new_max;
-        printk(KERN_DEBUG "%s: set policy for cpu %i\n", __func__, policy->cpu);
-        if (ret = __cpufreq_set_policy(policy, &new_policy)) {
-                printk(KERN_ERR "%s: can't set policy (%i)!\n", __func__, ret);
-                goto out;
-        }
-        policy->user_policy.max = policy->max;
-	msm_thermal_get_freq_table();
+	policy->cpuinfo.max_freq = new_policy.max = policy->user_policy.max;
+	if (ret = __cpufreq_set_policy(policy, &new_policy))
+		printk(KERN_ERR "%s: can't set policy (%i)!\n", __func__, ret);
 out:
-        kfree(work);
+	kfree(work);
 }
 
 /**
@@ -542,8 +536,8 @@ static ssize_t store_scaling_min_freq
 	if (ret != 1)
 		return -EINVAL;
 
+	policy->user_policy.min = new_policy.min;
 	ret = __cpufreq_set_policy(policy, &new_policy);
-	policy->user_policy.min = policy->min;
 
 	return ret ? ret : count;
 }
@@ -552,7 +546,6 @@ static ssize_t store_scaling_max_freq
 {
 	unsigned int ret = -EINVAL;
 	struct cpufreq_policy new_policy;
-	bool is_thermald = 0;
 
 	ret = cpufreq_get_policy(&new_policy, policy->cpu);
 	if (ret)
@@ -562,30 +555,28 @@ static ssize_t store_scaling_max_freq
 	if (ret != 1)
 		return -EINVAL;
 
-        if (check_current_is_thermald()) {
-                printk(KERN_DEBUG "%s: mangling thermald frequency %u\n",
+	if (check_current_is_thermald()) {
+		printk(KERN_DEBUG "%s: mangling thermald frequency %u\n",
 			__func__, new_policy.max);
-                is_thermald = 1;
-                if (new_policy.max == 1512000)
-                        new_policy.max = policy->user_policy.max;
-        }
+		if (new_policy.max == 1512000)
+			new_policy.max = policy->user_policy.max;
+	} else {
+		policy->user_policy.max = new_policy.max;
+	}
 
-	if (new_policy.max > 1512000) {
-		static struct freq_work_struct *enable_oc_work;
-		enable_oc_work = kzalloc(sizeof(struct freq_work_struct), GFP_KERNEL);
+	if (new_policy.max <= policy->cpuinfo.max_freq) {
+		ret = __cpufreq_set_policy(policy, &new_policy);
+	} else {
+		struct freq_work_struct *enable_oc_work = kzalloc(
+			sizeof(struct freq_work_struct), GFP_KERNEL);
 		if (enable_oc_work) {
 			INIT_WORK((struct work_struct *) enable_oc_work, do_enable_oc);
-			enable_oc_work->freq = new_policy.max;
 			enable_oc_work->policy = policy;
 			schedule_work((struct work_struct *) enable_oc_work);
 			ret = 0;
 		} else {
-			ret = -EINVAL;
+			ret = -ENOMEM;
 		}
-	} else {
-		ret = __cpufreq_set_policy(policy, &new_policy);
-		if (!is_thermald)
-			policy->user_policy.max = policy->max;
 	}
 
 	return ret ? ret : count;
@@ -2269,34 +2260,34 @@ static DECLARE_WORK(interactivity_on_work, do_interactivity);
 static DECLARE_WORK(interactivity_off_work, do_interactivity);
 
 static void do_interactivity(struct work_struct *work) {
-        unsigned int j;
+	unsigned int j;
 
-        for_each_online_cpu(j) {
-                struct cpufreq_policy *pol;
-                if (lock_policy_rwsem_read(j))
-                        continue;
-                pol = per_cpu(cpufreq_cpu_data, j);
-                if (unlikely(pol == NULL || pol->governor == NULL)) {
-                        printk(KERN_DEBUG "%s: policy for cpu %u is null\n", __func__, j);
-                } else {
-                        pol->governor->governor(pol,
-                                work == &interactivity_on_work ?
-                                CPUFREQ_GOV_INTERACT : CPUFREQ_GOV_NOINTERACT);
-                }
-                unlock_policy_rwsem_read(j);
-        }
+	for_each_online_cpu(j) {
+		struct cpufreq_policy *pol;
+		if (lock_policy_rwsem_read(j))
+			continue;
+		pol = per_cpu(cpufreq_cpu_data, j);
+		if (unlikely(pol == NULL || pol->governor == NULL)) {
+			printk(KERN_DEBUG "%s: policy for cpu %u is null\n", __func__, j);
+		} else {
+			pol->governor->governor(pol,
+				work == &interactivity_on_work ?
+				CPUFREQ_GOV_INTERACT : CPUFREQ_GOV_NOINTERACT);
+		}
+		unlock_policy_rwsem_read(j);
+	}
 }
 
 void cpufreq_set_interactivity(int on, int idbit) {
-        unsigned int mask = 1 << idbit;
-        int old, new;
+	unsigned int mask = 1 << idbit;
+	int old, new;
 
 	if (!atomic_read(&want_interact_hints))
 		return;
 
-        {
-        register unsigned long tmp;
-        __asm__ __volatile__(
+	{
+	register unsigned long tmp;
+	__asm__ __volatile__(
 "1:     ldrex   %0, [%4]\n"
 "       mov     %1, %0\n"
 "       teq     %5, #0\n"
@@ -2305,16 +2296,16 @@ void cpufreq_set_interactivity(int on, int idbit) {
 "       strex   %2, %0, [%4]\n"
 "       teq     %2, #0\n"
 "       bne     1b"
-        : "=&r" (new), "=&r" (old), "=&r" (tmp), "+Qo" (interactivity_state.counter)
-        : "r" (&interactivity_state.counter), "lr" (on), "lr" (mask)
-        : "cc");
-        }
+	: "=&r" (new), "=&r" (old), "=&r" (tmp), "+Qo" (interactivity_state.counter)
+	: "r" (&interactivity_state.counter), "lr" (on), "lr" (mask)
+	: "cc");
+	}
 
-        if (!old && new) {
-                schedule_work(&interactivity_on_work);
-        } else if (old && !new) {
-                schedule_work(&interactivity_off_work);
-        }
+	if (!old && new) {
+		schedule_work(&interactivity_on_work);
+	} else if (old && !new) {
+		schedule_work(&interactivity_off_work);
+	}
 }
 #endif
 
