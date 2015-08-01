@@ -91,10 +91,13 @@ static void update_clk_statistics(struct kgsl_device *device,
  * return the nearest possible level
  */
 
+extern int limited_gpu_pwrlevel;
 static inline int _adjust_pwrlevel(struct kgsl_pwrctrl *pwr, int level)
 {
-	int max_pwrlevel = max_t(int, pwr->thermal_pwrlevel, pwr->max_pwrlevel);
-	int min_pwrlevel = max_t(int, pwr->thermal_pwrlevel, pwr->min_pwrlevel);
+	int max_pwrlevel = max3(pwr->thermal_pwrlevel, (int)pwr->max_pwrlevel,
+		limited_gpu_pwrlevel);
+	int min_pwrlevel = max3(pwr->thermal_pwrlevel, (int)pwr->min_pwrlevel,
+		limited_gpu_pwrlevel);
 
 	if (level < max_pwrlevel)
 		return max_pwrlevel;

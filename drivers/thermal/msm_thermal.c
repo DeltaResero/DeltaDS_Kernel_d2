@@ -27,17 +27,19 @@
 static unsigned int temp_threshold __read_mostly = 50;
 module_param(temp_threshold, int, 0644);
 
-unsigned int limited_max_freq = UINT_MAX;
+static unsigned int limited_max_freq = UINT_MAX;
+int limited_gpu_pwrlevel = 0;
 
 static struct temp_limit {
 	unsigned int thresh;
 	unsigned int max_freq;
+	int gpu_pwrlevel;
 } temp_limits[] = {
-	{ 12,	702000 },
-	{ 9,	918000 },
-	{ 5,	1026000 },
-	{ 0,	1242000 },
-	{ UINT_MAX, UINT_MAX },
+	{ 12, 702000,  6 },
+	{ 9,  918000,  5 },
+	{ 5,  1026000, 4 },
+	{ 0,  1242000, 3 },
+	{ UINT_MAX, UINT_MAX, 0 },
 };
 
 static struct delayed_work check_temp_work;
@@ -63,14 +65,16 @@ static struct notifier_block msm_thermal_cpufreq_notifier = {
 	.notifier_call = msm_thermal_cpufreq_callback,
 };
 
-static void limit_cpu_freqs(uint32_t max_freq)
+static void limit_cpu_freqs(int idx)
 {
+	struct temp_limit *tl = &temp_limits[idx];
 	unsigned int cpu;
 
-	if (limited_max_freq == max_freq)
+	if (limited_max_freq == tl->max_freq)
 		return;
 
-	limited_max_freq = max_freq;
+	limited_max_freq = tl->max_freq;
+	limited_gpu_pwrlevel = tl->gpu_pwrlevel;
 
 	get_online_cpus();
 	for_each_online_cpu(cpu)
@@ -95,7 +99,7 @@ static void check_temp(struct work_struct *work)
 			break;
 	}
 
-	limit_cpu_freqs(temp_limits[i].max_freq);
+	limit_cpu_freqs(i);
 
 	schedule_delayed_work_on(0, &check_temp_work, HZ);
 }
