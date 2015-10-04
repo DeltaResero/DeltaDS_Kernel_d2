@@ -58,6 +58,11 @@ UNWIND(	.fnstart	)
 	add	r1, r1, r0, lsl #2	@ Get word offset
 	mov	r3, r2, lsl r3		@ create mask
 	smp_dmb
+#if __LINUX_ARM_ARCH__ >= 7 && defined(CONFIG_SMP)
+	.arch_extension	mp
+	ALT_SMP(W(pldw)	[r1])
+	ALT_UP(W(nop))
+#endif
 .ifnc \cond,
 	ldr	r2, [r1]
 	ands	r0, r2, r3

@@ -729,7 +729,6 @@ static struct cftype bfqio_files[] = {
 		.read_u64 = bfqio_cgroup_ioprio_class_read,
 		.write_u64 = bfqio_cgroup_ioprio_class_write,
 	},
-	{ }
 };
 
 static struct cgroup_subsys_state *bfqio_create(struct cgroup *cgroup)
