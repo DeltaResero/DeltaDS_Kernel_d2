@@ -1574,7 +1574,9 @@ static inline void ul_powerdown_finish(void)
 		unvote_dfab();
 		complete_all(&dfab_unvote_completion);
 		wait_for_dfab = 0;
+#ifdef DEBUG
 		bam_dmux_ratelimit = 0;
+#endif
 	}
 }
 
@@ -1656,6 +1658,7 @@ static void ul_timeout(struct work_struct *work)
 
 				info = list_first_entry(&bam_tx_pool,
 						struct tx_pkt_info, list_node);
+#ifdef DEBUG
 				if (!bam_dmux_ratelimit) {
 					DMUX_LOG_KERR
 					    ("%s: UL delayed ts=%u.%09lu\n",
@@ -1663,6 +1666,7 @@ static void ul_timeout(struct work_struct *work)
 					     info->ts_nsec);
 					bam_dmux_ratelimit++;
 				}
+#endif
 				DBG_INC_TX_STALL_CNT();
 				ul_packet_written = 1;
 			}
