@@ -157,7 +157,7 @@ static inline void atomic_set_mask(unsigned int mask, atomic_t *v)
 "1:	ldrex	%0, [%3]\n"
 "	orr	%0, %0, %4\n"
 "	strex	%1, %0, [%3]\n"
-"	teq	%1, %0\n"
+"	teq	%1, #0\n"
 "	bne	1b"
 	: "=&r" (tmp), "=&r" (tmp2), "+Qo" (v->counter)
 	: "r" (&v->counter), "Ir" (mask)
