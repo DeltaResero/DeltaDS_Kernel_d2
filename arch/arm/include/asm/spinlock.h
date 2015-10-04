@@ -207,12 +207,8 @@ BE("	ror	r1, r1, #16\n")
 "	bne	1b\n"
 
 "	teq	r1, r1, ror #16\n"
-"	beq	5f\n"
-
 "	mov	r2, lr\n"
-"	bl	__arch_spin_lock_slowpath\n"
-
-"5:\n"
+"	blne	__arch_spin_lock_slowpath\n"
 	:
 	: "r" (lockp)
 	: "r1", "r2", "cc");
@@ -251,7 +247,7 @@ static inline void arch_spin_unlock(arch_spinlock_t *lock)
 	 * don't touch the next_ticket field, we don't need exclusive access to
 	 * unlock.
 	 */
-	((uint16_t *)&lock->lock)[1]++;
+	((volatile uint16_t *)&lock->lock)[1]++;
 
 	dsb_sev();
 }
@@ -295,12 +291,9 @@ static inline void arch_write_lock(arch_rwlock_t *rw)
 "	mov	r1, #0x80000000\n"
 "	strex	r2, r1, [r0]\n"
 "	teq	r2, #0\n"
-"	beq	10f\n"
 
 "5:	mov	r2, lr\n"
-"	bl	__arch_write_lock_slowpath\n"
-
-"10:\n"
+"	blne	__arch_write_lock_slowpath\n"
 	:
 	: "r" (lockp)
 	: "r1", "r2", "cc");
@@ -370,12 +363,8 @@ static inline void arch_read_lock(arch_rwlock_t *rw)
 "	bne	1b\n"
 
 "	tst	r1, #0x80000000\n"
-"	beq	10f\n"
-
-"5:	mov	r2, lr\n"
-"	bl	__arch_read_lock_slowpath\n"
-
-"10:\n"
+"	mov	r2, lr\n"
+"	blne	__arch_read_lock_slowpath\n"
 	:
 	: "r" (lockp)
 	: "r1", "r2", "cc");

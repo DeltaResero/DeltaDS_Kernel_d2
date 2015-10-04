@@ -19,7 +19,7 @@
 #include <linux/list.h>
 #include <linux/wmavg.h>
 
-static struct kmem_cache *wmavg_cache;
+static struct kmem_cache *wmavg_cache __read_mostly;
 
 unsigned long wmavg_sample_calc(struct wmavg_sample *s)
 {
@@ -30,7 +30,7 @@ unsigned long wmavg_sample_calc(struct wmavg_sample *s)
 	ret = s->value;
 	do_div(ret, s->weight);
 	WARN_ONCE(ret > ULONG_MAX, "result overflow");
-		
+
 	return ret;
 }
 
