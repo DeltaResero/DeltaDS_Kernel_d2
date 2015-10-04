@@ -1,5 +1,5 @@
 /* drivers/cpufreq/cpufreq_tierservative.c -- yet another cpufreq governor
- * Copyright (C) 2014, Ryan Pennucci <decimalman@gmail.com>
+ * Copyright (C) 2014-2015, Ryan Pennucci <decimalman@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the Free
@@ -19,8 +19,8 @@
  * ondemand), ts maintains an extensive CPU usage history intended to predict
  * future usage.
  *
- * The exact details of how the usage history is maintained and used isn't
- * terribly important, and is subject to dramatic change at any moment.  In
+ * The exact details of how the usage history is maintained and used aren't
+ * terribly important, and are subject to dramatic change at any moment.  In
  * general, usage is categorized into "tiers" of increasing demand, and the
  * average demand for a tier is used to estimate future demand.
  */
@@ -55,38 +55,36 @@ struct ts_global_priv {
 	struct mutex		global_mutex;
 	unsigned int		enabled;
 	struct workqueue_struct	*wq;
-	struct notifier_block	idle_nb;
 
 	unsigned int		tier_count;
-	unsigned int		extra_mhz;
+	unsigned int		extra_khz;
 	unsigned int		sample_time;
 	unsigned int		max_sample;
 	unsigned int		active_sample;
-	unsigned int		saved_timeout;
 };
 
 static struct ts_global_priv ts_global __read_mostly = {
 	.tier_count = 8,
-	.extra_mhz = 75,
+	.extra_khz = 25000,
 	.sample_time = MS(16),
 	.max_sample = 333,
 	.active_sample = 100,
-	.saved_timeout = MS(83),
 };
 
 static void rebuild_all_privs(void);
 
-#define KNOB(fn, obj, min, max, mul, rb)		\
+#define KNOB(fn, obj, min, max, mul, div, rb)		\
 static ssize_t show_##fn				\
 (struct kobject *k, struct attribute *a, char *buf)	\
-{ return sprintf(buf, "%u\n", (ts_global.obj) * mul ); }\
+{ return sprintf(buf, "%i\n",				\
+	(int)((ts_global.obj) * mul / div)); }		\
 static ssize_t store_##fn				\
 (struct kobject *k, struct attribute *a,		\
 const char *buf, size_t count)				\
 {							\
 	int v, ret;					\
 	ret = sscanf(buf, "%i", &v);			\
-	v = DIV_ROUND_UP(v, mul);			\
+	v = DIV_ROUND_UP(v * div, mul);			\
 	if (ret != 1) return -EINVAL;			\
 	if (v < min) v = min;				\
 	if (v > max) v = max;				\
@@ -98,19 +96,17 @@ const char *buf, size_t count)				\
 }							\
 define_one_global_rw(fn);
 
-KNOB(tier_count, tier_count, 2, MAX_TIER, 1, 1);
-KNOB(extra_mhz, extra_mhz, 25, 500, 1, 0);
-KNOB(sample_time_ms, sample_time, 1, MS(100), jiffies_to_msecs(1), 0);
-KNOB(max_sample_ms, max_sample, 10, 1000, 1, 1);
-KNOB(active_sample_ms, active_sample, 1, 1000, 1, 1);
-KNOB(saved_expire_ms, saved_timeout, 0, MS(500), jiffies_to_msecs(1), 0);
+KNOB(tier_count, tier_count, 2, MAX_TIER, 1, 1, 1);
+KNOB(extra_mhz, extra_khz, 0, 500000, 1, 1000, 0);
+KNOB(sample_time_ms, sample_time, 1, MS(100), jiffies_to_msecs(1), 1, 0);
+KNOB(max_sample_ms, max_sample, 10, 1000, 1, 1, 1);
+KNOB(active_sample_ms, active_sample, 1, 1000, 1, 1, 1);
 static struct attribute *ts_attrs[] = {
 	&tier_count.attr,
 	&extra_mhz.attr,
 	&sample_time_ms.attr,
 	&max_sample_ms.attr,
 	&active_sample_ms.attr,
-	&saved_expire_ms.attr,
 	NULL
 };
 static struct attribute_group ts_attr_grp = {
@@ -134,13 +130,9 @@ struct ts_cpu_priv {
 	struct wmavg_sample	current_usage;
 	unsigned long		current_usage_khz;
 
+	int			max_tier;
 	struct wmavg_average	*usage;
 	struct wmavg_average	*tiers[MAX_TIER];
-	unsigned int		active_tier;
-	unsigned int		saved_tier;
-	unsigned int		max_tier;
-
-	unsigned long		saved_timeout;
 };
 
 static DEFINE_PER_CPU(struct ts_cpu_priv, ts_cpu);
@@ -182,10 +174,6 @@ static void rebuild_priv(struct ts_cpu_priv *ts)
 		}
 	}
 	ts->max_tier = ts_global.tier_count - 1;
-	if (ts->active_tier > ts->max_tier)
-		ts->active_tier = ts->max_tier;
-	if (ts->saved_tier > ts->max_tier)
-		ts->saved_tier = ts->max_tier;
 
 alloc_fail:
 	// Update max_sample and trim tiers
@@ -210,7 +198,7 @@ static void destroy_priv(struct ts_cpu_priv *ts)
 		wmavg_free(ts->tiers[i]);
 		ts->tiers[i] = NULL;
 	}
-	ts->max_tier = 0;
+	ts->max_tier = -1;
 
 	if (ts->usage)
 		wmavg_free(ts->usage);
@@ -239,21 +227,24 @@ static void rebuild_all_privs(void)
  */
 static void insert_current_sample(struct ts_cpu_priv *ts)
 {
-	int i;
+	int i = 0;
 	struct wmavg_sample samp = ts->current_usage;
 
-	if (!ts->active_tier) {
-		wmavg_insert_sample(ts->tiers[0], &samp);
+	ts->current_usage = (struct wmavg_sample){ 0 };
+
+	if (ts->current_usage_khz <= ts->policy->min)
 		return;
+
+	/* Disregard samples below the minimum or "above" the maximum.  They
+	 * don't tell us anything useful.
+	 */
+	if (ts->current_usage_khz >= ts->policy->max)
+		return;
+
+	for (i = 0; i < ts->max_tier; i++) {
+		if (ts->tiers[i]->avg > ts->current_usage_khz)
+			break;
 	}
-
-	if (ts->current_usage_khz < ts->policy->min / 4)
-		return;
-
-	i = ts->active_tier;
-	if (ts->current_usage_khz < ts->policy->min &&
-	    i > DIV_ROUND_UP(ts->max_tier + 1, 4))
-		i = DIV_ROUND_UP(ts->max_tier + 1, 4);
 
 	for (; i >= 0; i--) {
 		wmavg_insert_sample(ts->tiers[i], &samp);
@@ -307,62 +298,12 @@ static unsigned long get_usage(struct ts_cpu_priv *ts)
 	 * frequency more quickly.  Also, don't pollute the average with low
 	 * samples during idle.
 	 */
-	if (ts->active_tier &&
-	    ts->current_usage_khz > ts->policy->min * 2 / 3) {
+	if (ts->current_usage_khz > ts->policy->min / 2) {
 		wmavg_insert_sample(ts->usage, &samp);
 		return ts->usage->avg;
 	}
 
 	return ts->current_usage_khz;
-}
-
-/* find_tier_up/_down:
- * Applies logic related to switching tiers up/down, and selects an appropriate
- * tier to switch to.
- */
-#define usage_suitable(tier, usage) \
-	(ts->tiers[tier]->avg >= usage)
-static int find_tier_up(struct ts_cpu_priv *ts, unsigned long usage)
-{
-	int i;
-
-	if (usage_suitable(ts->active_tier, usage) ||
-	    ts->active_tier == ts->max_tier)
-		return -1;
-
-	i = max(ts->active_tier + 1, ts->saved_tier);
-	for (; i < ts->max_tier; i++) {
-		if (usage_suitable(i, usage))
-			break;
-	}
-
-	if (i > ts->saved_tier) {
-		ts->saved_tier = i;
-		ts->saved_timeout = jiffies + ts_global.saved_timeout;
-	}
-
-	return i;
-}
-
-static int find_tier_down(struct ts_cpu_priv *ts, unsigned long usage)
-{
-	int i;
-
-	if (!ts->active_tier || !usage_suitable(ts->active_tier, usage))
-		return -1;
-
-	if (ts->active_tier == 1) {
-		if (!usage_suitable(0, usage))
-			return -1;
-		return 0;
-	}
-
-	for (i = ts->active_tier - 2; i >= 0; i--) {
-		if (!usage_suitable(i, usage))
-			return (i + 2 == ts->active_tier) ? -1 : i + 2;
-	}
-
-	return 0;
 }
 
 /* ts_sample_worker:
@@ -372,110 +313,60 @@ static void ts_sample_worker(struct work_struct *work)
 {
 	struct ts_cpu_priv *ts =
 		container_of(work, struct ts_cpu_priv, work.work);
-	int next = -1;
-	unsigned long usage_khz, boost_tmp;
+	unsigned long avg_khz, fuzz_khz;
 
 	mutex_lock(&ts->cpu_mutex);
 
 	if (unlikely(!ts->enabled))
 		goto out_nosched;
 
-	usage_khz = get_usage(ts);
+	avg_khz = get_usage(ts);
+	insert_current_sample(ts);
 
 #ifndef MODULE
 	cpufreq_notify_utilization(ts->policy,
-		usage_khz / ts->policy->user_policy.max);
+		ts->current_usage_khz / ts->policy->user_policy.max);
 #endif
 
-	if (ts->saved_tier > 0 &&
-	    time_after_eq(jiffies, ts->saved_timeout) &&
-	    usage_khz < ts->tiers[ts->saved_tier]->avg) {
-		ts->saved_tier--;
-		ts->saved_timeout = jiffies + ts_global.saved_timeout;
+	fuzz_khz = ts->current_usage_khz + ts_global.extra_khz;
+	if (fuzz_khz >= avg_khz || fuzz_khz >= ts->policy->cur) {
+		unsigned long boost_tmp, khz_tmp;
+		int tier;
+
+		// Round off to the nearest tier
+		for (tier = 0; tier < ts->max_tier; tier++) {
+			if (ts->tiers[tier]->avg + ts->tiers[tier+1]->avg >
+			    fuzz_khz * 2)
+				break;
+		}
+
+		if (tier == ts->max_tier &&
+		    ts->tiers[tier]->avg <= ts->current_usage_khz &&
+		    ts->tiers[tier]->avg <= ts->policy->cur)
+			khz_tmp = ts->policy->max;
+		else
+			khz_tmp = ts->tiers[tier]->avg;
+		khz_tmp = khz_tmp - avg_khz;
+
+		if (avg_khz < ts->policy->cur + ts_global.extra_khz &&
+		    avg_khz < fuzz_khz)
+			boost_tmp = min(1024UL, 1024 *
+				(fuzz_khz - avg_khz) /
+				(ts->policy->cur - avg_khz +
+				ts_global.extra_khz));
+		else
+			boost_tmp = 1024;
+
+		avg_khz = ts->current_usage_khz + boost_tmp * khz_tmp / 1024;
 	}
-	next = find_tier_up(ts, usage_khz);
-	if (next == -1)
-		next = find_tier_down(ts, usage_khz);
-	if (next != -1)
-		ts->active_tier = next;
 
-	insert_current_sample(ts);
-
-	/* Boost only according to momentary usage to reduce aggressiveness
-	 * when coming out of idle.  The long-term average will remain
-	 * significantly elevated during idle.
-	 */
-	boost_tmp = ts->current_usage_khz * 1000 / ts->policy->cur;
-	boost_tmp = boost_tmp * boost_tmp / 1000;
-	boost_tmp = ts->current_usage_khz + boost_tmp * ts_global.extra_mhz
-		* min(6, (2 + ilog2(nr_running())));
-	if (usage_khz < boost_tmp)
-		usage_khz = boost_tmp;
-	if (ts->active_tier && usage_khz < ts->tiers[ts->active_tier]->avg)
-		usage_khz = ts->tiers[ts->active_tier]->avg;
-
-	__cpufreq_driver_target(ts->policy, usage_khz, CPUFREQ_RELATION_L);
+	__cpufreq_driver_target(ts->policy, avg_khz, CPUFREQ_RELATION_L);
 
 	queue_delayed_work_on(ts->policy->cpu, ts_global.wq, &ts->work,
 		ts_global.sample_time);
 
-	ts->current_usage.value = ts->current_usage.weight = 0;
-
 out_nosched:
 	mutex_unlock(&ts->cpu_mutex);
-}
-
-/* ts_idle_notify:
- * Handles idle-time logic.
- *
- * We use this callback to filter out long periods of idleness.  This results
- * in more responsive and more "correct" behavior.  Including the idle period
- * in demand sampling is incorrect in the sense that it doesn't predict future
- * demand well, except in the case of very light load at resume (e.g. a one-off
- * interrupt).
- *
- * We don't care what frequency the core is running at during idle.  It's
- * reasonable to expect that any task that was running prior to idle will
- * resume at its previous demand, and it doesn't make sense to ramp down due to
- * disk/net/whatever latency.
- */
-static int ts_idle_notify(struct notifier_block *nb, unsigned long val,
-			  void *data)
-{
-	struct ts_cpu_priv *ts = &per_cpu(ts_cpu, smp_processor_id());
-	ktime_t now;
-	s64 idle_ns;
-
-	// Not strictly needed (everything is cpu-bound), but lock anyway.
-	if (unlikely(!mutex_trylock(&ts->cpu_mutex)))
-		return 0;
-	// By default, all cores use the same governor in dkp
-	if (unlikely(!ts->enabled))
-		goto out;
-
-	now = ktime_get();
-
-	switch (val) {
-	case IDLE_START:
-		ts->idle_enter = now;
-		break;
-	case IDLE_END:
-		idle_ns = ktime_to_ns(ktime_sub(now, ts->idle_enter));
-		idle_ns -= jiffies_to_usecs(1) * 500;
-		if (idle_ns < 0)
-			break;
-
-		ts->prev_wall = ktime_add_ns(ts->prev_wall, idle_ns);
-		ts->prev_idle = ktime_add_ns(ts->prev_idle, idle_ns);
-
-		queue_delayed_work_on(ts->policy->cpu, ts_global.wq, &ts->work,
-				      1);
-		break;
-	}
-
-out:
-	mutex_unlock(&ts->cpu_mutex);
-	return 0;
 }
 
 static int ts_governor(struct cpufreq_policy *policy, unsigned int event)
@@ -502,11 +393,9 @@ static int ts_governor(struct cpufreq_policy *policy, unsigned int event)
 		mutex_lock(&ts->cpu_mutex);
 
 		ts->policy = policy;
-		ts->saved_tier =
-		ts->active_tier = 0;
-
 		ts->prev_wall = ktime_get();
 		ts->prev_idle = get_idle_ktime(policy->cpu);
+		ts->current_usage = (struct wmavg_sample){ 0 };
 
 		rebuild_priv(ts);
 		if (!ts->usage || !ts->tiers[0]) {
@@ -515,7 +404,6 @@ static int ts_governor(struct cpufreq_policy *policy, unsigned int event)
 		}
 
 		ts->enabled = 1;
-		INIT_DELAYED_WORK_DEFERRABLE(&ts->work, ts_sample_worker);
 		queue_delayed_work_on(ts->policy->cpu, ts_global.wq, &ts->work,
 			ts_global.sample_time);
 
@@ -526,17 +414,9 @@ static int ts_governor(struct cpufreq_policy *policy, unsigned int event)
 		ts->enabled = 0;
 		cancel_delayed_work_sync(&ts->work);
 
-		mutex_lock(&ts->cpu_mutex);
-		if (ts->usage && ts->tiers[ts->active_tier]) {
-			get_usage(ts);
-			insert_current_sample(ts);
-		}
-		mutex_unlock(&ts->cpu_mutex);
-
 		if (!--ts_global.enabled) {
 			sysfs_remove_group(cpufreq_global_kobject,
 				&ts_attr_grp);
-			idle_notifier_unregister(&ts_global.idle_nb);
 		}
 
 		break;
@@ -580,8 +460,8 @@ static int __init ts_init(void)
 		struct ts_cpu_priv *ts;
 		ts = &per_cpu(ts_cpu, i);
 		mutex_init(&ts->cpu_mutex);
+		INIT_DELAYED_WORK_DEFERRABLE(&ts->work, ts_sample_worker);
 	}
-	ts_global.idle_nb.notifier_call = ts_idle_notify;
 	ts_global.wq = alloc_workqueue("tierservative", WQ_HIGHPRI, NR_CPUS);
 	if (!ts_global.wq)
 		return -ENOMEM;
