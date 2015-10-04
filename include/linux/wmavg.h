@@ -23,6 +23,7 @@
  *
  * NB: While samples are 64-bit internally, values larger than 32-bit are
  *     likely to overflow.  Sum(value * weight) must be less than ULLONG_MAX.
+ *     Signed values are not supported.
  */
 
 #ifndef _WMAVG_H
@@ -58,11 +59,11 @@ struct wmavg_sample_list {
 };
 
 struct wmavg_average {
-	u64                 max_weight; // maximum weight of all samples
-	unsigned long       min_weight; // ignore insignificant samples
-	struct wmavg_sample __avg;      // accumulators for the average
 	unsigned long       avg;        // the average; updated every insert
-	struct list_head    samples;
+	unsigned long       min_weight; // ignore insignificant samples
+	u64                 max_weight; // maximum weight of all samples
+	struct wmavg_sample __avg;      // accumulators for the average
+	struct list_head    samples;    // list of wmavg_sample_list
 };
 
 struct wmavg_average *wmavg_alloc(void);
