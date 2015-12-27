@@ -64,8 +64,8 @@ struct ts_global_priv {
 };
 
 static struct ts_global_priv ts_global __read_mostly = {
-	.tier_count = 8,
-	.extra_khz = 25000,
+	.tier_count = 6,
+	.extra_khz = 33000,
 	.sample_time = MS(16),
 	.max_sample = 333,
 	.active_sample = 100,
