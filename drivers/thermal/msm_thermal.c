@@ -92,7 +92,6 @@ static void check_temp(struct work_struct *work)
 	unsigned long temp;
 	int i;
 
-	tsens_dev.sensor_num = msm_thermal_info.sensor_id;
 	tsens_get_temp(&tsens_dev, &temp);
 
 	for (i = 0; temp_limits[i].max_freq != UINT_MAX; i++) {
