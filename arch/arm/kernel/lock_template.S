@@ -2,7 +2,7 @@
  * arch/arm/kernel/lock_template.S
  * Generic spinlock slowpath implementation
  *
- * Copyright (C) 2014, Ryan Pennucci <decimalman@gmail.com>
+ * Copyright (C) 2014-2015, Ryan Pennucci <decimalman@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the Free
@@ -65,6 +65,7 @@
 	isb
 	msr	cpsr_cf, r2
 
+	dsb
 	spintest 12b
 
 	spintail
