@@ -571,7 +571,7 @@ static void cpufreq_skateractive_timer(unsigned long data)
 	spin_lock_irqsave(&speedchange_cpumask_lock, flags);
 	cpumask_set_cpu(data, &speedchange_cpumask);
 	spin_unlock_irqrestore(&speedchange_cpumask_lock, flags);
-	wake_up_process(speedchange_task);
+	wake_up_process_no_notif(speedchange_task);
 
 rearm_if_notmax:
 	/*
@@ -1626,7 +1626,7 @@ static int __init cpufreq_skateractive_init(void)
 	get_task_struct(speedchange_task);
 
 	/* NB: wake up so the thread does not look hung to the freezer */
-	wake_up_process(speedchange_task);
+	wake_up_process_no_notif(speedchange_task);
 
 	return cpufreq_register_governor(&cpufreq_gov_skateractive);
 }
