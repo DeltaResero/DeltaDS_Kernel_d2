@@ -52,6 +52,8 @@
 #include <linux/state_notifier.h>
 #endif
 
+#include <linux/display_state.h>
+
 #include <linux/platform_data/mms_ts.h>
 
 #include <asm/unaligned.h>
@@ -184,6 +186,13 @@ enum {
 
 #define ISC_CHAR_2_BCD(num)	(((num/10)<<4) + (num%10))
 #define ISC_MAX(x, y)		(((x) > (y)) ? (x) : (y))
+
+bool display_on = true;
+
+bool is_display_on()
+{
+	return display_on;
+}
 
 static const char section_name[SECTION_NUM][SECTION_NAME_LEN] = {
 	"BOOT", "CORE", "PRIV", "PUBL"
@@ -3112,6 +3121,9 @@ static int mms_ts_suspend(struct device *dev)
 	info->pdata->vdd_on(0);
 	msleep(50);
 
+
+	display_on = false;
+
 #ifdef CONFIG_STATE_NOTIFIER
 	state_suspend();
 #endif
@@ -3149,6 +3161,8 @@ static int mms_ts_resume(struct device *dev)
 	if (info->input_dev->users)
 		ret = mms_ts_enable(info, 0);
 	mutex_unlock(&info->input_dev->mutex);
+
+	display_on = true;
 
 #ifdef CONFIG_STATE_NOTIFIER
 	state_resume();
