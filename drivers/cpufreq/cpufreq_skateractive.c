@@ -493,6 +493,9 @@ static void cpufreq_skateractive_timer(unsigned long data)
 			new_freq = fastlane_freq(pcpu, cpu_load);
 		else
 		new_freq = choose_freq(pcpu, loadadjfreq);
+		if (new_freq > tunables->hispeed_freq &&
+				pcpu->target_freq < tunables->hispeed_freq)
+			new_freq = tunables->hispeed_freq;
 	}
 
 	if (pcpu->policy->cur >= tunables->hispeed_freq &&
