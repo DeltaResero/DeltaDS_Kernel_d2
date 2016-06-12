@@ -196,7 +196,7 @@ static int proc_root_getattr(struct vfsmount *mnt, struct dentry *dentry, struct
 )
 {
 	generic_fillattr(dentry->d_inode, stat);
-	stat->nlink = proc_root.nlink + nr_processes();
+	stat->nlink = proc_root->nlink + nr_processes();
 	return 0;
 }
 
@@ -248,7 +248,7 @@ static const struct inode_operations proc_root_inode_operations = {
 /*
  * This is the root "inode" in the /proc tree..
  */
-struct proc_dir_entry proc_root = {
+static struct proc_dir_entry __proc_root = {
 	.low_ino	= PROC_ROOT_INO, 
 	.namelen	= 5, 
 	.mode		= S_IFDIR | S_IRUGO | S_IXUGO, 
@@ -256,9 +256,10 @@ struct proc_dir_entry proc_root = {
 	.count		= ATOMIC_INIT(1),
 	.proc_iops	= &proc_root_inode_operations, 
 	.proc_fops	= &proc_root_operations,
-	.parent		= &proc_root,
+	.parent		= &__proc_root,
 	.name		= "/proc",
 };
+struct proc_dir_entry *proc_root = &__proc_root;
 
 int pid_ns_prepare_proc(struct pid_namespace *ns)
 {

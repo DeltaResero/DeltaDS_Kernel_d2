@@ -564,7 +564,7 @@ static int config_gpio_table(int gpio_en)
 				pr_err("%s not able to get gpio\n", __func__);
 				for (i--; i >= 0; i--)
 					gpio_free(gpio_conf->cam_gpio_tbl[i]);
-					break;
+				break;
 			}
 		}
 	} else {

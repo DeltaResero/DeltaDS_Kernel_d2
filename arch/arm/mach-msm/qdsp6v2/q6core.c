@@ -30,8 +30,10 @@
 
 #define TIMEOUT_MS 1000
 
+#ifdef CONFIG_DEBUG_FS
 static struct apr_svc *apr_handle_q;
 static struct apr_svc *apr_handle_m;
+#endif
 static struct apr_svc *core_handle_q;
 
 static int32_t query_adsp_ver;
@@ -127,6 +129,7 @@ static int32_t aprv2_core_fn_q(struct apr_client_data *data, void *priv)
 	return 0;
 }
 
+#ifdef CONFIG_DEBUG_FS
 static int32_t aprv2_debug_fn_q(struct apr_client_data *data, void *priv)
 {
 	pr_debug("Q6_Payload Length = %d\n", data->payload_size);
@@ -149,6 +152,7 @@ static ssize_t apr_debug_open(struct inode *inode, struct file *file)
 	pr_debug("apr debugfs opened\n");
 	return 0;
 }
+#endif
 
 void core_open(void)
 {
@@ -243,6 +247,7 @@ uint32_t core_get_adsp_version(void)
 }
 EXPORT_SYMBOL(core_get_adsp_version);
 
+#ifdef CONFIG_DEBUG_FS
 static ssize_t apr_debug_write(struct file *file, const char __user *buf,
 				size_t count, loff_t *ppos)
 {
@@ -384,6 +389,7 @@ static const struct file_operations apr_debug_fops = {
 	.write = apr_debug_write,
 	.open = apr_debug_open,
 };
+#endif
 
 static int __init core_init(void)
 {

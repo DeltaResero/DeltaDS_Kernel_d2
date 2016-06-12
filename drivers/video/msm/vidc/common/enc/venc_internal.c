@@ -2012,10 +2012,11 @@ map_ion_error:
 	if (control->kernel_virtual_addr)
 		ion_unmap_kernel(client_ctx->user_ion_client,
 			client_ctx->recon_buffer_ion_handle[i]);
-	if (client_ctx->recon_buffer_ion_handle[i])
+	if (client_ctx->recon_buffer_ion_handle[i]) {
 		ion_free(client_ctx->user_ion_client,
 			client_ctx->recon_buffer_ion_handle[i]);
 		client_ctx->recon_buffer_ion_handle[i] = NULL;
+	}
 import_ion_error:
 	return false;
 }

@@ -1867,12 +1867,13 @@ static int _find_start_of_cmd_seq(struct adreno_ringbuffer *rb,
 		/* Ensure above read is finished before next read */
 		rmb();
 		if (KGSL_CMD_IDENTIFIER == val1) {
-			if ((start_ptr / sizeof(unsigned int)) != rb->wptr)
+			if ((start_ptr / sizeof(unsigned int)) != rb->wptr) {
 				start_ptr = adreno_ringbuffer_dec_wrapped(
 							start_ptr, size);
 				*ptr = start_ptr;
 				status = 0;
 				break;
+			}
 		}
 	}
 	return status;
