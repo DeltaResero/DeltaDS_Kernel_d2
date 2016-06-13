@@ -62,12 +62,6 @@ enum subsys_state {
 	SUBSYS_CRASHED,
 };
 
-static const char * const subsys_states[] = {
-	[SUBSYS_OFFLINE] = "OFFLINE",
-	[SUBSYS_ONLINE] = "ONLINE",
-	[SUBSYS_CRASHED] = "CRASHED",
-};
-
 struct subsys_device {
 	struct subsys_desc *desc;
 	struct list_head list;

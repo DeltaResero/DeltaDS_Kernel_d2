@@ -706,14 +706,14 @@ static int fsa9485_detect_dev(struct fsa9485_usbsw *usbsw)
 			} else if (pdata->usb_cb) {
 				force_fast_charge |= 2;
 				pdata->usb_cb(FSA9485_ATTACHED);
-				if (usbsw->mansw) {
-					ret = i2c_smbus_write_byte_data(client,
-					FSA9485_REG_MANSW1, usbsw->mansw);
+			}
+			if (usbsw->mansw) {
+				ret = i2c_smbus_write_byte_data(client,
+				FSA9485_REG_MANSW1, usbsw->mansw);
 
-					if (ret < 0)
-						dev_err(&client->dev,
-							"%s: err %d\n", __func__, ret);
-				}
+				if (ret < 0)
+					dev_err(&client->dev,
+						"%s: err %d\n", __func__, ret);
 			}
 		/* USB_CDP */
 		} else if (val1 & DEV_USB_CHG) {
@@ -938,34 +938,34 @@ static int fsa9485_detect_dev(struct fsa9485_usbsw *usbsw)
 		} else if (usbsw->dev2 & DEV_JIG_UART_ON) {
 			if (pdata->dock_cb)
 				pdata->dock_cb(FSA9485_DETACHED_DOCK);
-				ret = i2c_smbus_read_byte_data(client,
-						FSA9485_REG_CTRL);
-				if (ret < 0)
-					dev_err(&client->dev,
-						"%s: err %d\n", __func__, ret);
+			ret = i2c_smbus_read_byte_data(client,
+					FSA9485_REG_CTRL);
+			if (ret < 0)
+				dev_err(&client->dev,
+					"%s: err %d\n", __func__, ret);
 
-				ret = i2c_smbus_write_byte_data(client,
-						FSA9485_REG_CTRL,
-						ret | CON_MANUAL_SW);
-				if (ret < 0)
-					dev_err(&client->dev,
-						"%s: err %d\n", __func__, ret);
-				usbsw->dock_attached = FSA9485_DETACHED;
+			ret = i2c_smbus_write_byte_data(client,
+					FSA9485_REG_CTRL,
+					ret | CON_MANUAL_SW);
+			if (ret < 0)
+				dev_err(&client->dev,
+					"%s: err %d\n", __func__, ret);
+			usbsw->dock_attached = FSA9485_DETACHED;
 #if defined(CONFIG_USB_SWITCH_SMART_DOCK_ENABLE)
 		} else if (usbsw->adc == 0x10) {
 			dev_info(&client->dev, "smart dock disconnect\n");
 
 			ret = i2c_smbus_read_byte_data(client,
 						FSA9485_REG_CTRL);
-				if (ret < 0)
-					dev_err(&client->dev,
-						"%s: err %d\n", __func__, ret);
-				ret = i2c_smbus_write_byte_data(client,
-						FSA9485_REG_CTRL,
-						ret | CON_MANUAL_SW);
-				if (ret < 0)
-					dev_err(&client->dev,
-						"%s: err %d\n", __func__, ret);
+			if (ret < 0)
+				dev_err(&client->dev,
+					"%s: err %d\n", __func__, ret);
+			ret = i2c_smbus_write_byte_data(client,
+					FSA9485_REG_CTRL,
+					ret | CON_MANUAL_SW);
+			if (ret < 0)
+				dev_err(&client->dev,
+					"%s: err %d\n", __func__, ret);
 
 			if (pdata->smartdock_cb)
 				pdata->smartdock_cb(FSA9485_DETACHED);
@@ -979,15 +979,15 @@ static int fsa9485_detect_dev(struct fsa9485_usbsw *usbsw)
 
 			ret = i2c_smbus_read_byte_data(client,
 						FSA9485_REG_CTRL);
-				if (ret < 0)
-					dev_err(&client->dev,
-						"%s: err %d\n", __func__, ret);
-				ret = i2c_smbus_write_byte_data(client,
-						FSA9485_REG_CTRL,
-						ret | CON_MANUAL_SW);
-				if (ret < 0)
-					dev_err(&client->dev,
-						"%s: err %d\n", __func__, ret);
+			if (ret < 0)
+				dev_err(&client->dev,
+					"%s: err %d\n", __func__, ret);
+			ret = i2c_smbus_write_byte_data(client,
+					FSA9485_REG_CTRL,
+					ret | CON_MANUAL_SW);
+			if (ret < 0)
+				dev_err(&client->dev,
+					"%s: err %d\n", __func__, ret);
 
 			if (pdata->audio_dock_cb)
 				pdata->audio_dock_cb(FSA9485_DETACHED);

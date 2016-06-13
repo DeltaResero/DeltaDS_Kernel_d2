@@ -222,7 +222,7 @@ extern struct rpc_clnt *nfs4_proc_lookup_mountpoint(struct inode *, struct qstr 
 			    struct nfs_fh *, struct nfs_fattr *);
 extern int nfs4_proc_secinfo(struct inode *, const struct qstr *, struct nfs4_secinfo_flavors *);
 extern int nfs4_release_lockowner(struct nfs4_lock_state *);
-extern const struct xattr_handler *nfs4_xattr_handlers[];
+extern const struct xattr_handler **nfs4_xattr_handlers;
 
 #if defined(CONFIG_NFS_V4_1)
 static inline struct nfs4_session *nfs4_get_session(const struct nfs_server *server)

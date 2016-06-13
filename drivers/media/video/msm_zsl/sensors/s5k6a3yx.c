@@ -450,23 +450,23 @@ static int32_t s5k6a3yx_write_exp_gain(
 		   old_fl_lines,
 		   old_line);
 
-		if ((gain == old_gain) &&  (line == old_line)) {
-			CDBG("%s XXX\n", __func__);
-			return rc;
-		}
+	if ((gain == old_gain) && (line == old_line)) {
+		CDBG("%s XXX\n", __func__);
+		return rc;
+	}
 
-		fl_lines = s_ctrl->curr_frame_length_lines;
-		fl_lines = (fl_lines * s_ctrl->fps_divider) / Q10;
-		offset = s_ctrl->sensor_exp_gain_info->vert_offset;
+	fl_lines = s_ctrl->curr_frame_length_lines;
+	fl_lines = (fl_lines * s_ctrl->fps_divider) / Q10;
+	offset = s_ctrl->sensor_exp_gain_info->vert_offset;
 
-		if (line > (fl_lines - offset))
-			fl_lines = line + offset;
+	if (line > (fl_lines - offset))
+		fl_lines = line + offset;
 
-			s5k6a3yx_write_exp_params(s_ctrl, gain, fl_lines, line);
+	s5k6a3yx_write_exp_params(s_ctrl, gain, fl_lines, line);
 
-		old_gain = gain;
-		old_line = line;
-		old_fl_lines = fl_lines;
+	old_gain = gain;
+	old_line = line;
+	old_fl_lines = fl_lines;
 
 	CDBG("%s X old_gain %d old_line %d\n", __func__, old_gain, old_line);
 

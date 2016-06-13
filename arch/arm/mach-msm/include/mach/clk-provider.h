@@ -27,7 +27,7 @@
  * Bit manipulation macros
  */
 #define BM(msb, lsb)	(((((uint32_t)-1) << (31-msb)) >> (31-msb+lsb)) << lsb)
-#define BVAL(msb, lsb, val)	(((val) << lsb) & BM(msb, lsb))
+#define BVAL(msb, lsb, val)	((((uint32_t)val) << lsb) & BM(msb, lsb))
 
 /*
  * Halt/Status Checking Mode Macros

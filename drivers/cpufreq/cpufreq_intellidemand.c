@@ -1652,7 +1652,7 @@ static void dbs_refresh_callback(struct work_struct *work)
 		 * Don't update governor frequency upon failure.
 		 */
 		if (__cpufreq_driver_target(policy, DBS_INPUT_EVENT_MIN_FREQ,
-					CPUFREQ_RELATION_L) >= 0);
+					CPUFREQ_RELATION_L) >= 0)
 			policy->cur = DBS_INPUT_EVENT_MIN_FREQ;
 		this_dbs_info->prev_cpu_idle = get_cpu_idle_time(cpu,
 				&this_dbs_info->prev_cpu_wall, 0);

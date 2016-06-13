@@ -586,14 +586,12 @@ KBUILD_CFLAGS	+= -fgraphite-identity -ftree-loop-distribution -floop-block -ftre
 # Modulo scheduling
 KBUILD_CFLAGS	+= -fmodulo-sched -fmodulo-sched-allow-regmoves
 # GCC extras
-KBUILD_CFLAGS	+= -fgcse-sm -fgcse-las -fsched-spec-load -fsched-pressure \
-		   -fsched-stalled-insns=0
+KBUILD_CFLAGS	+= -fgcse-sm -fgcse-las -fsched-spec-load -fsched-stalled-insns=0
 # GCC params
 KBUILD_CFLAGS	+= --param max-gcse-memory=0 \
 		   --param max-gcse-insertion-ratio=50 \
 		   --param max-tail-merge-comparisons=100 \
 		   --param max-tail-merge-iterations=4 \
-		   --param l1-cache-size=32 \
 		   --param l2-cache-size=1024
 else
 # Optimize for getting stuff done
@@ -608,18 +606,20 @@ KBUILD_CFLAGS	+= -fgraphite-identity -ftree-loop-distribution -floop-block -ftre
 KBUILD_CFLAGS	+= -fmodulo-sched -fmodulo-sched-allow-regmoves
 # GCC extras
 KBUILD_CFLAGS	+= -fgcse-sm -fgcse-las -fsched-spec-load -fsched-pressure \
-		   -fsched-stalled-insns=0
+		   -fsched-stalled-insns=0 -fsched-stalled-insns-dep=32
 # GCC params
 KBUILD_CFLAGS	+= --param max-gcse-memory=0 \
 		   --param max-gcse-insertion-ratio=50 \
 		   --param max-tail-merge-comparisons=100 \
 		   --param max-tail-merge-iterations=4 \
-		   --param l1-cache-size=32 \
 		   --param l2-cache-size=1024
 
 # New in GCC5
 ifeq ($(call cc-ifversion, -ge, 0501,y),y)
-KBUILD_CFLAGS	+= -flra-remat -fipa-ra
+KBUILD_CFLAGS	+= -fipa-ra -fgcse-after-reload -fira-hoist-pressure -fira-loop-pressure \
+		   -fsched2-use-superblocks -fno-semantic-interposition -floop-nest-optimize \
+		   -ftree-loop-if-convert -ftree-loop-distribution -ftree-loop-distribute-patterns \
+		   -fvariable-expansion-in-unroller
 endif
 endif
 

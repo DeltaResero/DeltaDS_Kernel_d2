@@ -490,12 +490,12 @@ int proc_fill_super(struct super_block *s)
 	s->s_op = &proc_sops;
 	s->s_time_gran = 1;
 	
-	pde_get(&proc_root);
-	s->s_root = d_make_root(proc_get_inode(s, &proc_root));
+	pde_get(proc_root);
+	s->s_root = d_make_root(proc_get_inode(s, proc_root));
 	if (s->s_root)
 		return 0;
 
 	printk("proc_read_super: get root inode failed\n");
-	pde_put(&proc_root);
+	pde_put(proc_root);
 	return -ENOMEM;
 }

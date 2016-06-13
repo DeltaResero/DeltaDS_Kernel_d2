@@ -74,7 +74,7 @@ extern void __init usb_switch_init(void);
 
 #ifdef CONFIG_SAMSUNG_CMC624
 extern int samsung_cmc624_on(int enable);
-extern int samsung_has_cmc624(void);
+extern bool samsung_has_cmc624(void);
 #endif
 
 enum {
@@ -111,7 +111,7 @@ extern void msm8960_add_vidc_device(void);
 extern void msm_otg_set_cable_state(int);
 extern void msm_otg_set_vbus_state(int);
 extern void msm_otg_set_charging_state(bool enable);
-extern void msm_otg_set_id_state(bool enable);
+extern void msm_otg_set_id_state(int online);
 extern void msm_otg_set_smartdock_state(bool enable);
 
 

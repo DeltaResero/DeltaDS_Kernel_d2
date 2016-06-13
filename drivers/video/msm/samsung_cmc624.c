@@ -1016,12 +1016,12 @@ int apply_main_tune_value(enum eLcd_mDNIe_UI ui, enum eBackground_Mode bg,
 	pr_debug("[CMC624:INFO]:%s: main tune : %s\n", __func__,
 		tune_value[bg][ui].value[cabc].name);
 
-if (ui == mDNIe_VIDEO_MODE ||
-	ui == mDNIe_VIDEO_WARM_MODE ||
-	ui == mDNIe_VIDEO_COLD_MODE)
-	video_mode = true;
-else
-	video_mode = false;
+	if (ui == mDNIe_VIDEO_MODE ||
+		ui == mDNIe_VIDEO_WARM_MODE ||
+		ui == mDNIe_VIDEO_COLD_MODE)
+		video_mode = true;
+	else
+		video_mode = false;
 
 	if ((ui == mDNIe_VIDEO_MODE) || (ui == mDNIe_DMB_MODE)) {
 		if (apply_sub_tune_value\
@@ -1085,9 +1085,12 @@ int apply_browser_tune_value(enum SCENARIO_COLOR_TONE browser_mode, int force)
 	pr_debug(" CMC624 Mode Change. brower tune\n");
 	pr_debug("==================================================\n");
 
-	if (!init_tune_flag[BROW_TUNE])
-		init_tune_flag[MAIN_TUNE] = 0; init_tune_flag[SUB_TUNE] = 0;\
-		init_tune_flag[BROW_TUNE] = 1; force = 1;
+	if (!init_tune_flag[BROW_TUNE]) {
+		init_tune_flag[MAIN_TUNE] = 0;
+		init_tune_flag[SUB_TUNE] = 0;
+		init_tune_flag[BROW_TUNE] = 1;
+		force = 1;
+	}
 
 	if ((force == 0) && (cmc624_state.browser_scenario == browser_mode)) {
 			pr_debug(

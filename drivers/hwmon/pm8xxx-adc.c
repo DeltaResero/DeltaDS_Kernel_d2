@@ -1107,6 +1107,7 @@ static ssize_t pm8xxx_adc_show(struct device *dev,
 		"Result:%lld Raw:%d\n", result.physical, result.adc_code);
 }
 
+#ifdef CONFIG_DEBUG_FS
 static int get_adc(void *data, u64 *val)
 {
 	struct pm8xxx_adc_chan_result result;
@@ -1123,7 +1124,6 @@ static int get_adc(void *data, u64 *val)
 }
 DEFINE_SIMPLE_ATTRIBUTE(reg_fops, get_adc, NULL, "%llu\n");
 
-#ifdef CONFIG_DEBUG_FS
 static void create_debugfs_entries(void)
 {
 	int i = 0;

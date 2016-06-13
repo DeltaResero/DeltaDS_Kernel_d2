@@ -90,8 +90,10 @@ static u32 bottom_spk_pamp_gpio = PM8921_GPIO_PM_TO_SYS(PMIC_GPIO_VPS_EN);
 static int msm8960_spk_control;
 static int msm8960_ext_bottom_spk_pamp;
 static int msm8960_ext_top_spk_pamp;
+#if defined(CONFIG_MACH_M2_DCM)
 static int msm8960_slim_0_rx_ch = 1;
 static int msm8960_slim_0_tx_ch = 1;
+#endif
 
 static int msm8960_btsco_rate = BTSCO_RATE_8KHZ;
 static int msm8960_btsco_ch = 1;
@@ -237,6 +239,7 @@ static void msm8960_ext_control(struct snd_soc_codec *codec)
 	mutex_unlock(&dapm->codec->mutex);
 }
 
+#if defined(CONFIG_MACH_M2_DCM)
 static int msm8960_get_spk(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
@@ -257,6 +260,7 @@ static int msm8960_set_spk(struct snd_kcontrol *kcontrol,
 	msm8960_ext_control(codec);
 	return 1;
 }
+#endif
 static int msm8960_spkramp_event(struct snd_soc_dapm_widget *w,
 	struct snd_kcontrol *k, int event)
 {
@@ -521,6 +525,7 @@ static const struct snd_soc_dapm_route express_audio_map_org[] = {
 	{"Ext Spk Top Pos", NULL, "LINEOUT2"}
 };
 
+#if defined(CONFIG_MACH_M2_DCM)
 /* Main Main LDO is added */
 static const struct snd_soc_dapm_widget msm8960_dapm_widgets_rev00[] = {
 
@@ -633,6 +638,7 @@ static const struct snd_soc_dapm_route common_audio_map_rev00[] = {
 	{"DMIC6", NULL, "MIC BIAS4 External"},
 	{"MIC BIAS4 External", NULL, "Digital Mic6"},
 };
+#endif
 
 
 /* VDD_CDC_RXTX , Third mic is added */
@@ -767,10 +773,12 @@ static const struct soc_enum msm8960_enum[] = {
 	SOC_ENUM_SINGLE_EXT(4, slim0_tx_ch_text),
 };
 
+#if defined(CONFIG_MACH_M2_DCM)
 static const char *btsco_rate_text[] = {"8000", "16000"};
 static const struct soc_enum msm8960_btsco_enum[] = {
 		SOC_ENUM_SINGLE_EXT(2, btsco_rate_text),
 };
+#endif
 
 static int msm8960_i2s_rx_ch_get(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
@@ -810,6 +818,7 @@ static int msm8960_i2s_tx_ch_put(struct snd_kcontrol *kcontrol,
 	return 1;
 }
 
+#if defined(CONFIG_MACH_M2_DCM)
 static int msm8960_slim_0_rx_ch_get(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
@@ -875,6 +884,7 @@ static int msm8960_btsco_rate_put(struct snd_kcontrol *kcontrol,
 					msm8960_btsco_rate);
 	return 0;
 }
+#endif
 
 static int msm8960_i2s_set_spk(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
@@ -907,6 +917,7 @@ static const struct snd_kcontrol_new tabla_msm8960_i2s_controls[] = {
 		msm8960_i2s_tx_ch_get, msm8960_i2s_tx_ch_put),
 };
 
+#if defined(CONFIG_MACH_M2_DCM)
 static const struct snd_kcontrol_new tabla_msm8960_controls[] = {
 	SOC_ENUM_EXT("Speaker Function", msm8960_enum[0], msm8960_get_spk,
 		msm8960_set_spk),
@@ -917,6 +928,7 @@ static const struct snd_kcontrol_new tabla_msm8960_controls[] = {
 	SOC_ENUM_EXT("Internal BTSCO SampleRate", msm8960_btsco_enum[0],
 		msm8960_btsco_rate_get, msm8960_btsco_rate_put),
 };
+#endif
 
 
 #if 0

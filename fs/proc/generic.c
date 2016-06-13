@@ -307,7 +307,7 @@ static int __xlate_proc_name(const char *name, struct proc_dir_entry **ret,
 
 	de = *ret;
 	if (!de)
-		de = &proc_root;
+		de = proc_root;
 
 	while (1) {
 		next = strchr(cp, '/');

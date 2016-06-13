@@ -6694,10 +6694,11 @@ static const struct xattr_handler nfs4_xattr_nfs4_acl_handler = {
 	.set	= nfs4_xattr_set_nfs4_acl,
 };
 
-const struct xattr_handler *nfs4_xattr_handlers[] = {
+static const struct xattr_handler *__nfs4_xattr_handlers[] = {
 	&nfs4_xattr_nfs4_acl_handler,
 	NULL
 };
+const struct xattr_handler **nfs4_xattr_handlers = __nfs4_xattr_handlers;
 
 module_param(max_session_slots, ushort, 0644);
 MODULE_PARM_DESC(max_session_slots, "Maximum number of outstanding NFSv4.1 "
