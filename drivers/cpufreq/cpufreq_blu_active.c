@@ -14,7 +14,7 @@
  * GNU General Public License for more details.
  *
  * Author: Mike Chan (mike@android.com)
- * Author: engstk (eng.stk@sapo.pt)
+  * Author: engstk (eng.stk@sapo.pt)
  *
  */
 
@@ -25,7 +25,6 @@
 #include <linux/moduleparam.h>
 #include <linux/rwsem.h>
 #include <linux/sched.h>
-#include <linux/sched/rt.h>
 #include <linux/tick.h>
 #include <linux/time.h>
 #include <linux/timer.h>
@@ -550,15 +549,17 @@ static void cpufreq_blu_active_timer(unsigned long data)
 			if (new_freq < tunables->hispeed_freq)
 				new_freq = tunables->hispeed_freq;
 		}
-	} else {
-		if (!tunables->fastlane)
-			new_freq = choose_freq(ppol, loadadjfreq);
-		else
-			new_freq = ppol->policy->min + cpu_load * (ppol->policy->max - ppol->policy->min) / 100;
-		if (new_freq > tunables->hispeed_freq &&
-				ppol->policy->cur < tunables->hispeed_freq)
-			new_freq = tunables->hispeed_freq;
-	}
+	} else if (cpu_load <= 5) {
+		new_freq = ppol->policy->min;
+		} else {
+			if (!tunables->fastlane)
+				new_freq = choose_freq(ppol, loadadjfreq);
+			else
+				new_freq = ppol->policy->min + cpu_load * (ppol->policy->max - ppol->policy->min) / 100;
+			if (new_freq > tunables->hispeed_freq &&
+					ppol->policy->cur < tunables->hispeed_freq)
+				new_freq = tunables->hispeed_freq;
+		}
 
 	if (now - ppol->max_freq_hyst_start_time <
 	    tunables->max_freq_hysteresis)
