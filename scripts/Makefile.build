@@ -131,7 +131,7 @@ endif
 # ===========================================================================
 
 ifneq ($(strip $(lib-y) $(lib-m) $(lib-n) $(lib-)),)
-lib-target := $(obj)/lib.a
+lib-target := $(obj)/lib-statics.o
 endif
 
 ifneq ($(strip $(obj-y) $(obj-m) $(obj-n) $(obj-) $(subdir-m) $(lib-target)),)
@@ -367,7 +367,7 @@ ifdef builtin-target
 quiet_cmd_link_o_target = LD      $@
 # If the list of objects to link is empty, just create an empty built-in.o
 cmd_link_o_target = $(if $(strip $(obj-y)),\
-		      $(LD) $(ld_flags) -r -o $@ $(filter $(obj-y), $^) \
+		      $(LD) $(ld_flags) -r -q -o $@ $(filter $(obj-y), $^) \
 		      $(cmd_secanalysis),\
 		      rm -f $@; $(AR) rcs$(KBUILD_ARFLAGS) $@)
 
@@ -395,7 +395,7 @@ $(modorder-target): $(subdir-ym) FORCE
 #
 ifdef lib-target
 quiet_cmd_link_l_target = LD      $@
-cmd_link_l_target = $(LD) $(ld_flags) -r -o $@ $(lib-y)
+cmd_link_l_target = $(LD) $(ld_flags) -r -q -o $@ $(lib-y)
 
 $(lib-target): $(lib-y) FORCE
 	$(call if_changed,link_l_target)
