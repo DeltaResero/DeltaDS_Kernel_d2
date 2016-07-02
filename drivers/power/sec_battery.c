@@ -1588,7 +1588,6 @@ static void sec_bat_monitor_work(struct work_struct *work)
 	pm8921_enable_batt_therm(1);
 	/* check battery 5 times */
 	for (i = 0; i < 5; i++) {
-		msleep(500);
 		info->present = !gpio_get_value_cansleep(info->batt_int);
 
 		/* If the battery is missing, then check more */
@@ -1596,6 +1595,7 @@ static void sec_bat_monitor_work(struct work_struct *work)
 			i++;
 			break;
 		}
+		msleep(500);
 	}
 	pm8921_enable_batt_therm(0);
 	pr_debug("%s: battery check is %s (%d time%c)\n",
