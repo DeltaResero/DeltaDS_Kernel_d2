@@ -11,6 +11,7 @@ DHDCFLAGS += -Wall -Wstrict-prototypes -Dlinux -DLINUX -DBCMDRIVER            \
         -DWIFI_ACT_FRAME -DARP_OFFLOAD_SUPPORT                                \
         -DKEEP_ALIVE -DCSCAN -DPKT_FILTER_SUPPORT                             \
         -DEMBEDDED_PLATFORM -DPNO_SUPPORT
+	-DBCMBUSTYPE=SDIO_BUS
 
 #################
 # Common feature
