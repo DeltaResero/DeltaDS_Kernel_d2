@@ -243,7 +243,7 @@ static int gic_suspend(void)
 	return 0;
 }
 
-#ifdef CONFIG_SHOW_RESUME_IRQ
+#ifdef CONFIG_MSM_SHOW_RESUME_IRQ
 extern int msm_show_resume_irq_mask;
 
 static void gic_show_resume_irq(struct gic_chip_data *gic)
