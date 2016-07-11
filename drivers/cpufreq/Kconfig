@@ -142,6 +142,18 @@ config CPU_FREQ_DEFAULT_GOV_FREELUNCH
 	bool "freelunch"
 	select CPU_FREQ_GOV_FREELUNCH
 
+config CPU_FREQ_DEFAULT_GOV_CHILL
+	bool "chill"
+	select CPU_FREQ_GOV_CHILL
+	select CPU_FREQ_GOV_INTERACTIVE
+	help
+	  Use the CPUFreq governor 'chill' as default. This allows
+	  you to get a full dynamic frequency capable system by simply
+	  loading your cpufreq low-level hardware driver.
+	  Be aware that not all cpufreq drivers support the conservative
+	  governor. If unsure have a look at the help section of the
+	  driver. Fallback governor will be the interactive governor.
+
 endchoice
 
 config CPU_FREQ_GOV_PERFORMANCE
@@ -278,6 +290,14 @@ config CPU_FREQ_GOV_TIERSERVATIVE
 	select WMAVG
 	help
 	  Here be dragons.
+
+config CPU_FREQ_GOV_CHILL
+	tristate "'chill' cpufreq governor"
+	depends on CPU_FREQ
+	default y
+	help
+	  'chill' - similar to 'conservative', but optimized for devices
+	  that go into suspended or display off states often.
 
 menu "x86 CPU frequency scaling drivers"
 depends on X86
