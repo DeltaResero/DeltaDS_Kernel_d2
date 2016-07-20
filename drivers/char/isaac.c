@@ -356,9 +356,9 @@ static inline void isaac_copyout(struct isaac_ctx *ctx, void *buf, size_t len)
 }
 
 /* isaac_copyout wrappers. */
-unsigned int get_random_int(void)
+unsigned long get_random_long(void)
 {
-	unsigned int r;
+	unsigned long r;
 	struct isaac_ctx *ctx = &get_cpu_var(cpu_seeds);
 
 	if (unlikely(!ctx->rem)) {

@@ -66,7 +66,15 @@ extern const struct file_operations isaac_fops;
 #endif
 #endif
 
+unsigned long get_random_long(void);
+#ifdef CONFIG_ISAAC_RANDOM
+static inline unsigned int get_random_int(void)
+{
+	return get_random_long();
+}
+#else
 unsigned int get_random_int(void);
+#endif
 unsigned long randomize_range(unsigned long start, unsigned long end, unsigned long len);
 
 u32 random32(void);

@@ -3352,10 +3352,13 @@ static int __init msm_ipc_router_init(void)
 	int i, ret;
 	struct msm_ipc_routing_table_entry *rt_entry;
 
-	msm_ipc_router_workqueue =
-		create_singlethread_workqueue("msm_ipc_router");
-	if (!msm_ipc_router_workqueue)
-		return -ENOMEM;
+#if defined(DEBUG)
+	ipc_rtr_log_ctxt = ipc_log_context_create(IPC_RTR_LOG_PAGES,
+						  "ipc_router");
+	if (!ipc_rtr_log_ctxt)
+		pr_err("%s: Unable to create IPC logging for IPC RTR",
+			__func__);
+#endif
 
 	debugfs_init();
 
@@ -3382,6 +3385,10 @@ static int __init msm_ipc_router_init(void)
 	if (ret < 0)
 		pr_err("%s: Security Init failed\n", __func__);
 
+	msm_ipc_router_workqueue =
+		create_singlethread_workqueue("msm_ipc_router");
+	if (!msm_ipc_router_workqueue)
+		return -ENOMEM;
 	complete_all(&msm_ipc_local_router_up);
 	return ret;
 }

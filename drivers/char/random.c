@@ -1352,6 +1352,12 @@ unsigned int get_random_int(void) {
 	get_random_bytes((u8 *)&ret, sizeof(ret));
 	return ret;
 }
+unsigned long get_random_long(void) {
+	unsigned long ret;
+	get_random_bytes((u8 *)&ret, sizeof(ret));
+	return ret;
+}
+EXPORT_SYMBOL(get_random_long);
 #endif
 
 /*

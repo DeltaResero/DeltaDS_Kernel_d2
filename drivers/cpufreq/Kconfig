@@ -46,12 +46,16 @@ config CPU_FREQ_STAT_DETAILS
 
 	  If in doubt, say N.
 
-config CPU_BOOST_DRIVER
-	bool "CPU frequency boost driver"
+config CPU_FREQ_LIMIT
+	tristate "CPU frequency limits"
 	help
-	  A battery-hungry hydra: cut one touch booster off, two more grow back
-	  in its place.  This one is particularly vicious: it's even more
-	  aggressive, and it breaks CPU hotplugging.
+	  This driver allows userspace to limit the CPU frequency through sysfs
+	  file system.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called cpufreq_stats.
+
+	  If in doubt, say N.
 
 choice
 	prompt "Default CPUFreq governor"

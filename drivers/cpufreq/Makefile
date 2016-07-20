@@ -19,7 +19,8 @@ obj-$(CONFIG_CPU_FREQ_GOV_TIERSERVATIVE)+= cpufreq_tierservative.o
 # CPUfreq cross-arch helpers
 obj-$(CONFIG_CPU_FREQ_TABLE)		+= freq_table.o
 
-obj-$(CONFIG_CPU_FREQ_DVFS_MONITOR)	+= dvfs_monitor.o
+# CPUfreq limiter
+obj-$(CONFIG_CPU_FREQ_LIMIT) += cpufreq_limit.o
 
 ##################################################################################
 # x86 drivers.
