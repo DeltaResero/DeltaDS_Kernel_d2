@@ -41,6 +41,8 @@ static inline void atomic_add(int i, atomic_t *v)
 	unsigned long tmp;
 	int result;
 
+	prefetchw(&v->counter);
+
 	__asm__ __volatile__("@ atomic_add\n"
 "1:	ldrex	%0, [%3]\n"
 "	add	%0, %0, %4\n"
@@ -79,6 +81,8 @@ static inline void atomic_sub(int i, atomic_t *v)
 {
 	unsigned long tmp;
 	int result;
+
+	prefetchw(&v->counter);
 
 	__asm__ __volatile__("@ atomic_sub\n"
 "1:	ldrex	%0, [%3]\n"
@@ -341,6 +345,8 @@ static inline void atomic64_add(u64 i, atomic64_t *v)
 	u64 result;
 	unsigned long tmp;
 
+	prefetchw(&v->counter);
+
 	__asm__ __volatile__("@ atomic64_add\n"
 "1:	ldrexd	%0, %H0, [%3]\n"
 "	adds	%0, %0, %4\n"
@@ -381,6 +387,8 @@ static inline void atomic64_sub(u64 i, atomic64_t *v)
 {
 	u64 result;
 	unsigned long tmp;
+
+	prefetchw(&v->counter);
 
 	__asm__ __volatile__("@ atomic64_sub\n"
 "1:	ldrexd	%0, %H0, [%3]\n"
