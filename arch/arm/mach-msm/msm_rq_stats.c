@@ -299,8 +299,18 @@ static struct kobj_attribute hotplug_disabled_attr = __ATTR_RO(hotplug_disable);
 
 static void def_work_fn(struct work_struct *work)
 {
-	/* Notify polling threads on change of value */
-	sysfs_notify(rq_info.kobj, NULL, "def_timer_ms");
+	struct sysfs_dirent *sd = sysfs_get_dirent(rq_info.kobj->sd, NULL,
+		"def_timer_ms");
+	if (!sd)
+		return;
+
+	if (sysfs_dirent_is_open(sd)) {
+		/* Notify polling threads on change of value */
+		sysfs_notify(rq_info.kobj, NULL, "def_timer_ms");
+	} else {
+		hotplug_alg_available(&mpdec_alg, 0);
+	}
+	sysfs_put(sd);
 }
 
 static ssize_t run_queue_avg_show(struct kobject *kobj,
