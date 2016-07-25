@@ -110,9 +110,9 @@ static void reset_history(void)
 }
 
 static int hotplug_sampling_rate = 4;
-static int hotplug_enable_all_threshold = 300;
-static int hotplug_enable_one_threshold = 200;
-static int hotplug_disable_one_threshold = 67;
+static int hotplug_enable_all_threshold = 333;
+static int hotplug_enable_one_threshold = 233;
+static int hotplug_disable_one_threshold = 133;
 static __GATTR_NAME(enable_autohp,
 	enable, 0, 1, enable_autohp_cb);
 static __GATTR_NAME(hotplug_sampling_periods,
