@@ -648,6 +648,12 @@ struct sysfs_dirent *sysfs_get_dirent(struct sysfs_dirent *parent_sd,
 }
 EXPORT_SYMBOL_GPL(sysfs_get_dirent);
 
+int sysfs_dirent_is_open(struct sysfs_dirent *sd)
+{
+	return !!sd->s_attr.open;
+}
+EXPORT_SYMBOL_GPL(sysfs_dirent_open);
+
 static int create_dir(struct kobject *kobj, struct sysfs_dirent *parent_sd,
 	enum kobj_ns_type type, const void *ns, const char *name,
 	struct sysfs_dirent **p_sd)
