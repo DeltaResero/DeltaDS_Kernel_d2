@@ -452,12 +452,7 @@ static void tz_idle(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 	device->ftbl->power_stats(device, &stats);
 	priv->bin.total_time += stats.total_time;
 	priv->bin.busy_time += stats.busy_time;
-	/* Do not waste CPU cycles running this algorithm if
-	 * the GPU just started, or if less than FLOOR time
-	 * has passed since the last run.
-	 */
-	if (stats.total_time == 0 || priv->bin.total_time <
-	    (priv->governor == TZ_GOVERNOR_SIMPLE ? SIMPLE_FLOOR : FLOOR))
+	if (!priv->bin.total_time)
 		return;
 	/* Skip progressively more samples as the frequency stays stable for
 	 * long periods.  For non-maximum frequencies, sample more frequently
@@ -467,12 +462,14 @@ static void tz_idle(struct kgsl_device *device, struct kgsl_pwrscale *pwrscale)
 		return;
 	if (priv->skip_cnt > 31 && priv->skip_mask <
 	    ((pwr->active_pwrlevel == pwr->thermal_pwrlevel) ? 31 : 7))
-		priv->skip_mask = (priv->skip_mask << 1) + 1;
+		priv->skip_mask = (priv->skip_mask << 1) | 1;
 
 	idle = priv->bin.total_time - priv->bin.busy_time;
 	idle = (idle > 0) ? idle : 0;
-	idle *= idle_scale;
-	do_div(idle, priv->bin.total_time);
+	if (priv->bin.total_time > idle_scale) {
+		idle *= idle_scale;
+		do_div(idle, priv->bin.total_time);
+	}
 	priv->bin.total_time = 0;
 	priv->bin.busy_time = 0;
 #ifdef CONFIG_MSM_KGSL_SIMPLE_GOV
