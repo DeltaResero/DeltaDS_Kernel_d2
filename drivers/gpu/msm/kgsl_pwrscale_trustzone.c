@@ -125,7 +125,8 @@ static ssize_t tz_governor_store(struct kgsl_device *device,
 		priv->governor = TZ_GOVERNOR_SIMPLE;
 #endif
 #ifdef CONFIG_MSM_KGSL_TIERED_GOV
-	else if (!strncmp(buf, "interactive", 11)) {
+	else if (!strncmp(buf, "interactive", 11) ||
+		 !strncmp(buf, "conservative", 12)) {
 		priv->governor = TZ_GOVERNOR_TIERED;
 		priv->tiered_next_up = priv->tiered_next_down = ktime_get();
 	}
