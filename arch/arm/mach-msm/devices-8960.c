@@ -3343,8 +3343,11 @@ struct platform_device msm_slim_ctrl = {
 static struct msm_dcvs_freq_entry grp3d_freq[] = {
 	{0, 900, 0, 0, 0},
 	{0, 950, 0, 0, 0},
-	{0, 950, 0, 0, 0},
-	{0, 1200, 1, 100, 100},
+	{0, 950, 0, 50, 50},
+	{0, 1100, 0, 100, 100},
+	{0, 1100, 0, 100, 100},
+	{0, 1150, 1, 125, 125},
+	{0, 1200, 1, 175, 175},
 };
 
 static struct msm_dcvs_freq_entry grp2d_freq[] = {
@@ -3641,6 +3644,21 @@ static struct kgsl_device_iommu_data kgsl_3d0_iommu_data[] = {
 static struct kgsl_device_platform_data kgsl_3d0_pdata = {
 	.pwrlevel = {
 		{
+			.gpu_freq = 600000000,
+			.bus_freq = 4,
+			.io_fraction = 0,
+		},
+		{
+			.gpu_freq = 533333000,
+			.bus_freq = 4,
+			.io_fraction = 0,
+		},
+		{
+			.gpu_freq = 480000000,
+			.bus_freq = 4,
+			.io_fraction = 0,
+		},
+		{
 			.gpu_freq = 400000000,
 			.bus_freq = 4,
 			.io_fraction = 0,
@@ -3665,7 +3683,7 @@ static struct kgsl_device_platform_data kgsl_3d0_pdata = {
 			.bus_freq = 0,
 		},
 	},
-	.init_level = 1,
+	.init_level = 4,
 	.num_levels = ARRAY_SIZE(grp3d_freq) + 1,
 	.set_grp_async = NULL,
 	.idle_timeout = HZ/12,
