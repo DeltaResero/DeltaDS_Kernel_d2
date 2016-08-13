@@ -16,6 +16,7 @@ obj-$(CONFIG_CPU_FREQ_GOV_CONSERVATIVE)	+= cpufreq_conservative.o
 obj-$(CONFIG_CPU_FREQ_GOV_INTERACTIVE)	+= cpufreq_interactive.o
 obj-$(CONFIG_CPU_FREQ_GOV_LIONFISH)	+= cpufreq_lionfish.o
 obj-$(CONFIG_CPU_FREQ_GOV_FREELUNCH)	+= cpufreq_freelunch.o
+obj-$(CONFIG_CPU_FREQ_GOV_TIERSERVATIVE)+= cpufreq_tierservative.o
 
 # CPUfreq cross-arch helpers
 obj-$(CONFIG_CPU_FREQ_TABLE)		+= freq_table.o
