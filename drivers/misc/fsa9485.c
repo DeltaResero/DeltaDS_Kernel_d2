@@ -36,6 +36,8 @@
 #include <linux/mfd/pmic8058.h>
 #include <linux/input.h>
 #include <linux/sii9234.h>
+#include <linux/kobject.h>
+#include <linux/sysfs.h>
 
 /* FSA9480 I2C registers */
 #define FSA9485_REG_DEVID		0x01
@@ -135,6 +137,9 @@
 #define	ADC_JIG_UART_ON		0x1d
 #define	ADC_CARDOCK		0x1d
 #define	ADC_OPEN		0x1f
+
+/* (1 = enabled) | (2 = state_usb) | (4 = state_fast) */
+static int force_fast_charge;
 
 int uart_connecting;
 EXPORT_SYMBOL(uart_connecting);
@@ -241,8 +246,9 @@ void fsa9485_checkandhookaudiodockfornoise(int value)
 		if (ret < 0)
 			dev_err(&client->dev,
 					"%s: err %d\n", __func__, ret);
-		} else
-			pr_info("Dock is not connect\n");
+	} else {
+		pr_info("Dock is not connect\n");
+	}
 }
 #endif
 
@@ -254,48 +260,48 @@ void FSA9485_CheckAndHookAudioDock(int value)
 
 	if (value) {
 		pr_info("FSA9485_CheckAndHookAudioDock ON\n");
-			if (pdata->dock_cb)
-				pdata->dock_cb(FSA9485_ATTACHED_DESK_DOCK);
+		if (pdata->dock_cb)
+			pdata->dock_cb(FSA9485_ATTACHED_DESK_DOCK);
 
-			ret = i2c_smbus_write_byte_data(client,
-					FSA9485_REG_MANSW1, SW_AUDIO);
+		ret = i2c_smbus_write_byte_data(client,
+				FSA9485_REG_MANSW1, SW_AUDIO);
 
-			if (ret < 0)
-				dev_err(&client->dev, "%s: err %d\n",
-							__func__, ret);
+		if (ret < 0)
+			dev_err(&client->dev, "%s: err %d\n",
+						__func__, ret);
 
-			ret = i2c_smbus_read_byte_data(client,
-							FSA9485_REG_CTRL);
-
-			if (ret < 0)
-				dev_err(&client->dev, "%s: err %d\n",
-							__func__, ret);
-
-			ret = i2c_smbus_write_byte_data(client,
-					FSA9485_REG_CTRL,
-					ret & ~CON_MANUAL_SW & ~CON_RAW_DATA);
-			if (ret < 0)
-				dev_err(&client->dev,
-						"%s: err %d\n", __func__, ret);
-		} else {
-			dev_info(&client->dev,
-			"FSA9485_CheckAndHookAudioDock Off\n");
-
-			if (pdata->dock_cb)
-				pdata->dock_cb(FSA9485_DETACHED_DOCK);
-
-			ret = i2c_smbus_read_byte_data(client,
+		ret = i2c_smbus_read_byte_data(client,
 						FSA9485_REG_CTRL);
-			if (ret < 0)
-				dev_err(&client->dev,
-					"%s: err %d\n", __func__, ret);
 
-			ret = i2c_smbus_write_byte_data(client,
-					FSA9485_REG_CTRL,
-					ret | CON_MANUAL_SW | CON_RAW_DATA);
-			if (ret < 0)
-				dev_err(&client->dev,
+		if (ret < 0)
+			dev_err(&client->dev, "%s: err %d\n",
+						__func__, ret);
+
+		ret = i2c_smbus_write_byte_data(client,
+				FSA9485_REG_CTRL,
+				ret & ~CON_MANUAL_SW & ~CON_RAW_DATA);
+		if (ret < 0)
+			dev_err(&client->dev,
 					"%s: err %d\n", __func__, ret);
+	} else {
+		dev_info(&client->dev,
+		"FSA9485_CheckAndHookAudioDock Off\n");
+
+		if (pdata->dock_cb)
+			pdata->dock_cb(FSA9485_DETACHED_DOCK);
+
+		ret = i2c_smbus_read_byte_data(client,
+					FSA9485_REG_CTRL);
+		if (ret < 0)
+			dev_err(&client->dev,
+				"%s: err %d\n", __func__, ret);
+
+		ret = i2c_smbus_write_byte_data(client,
+				FSA9485_REG_CTRL,
+				ret | CON_MANUAL_SW | CON_RAW_DATA);
+		if (ret < 0)
+			dev_err(&client->dev,
+				"%s: err %d\n", __func__, ret);
 	}
 }
 
@@ -689,8 +695,13 @@ static int fsa9485_detect_dev(struct fsa9485_usbsw *usbsw)
 		if (val1 & DEV_USB || val2 & DEV_T2_USB_MASK) {
 			dev_info(&client->dev, "usb connect\n");
 
-			if (pdata->usb_cb)
+			if ((force_fast_charge & 1) && pdata->charger_cb) {
+				force_fast_charge |= 4;
+				pdata->charger_cb(FSA9485_ATTACHED);
+			} else if (pdata->usb_cb) {
+				force_fast_charge |= 2;
 				pdata->usb_cb(FSA9485_ATTACHED);
+			}
 			if (usbsw->mansw) {
 				ret = i2c_smbus_write_byte_data(client,
 				FSA9485_REG_MANSW1, usbsw->mansw);
@@ -866,8 +877,12 @@ static int fsa9485_detect_dev(struct fsa9485_usbsw *usbsw)
 		/* USB */
 		if (usbsw->dev1 & DEV_USB ||
 				usbsw->dev2 & DEV_T2_USB_MASK) {
-			if (pdata->usb_cb)
+			if ((force_fast_charge & 4) && pdata->charger_cb)
 				pdata->usb_cb(FSA9485_DETACHED);
+			else if ((force_fast_charge & 2) && pdata->usb_cb)
+				pdata->usb_cb(FSA9485_DETACHED);
+			else BUG();
+			force_fast_charge &= 1;
 		} else if (usbsw->dev1 & DEV_USB_CHG) {
 			if (pdata->usb_cdp_cb)
 				pdata->usb_cdp_cb(FSA9485_DETACHED);
@@ -918,34 +933,34 @@ static int fsa9485_detect_dev(struct fsa9485_usbsw *usbsw)
 		} else if (usbsw->dev2 & DEV_JIG_UART_ON) {
 			if (pdata->dock_cb)
 				pdata->dock_cb(FSA9485_DETACHED_DOCK);
-				ret = i2c_smbus_read_byte_data(client,
-						FSA9485_REG_CTRL);
-				if (ret < 0)
-					dev_err(&client->dev,
-						"%s: err %d\n", __func__, ret);
+			ret = i2c_smbus_read_byte_data(client,
+					FSA9485_REG_CTRL);
+			if (ret < 0)
+				dev_err(&client->dev,
+					"%s: err %d\n", __func__, ret);
 
-				ret = i2c_smbus_write_byte_data(client,
-						FSA9485_REG_CTRL,
-						ret | CON_MANUAL_SW);
-				if (ret < 0)
-					dev_err(&client->dev,
-						"%s: err %d\n", __func__, ret);
-				usbsw->dock_attached = FSA9485_DETACHED;
+			ret = i2c_smbus_write_byte_data(client,
+					FSA9485_REG_CTRL,
+					ret | CON_MANUAL_SW);
+			if (ret < 0)
+				dev_err(&client->dev,
+					"%s: err %d\n", __func__, ret);
+			usbsw->dock_attached = FSA9485_DETACHED;
 #if defined(CONFIG_USB_SWITCH_SMART_DOCK_ENABLE)
 		} else if (usbsw->adc == 0x10) {
 			dev_info(&client->dev, "smart dock disconnect\n");
 
 			ret = i2c_smbus_read_byte_data(client,
 						FSA9485_REG_CTRL);
-				if (ret < 0)
-					dev_err(&client->dev,
-						"%s: err %d\n", __func__, ret);
-				ret = i2c_smbus_write_byte_data(client,
-						FSA9485_REG_CTRL,
-						ret | CON_MANUAL_SW);
-				if (ret < 0)
-					dev_err(&client->dev,
-						"%s: err %d\n", __func__, ret);
+			if (ret < 0)
+				dev_err(&client->dev,
+					"%s: err %d\n", __func__, ret);
+			ret = i2c_smbus_write_byte_data(client,
+					FSA9485_REG_CTRL,
+					ret | CON_MANUAL_SW);
+			if (ret < 0)
+				dev_err(&client->dev,
+					"%s: err %d\n", __func__, ret);
 
 			if (pdata->smartdock_cb)
 				pdata->smartdock_cb(FSA9485_DETACHED);
@@ -959,15 +974,15 @@ static int fsa9485_detect_dev(struct fsa9485_usbsw *usbsw)
 
 			ret = i2c_smbus_read_byte_data(client,
 						FSA9485_REG_CTRL);
-				if (ret < 0)
-					dev_err(&client->dev,
-						"%s: err %d\n", __func__, ret);
-				ret = i2c_smbus_write_byte_data(client,
-						FSA9485_REG_CTRL,
-						ret | CON_MANUAL_SW);
-				if (ret < 0)
-					dev_err(&client->dev,
-						"%s: err %d\n", __func__, ret);
+			if (ret < 0)
+				dev_err(&client->dev,
+					"%s: err %d\n", __func__, ret);
+			ret = i2c_smbus_write_byte_data(client,
+					FSA9485_REG_CTRL,
+					ret | CON_MANUAL_SW);
+			if (ret < 0)
+				dev_err(&client->dev,
+					"%s: err %d\n", __func__, ret);
 
 			if (pdata->audio_dock_cb)
 				pdata->audio_dock_cb(FSA9485_DETACHED);
@@ -1393,6 +1408,51 @@ static int fsa9485_resume(struct i2c_client *client)
 	return 0;
 }
 
+/* This is kind of hacky, but most of this code already abuses local_usbsw. */
+static inline void ffc_migrate(void) {
+	struct fsa9485_platform_data *pdata;
+	if (!local_usbsw || !local_usbsw->pdata) return;
+	pdata = local_usbsw->pdata;
+	if (pdata->usb_cb && pdata->charger_cb) {
+		if (force_fast_charge == 3) {
+			/* enabled | state_usb */
+			pdata->usb_cb(FSA9485_DETACHED);
+			pdata->charger_cb(FSA9485_ATTACHED);
+			force_fast_charge = 5;
+		} else if (force_fast_charge == 4) {
+			/* !enabled | state_fast */
+			pdata->charger_cb(FSA9485_DETACHED);
+			pdata->usb_cb(FSA9485_ATTACHED);
+			force_fast_charge = 2;
+		}
+	}
+}
+
+static ssize_t ffc_show(struct kobject *kobj,
+	struct kobj_attribute *attr, char *buf) {
+	return sprintf(buf, "%u\n", force_fast_charge & 1);
+}
+
+static ssize_t ffc_store(struct kobject *kobj,
+	struct kobj_attribute *attr, const char *buf, size_t count) {
+	int tmp;
+	if (sscanf(buf, "%u", &tmp)) {
+		if (!(tmp & ~1)) {
+			force_fast_charge = (force_fast_charge & ~1) | tmp;
+			ffc_migrate();
+			return count;
+		}
+	}
+	return -EINVAL;
+}
+
+static struct kobj_attribute ffc_attr =
+	__ATTR(force_fast_charge, 0666, ffc_show, ffc_store);
+static struct attribute *ffc_attrs[] = { &ffc_attr.attr, NULL };
+static struct attribute_group ffc_attr_group = {
+	.attrs = ffc_attrs,
+	.name = "fast_charge"
+};
 
 static const struct i2c_device_id fsa9485_id[] = {
 	{"fsa9485", 0},
@@ -1412,6 +1472,8 @@ static struct i2c_driver fsa9485_i2c_driver = {
 
 static int __init fsa9485_init(void)
 {
+	if (sysfs_create_group(kernel_kobj, &ffc_attr_group))
+		pr_err("Unable to create fast_charge group!\n");
 	return i2c_add_driver(&fsa9485_i2c_driver);
 }
 module_init(fsa9485_init);
