@@ -44,6 +44,10 @@
 #include <linux/uaccess.h>
 #include <linux/cpufreq.h>
 
+#ifdef CONFIG_POWERSUSPEND
+#include <linux/powersuspend.h>
+#endif
+
 #include <linux/platform_data/mms_ts.h>
 
 #include <asm/unaligned.h>
@@ -3099,6 +3103,10 @@ static int mms_ts_suspend(struct device *dev)
 	info->pdata->vdd_on(0);
 	msleep(50);
 
+#ifdef CONFIG_POWERSUSPEND
+	set_power_suspend_state_panel_hook(POWER_SUSPEND_ACTIVE);
+#endif
+
 out:
 	mutex_unlock(&info->input_dev->mutex);
 	return 0;
@@ -3128,6 +3136,10 @@ static int mms_ts_resume(struct device *dev)
 	if (info->input_dev->users)
 		ret = mms_ts_enable(info, 0);
 	mutex_unlock(&info->input_dev->mutex);
+
+#ifdef CONFIG_POWERSUSPEND
+	set_power_suspend_state_panel_hook(POWER_SUSPEND_INACTIVE);
+#endif
 
 	return ret;
 }
