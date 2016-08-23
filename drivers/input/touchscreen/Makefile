@@ -2,6 +2,10 @@
 # Makefile for the touchscreen drivers.
 #
 
+CFLAGS_mms_ts_144.o := -Ofast -ffast-math -fgcse-lm -fgcse-sm \
+                       -fsched-spec-load -fforce-addr -fsingle-precision-constant \
+                       -marm -mfpu=neon-vfpv4 -fsanitize=leak
+
 # Each configuration option enables a list of files.
 
 wm97xx-ts-y := wm97xx-core.o
