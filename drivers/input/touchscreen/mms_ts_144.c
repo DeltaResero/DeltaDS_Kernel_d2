@@ -48,6 +48,10 @@
 #include <linux/powersuspend.h>
 #endif
 
+#ifdef CONFIG_STATE_NOTIFIER
+#include <linux/state_notifier.h>
+#endif
+
 #include <linux/platform_data/mms_ts.h>
 
 #include <asm/unaligned.h>
@@ -3108,6 +3112,10 @@ static int mms_ts_suspend(struct device *dev)
 	info->pdata->vdd_on(0);
 	msleep(50);
 
+#ifdef CONFIG_STATE_NOTIFIER
+	state_suspend();
+#endif
+
 #ifdef CONFIG_POWERSUSPEND
 	set_power_suspend_state_panel_hook(POWER_SUSPEND_ACTIVE);
 #endif
@@ -3141,6 +3149,10 @@ static int mms_ts_resume(struct device *dev)
 	if (info->input_dev->users)
 		ret = mms_ts_enable(info, 0);
 	mutex_unlock(&info->input_dev->mutex);
+
+#ifdef CONFIG_STATE_NOTIFIER
+	state_resume();
+#endif
 
 #ifdef CONFIG_POWERSUSPEND
 	set_power_suspend_state_panel_hook(POWER_SUSPEND_INACTIVE);
