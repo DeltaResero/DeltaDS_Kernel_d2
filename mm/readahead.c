@@ -377,8 +377,8 @@ static int try_context_readahead(struct address_space *mapping,
 	 * no history pages:
 	 * it could be a random read
 	 */
-	if (!size)
-		return 0;
+	if (size <= req_size)
+ 		return 0;
 
 	/*
 	 * starts from beginning of file:
@@ -388,8 +388,8 @@ static int try_context_readahead(struct address_space *mapping,
 		size <<= 1;
 
 	ra->start = offset;
-	ra->size = get_init_ra_size(size + req_size, max);
-	ra->async_size = ra->size;
+	ra->size = min(size + req_size, max);
+	ra->async_size = 1;
 
 	return 1;
 }
