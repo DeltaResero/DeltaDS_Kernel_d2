@@ -1,5 +1,13 @@
 # Kconfig file for hotplugs
 
+config ASMP
+	bool "Multi-core automatic hotplug support"
+        depends on SMP && HOTPLUG_CPU
+        default n
+        help
+          Automatically hotplugs the multiple cpu cores on and off
+          based on cpu load and suspend state
+
 config INTELLI_PLUG
 	bool "Enable intelli-plug cpu hotplug driver"
 	default n
