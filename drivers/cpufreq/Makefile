@@ -1,5 +1,5 @@
 # CPUfreq core
-obj-$(CONFIG_CPU_FREQ)			+= cpufreq.o
+obj-$(CONFIG_CPU_FREQ)			+= cpufreq.o cpufreq_governor.o
 
 # CPU Boost
 obj-$(CONFIG_CPU_BOOST_DRIVER)		+= cpu-boost.o
