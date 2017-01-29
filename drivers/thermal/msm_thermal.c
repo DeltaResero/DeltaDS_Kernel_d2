@@ -27,7 +27,7 @@
 #include <mach/cpufreq.h>
 #include <linux/cpufreq_limit.h>
 
-unsigned int temp_threshold = 70;
+unsigned int temp_threshold = 50;
 module_param(temp_threshold, int, 0644);
 
 static struct thermal_info {
@@ -51,10 +51,10 @@ enum thermal_freqs {
 	FREQ_HOT 	  = 702000,
 	FREQ_WARM 	  = 918000,
 #else
-        FREQ_HELL         = 702000,
-        FREQ_VERY_HOT     = 918000,
-        FREQ_HOT          = 1026000,
-        FREQ_WARM         = 1242000,
+        FREQ_HELL         = 648000,
+        FREQ_VERY_HOT     = 864000,
+        FREQ_HOT          = 972000,
+        FREQ_WARM         = 1188000,
 #endif
 };
 
