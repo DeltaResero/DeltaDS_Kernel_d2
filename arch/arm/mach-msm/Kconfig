@@ -1359,7 +1359,7 @@ config MSM_PCIE
 
 config MSM_SMD_DEBUG
 	depends on MSM_SMD
-	default y
+	default n
 	bool "MSM SMD debug support"
 	help
 	  Support for debugging the SMD for communication
@@ -1400,7 +1400,7 @@ config MSM_RESET_MODEM
 
 config MSM_SMD_LOGGING
 	depends on MSM_SMD
-	default y
+	default n
 	bool "MSM Shared Memory Logger"
 	help
 	  This option exposes the shared memory logger at /dev/smem_log
@@ -1518,7 +1518,7 @@ config MSM_IPC_ROUTER_SECURITY
 
 config MSM_ONCRPCROUTER_DEBUG
 	depends on MSM_ONCRPCROUTER
-	default y
+	default n
 	bool "MSM debug ONCRPC router support"
 	help
 	  Support for debugging the ONCRPC router for communication
