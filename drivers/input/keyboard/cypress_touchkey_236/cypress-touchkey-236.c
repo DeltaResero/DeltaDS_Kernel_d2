@@ -60,7 +60,7 @@
 #define CYPRESS_LED_CONTROL_ON	0X60
 #define CYPRESS_LED_CONTROL_OFF	0X70
 #define CYPRESS_SLEEP		0X80
-static int vol_mv_level = 33;
+static int vol_mv_level = 25;
 extern unsigned int system_rev;
 
 
@@ -163,7 +163,7 @@ static void change_touch_key_led_voltage(int vol_mv)
 		return;
 	}
 	ret = regulator_set_voltage(tled_regulator,
-		vol_mv * 100000, vol_mv * 100000);
+		vol_mv * 65000, vol_mv * 65000);
 	if (ret)
 		printk(KERN_ERR"error setting voltage\n");
 	regulator_put(tled_regulator);
