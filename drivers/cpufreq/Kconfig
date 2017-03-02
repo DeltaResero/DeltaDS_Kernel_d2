@@ -189,6 +189,17 @@ config CPU_FREQ_DEFAULT_GOV_RELAXED
 	  governor. If unsure have a look at the help section of the
 	  driver. Fallback governor will be the interactive governor.
 
+config CPU_FREQ_DEFAULT_GOV_SKATTER_CORE
+	bool "skatter_core"
+	select CPU_FREQ_GOV_SKATTER_CORE
+	help
+	  Frequency governor 'umbrella_core' heavily modified for D2 devices
+          Renamed as 'skatter_core'
+	  Use the CPUFreq governor 'skatter_core' as default. This allows
+	  you to get a full dynamic cpu frequency capable system by simply
+	  loading your cpufreq low-level hardware driver, using the
+	  'skatter_core' governor for latency-sensitive workloads.
+
 config CPU_FREQ_DEFAULT_GOV_SMARTMAX
         bool "smartmax"
         select CPU_FREQ_GOV_SMARTMAX
@@ -360,6 +371,14 @@ config CPU_FREQ_GOV_RELAXED
 	help
 	  'relaxed' - similar to 'conservative', but optimized for devices
 	  that go into suspended or display off states often.
+
+config CPU_FREQ_GOV_SKATTER_CORE
+	tristate "'skatter_core' cpufreq policy governor"
+ 	help
+	  'skatter_core' - This driver adds a dynamic cpufreq policy governor
+	  designed for latency-sensitive workloads.
+	  The governor is based on interactive to provide a resident controller
+	  which interprets unnecessary battery drain as evil
 
 config CPU_FREQ_GOV_SMARTMAX
         tristate "'smartmax' cpufreq policy governor"

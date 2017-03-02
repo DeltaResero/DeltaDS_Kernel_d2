@@ -805,6 +805,7 @@ static struct attribute *default_attrs[] = {
 struct kobject *cpufreq_global_kobject;
 EXPORT_SYMBOL(cpufreq_global_kobject);
 
+static int cpufreq_global_kobject_usage;
 #define to_policy(k) container_of(k, struct cpufreq_policy, kobj)
 #define to_attr(a) container_of(a, struct freq_attr, attr)
 
@@ -874,6 +875,12 @@ static struct kobj_type ktype_cpufreq = {
 	.default_attrs	= default_attrs,
 	.release	= cpufreq_sysfs_release,
 };
+
+int cpufreq_get_global_kobject(void)
+{
+	return 0;
+}
+EXPORT_SYMBOL(cpufreq_get_global_kobject);
 
 /*
  * Returns:
@@ -976,6 +983,12 @@ static int cpufreq_add_dev_policy(unsigned int cpu,
 	return ret;
 }
 
+void cpufreq_put_global_kobject(void)
+{
+	if (!--cpufreq_global_kobject_usage)
+		kobject_del(cpufreq_global_kobject);
+}
+EXPORT_SYMBOL(cpufreq_put_global_kobject);
 
 /* symlink affected CPUs */
 static int cpufreq_add_dev_symlink(unsigned int cpu,
