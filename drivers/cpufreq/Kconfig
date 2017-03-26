@@ -253,6 +253,13 @@ config CPU_FREQ_GOV_LIONFISH
 
 	  If in doubt, say N.
 
+config CPU_FREQ_DVFS_MONITOR
+	bool "dvfs monitor"
+	depends on CPU_FREQ
+	help
+	  This option adds a proc node for dvfs monitoring.
+	  /proc/dvfs_mon
+
 menu "x86 CPU frequency scaling drivers"
 depends on X86
 source "drivers/cpufreq/Kconfig.x86"
