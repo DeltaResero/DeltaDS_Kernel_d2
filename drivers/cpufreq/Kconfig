@@ -138,6 +138,10 @@ config CPU_FREQ_DEFAULT_GOV_LIONFISH
 	help
 	  Use the CPUFreq governor 'lionfish' as default.
 
+config CPU_FREQ_DEFAULT_GOV_FREELUNCH
+	bool "freelunch"
+	select CPU_FREQ_GOV_FREELUNCH
+
 endchoice
 
 config CPU_FREQ_GOV_PERFORMANCE
@@ -256,6 +260,10 @@ config CPU_FREQ_GOV_LIONFISH
 	  module will be called cpufreq_lionfish.
 
 	  If in doubt, say N.
+
+config CPU_FREQ_GOV_FREELUNCH
+	tristate "'freelunch' cpufreq governor"
+	depends on CPU_FREQ && INTERACTION_HINTS
 
 config CPU_FREQ_DVFS_MONITOR
 	bool "dvfs monitor"
