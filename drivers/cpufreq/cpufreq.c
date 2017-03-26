@@ -2056,6 +2056,36 @@ bool need_load_eval(struct cpu_dbs_common_info *cdbs,
 }
 EXPORT_SYMBOL_GPL(need_load_eval);
 
+/* Notify governors of touch immediately.
+ * This may block while mutexes are locked, and should not be called in
+ * interrupt context.
+ */
+void cpufreq_set_interactivity(int on, int idbit) {
+	unsigned int j;
+	static int pressids = 0;
+	/* Filter events so we don't grab mutexes all over the place */
+	if (on) {
+	       int oldids;
+	       oldids = pressids;
+	       pressids |= 1 << idbit;
+	       if (oldids) return;
+	} else {
+	       pressids &= ~(1 << idbit);
+	       if (pressids) return;
+	}
+	/* Inform all available policies */
+	for_each_online_cpu(j) {
+	       struct cpufreq_policy *pol;
+	       pol = per_cpu(cpufreq_cpu_data, j);
+	       if (!pol) continue;
+	       /* Call governor directly, without __cpufreq_governor()'s
+	        * initializing stuff that doesn't apply here.
+	        */
+	       pol->governor->governor(pol,
+	               pressids ? CPUFREQ_GOV_INTERACT : CPUFREQ_GOV_NOINTERACT);
+	}
+}
+
 /*********************************************************************
  *               REGISTER / UNREGISTER CPUFREQ DRIVER                *
  *********************************************************************/
