@@ -37,6 +37,8 @@
 
 static int active_count;
 
+extern bool screen_on;
+
 struct cpufreq_interactive_cpuinfo {
 	struct timer_list cpu_timer;
 	struct timer_list cpu_slack_timer;
@@ -76,7 +78,7 @@ static unsigned int hispeed_freq;
 static unsigned long go_hispeed_load = DEFAULT_GO_HISPEED_LOAD;
 
 /* Target load.  Lower values result in higher CPU speeds. */
-#define DEFAULT_TARGET_LOAD 90
+#define DEFAULT_TARGET_LOAD 95
 static unsigned int default_target_loads[] = {DEFAULT_TARGET_LOAD};
 static spinlock_t target_loads_lock;
 static unsigned int *target_loads = default_target_loads;
@@ -91,14 +93,18 @@ static unsigned long min_sample_time = DEFAULT_MIN_SAMPLE_TIME;
 /*
  * The sample rate of the timer used to increase frequency
  */
-#define DEFAULT_TIMER_RATE (20 * USEC_PER_MSEC)
+#define DEFAULT_TIMER_RATE 50000
 static unsigned long timer_rate = DEFAULT_TIMER_RATE;
+/*
+ * The sample rate of the timer used during suspend
+ */
+unsigned long timer_rate_prev = DEFAULT_TIMER_RATE;
 
 /*
  * Wait this long before raising speed above hispeed, by default a single
  * timer interval.
  */
-#define DEFAULT_ABOVE_HISPEED_DELAY DEFAULT_TIMER_RATE
+#define DEFAULT_ABOVE_HISPEED_DELAY 25000
 static unsigned int default_above_hispeed_delay[] = {
 	DEFAULT_ABOVE_HISPEED_DELAY };
 static spinlock_t above_hispeed_delay_lock;
@@ -109,10 +115,13 @@ static int nabove_hispeed_delay = ARRAY_SIZE(default_above_hispeed_delay);
  * Max additional time to wait in idle, beyond timer_rate, at speeds above
  * minimum before wakeup to reduce speed, or -1 if unnecessary.
  */
-#define DEFAULT_TIMER_SLACK (4 * DEFAULT_TIMER_RATE)
+#define DEFAULT_TIMER_SLACK 80000
 static int timer_slack_val = DEFAULT_TIMER_SLACK;
 
 static bool io_is_busy;
+
+#define DEFAULT_SCREEN_OFF_MAX 648000
+static unsigned long screen_off_max = DEFAULT_SCREEN_OFF_MAX;
 
 /*
  * Stay at max freq for at least max_freq_hysteresis before dropping frequency.
@@ -134,7 +143,6 @@ static void cpufreq_interactive_timer_resched(unsigned long cpu,
 	struct cpufreq_interactive_cpuinfo *pcpu = &per_cpu(cpuinfo, cpu);
 	u64 expires;
 	unsigned long flags;
-	u64 now = ktime_to_us(ktime_get());
 
 	spin_lock_irqsave(&pcpu->load_lock, flags);
 	expires = round_to_nw_start(pcpu->last_evaluated_jiffy);
@@ -149,7 +157,7 @@ static void cpufreq_interactive_timer_resched(unsigned long cpu,
 		add_timer_on(&pcpu->cpu_timer, cpu);
 	}
 
-	if (timer_slack_val >= 0 &&
+	if ((unlikely(screen_on)) && timer_slack_val >= 0 &&
 	    (pcpu->target_freq > pcpu->policy->min ||
 		(pcpu->target_freq == pcpu->policy->min))) {
 		expires += usecs_to_jiffies(timer_slack_val);
@@ -170,12 +178,11 @@ static void cpufreq_interactive_timer_start(int cpu)
 	struct cpufreq_interactive_cpuinfo *pcpu = &per_cpu(cpuinfo, cpu);
 	u64 expires = round_to_nw_start(pcpu->last_evaluated_jiffy);
 	unsigned long flags;
-	u64 now = ktime_to_us(ktime_get());
 
 	spin_lock_irqsave(&pcpu->load_lock, flags);
 	pcpu->cpu_timer.expires = expires;
 	add_timer_on(&pcpu->cpu_timer, cpu);
-	if (timer_slack_val >= 0 &&
+	if ((unlikely(screen_on)) && timer_slack_val >= 0 &&
 	    (pcpu->target_freq > pcpu->policy->min ||
 		(pcpu->target_freq == pcpu->policy->min))) {
 		expires += usecs_to_jiffies(timer_slack_val);
@@ -367,6 +374,19 @@ static void cpufreq_interactive_timer(unsigned long data)
 	pcpu->last_evaluated_jiffy = get_jiffies_64();
 	spin_unlock_irqrestore(&pcpu->load_lock, flags);
 
+	/* Increase timer rate if suspended */
+	if ((unlikely(screen_on)) && timer_rate != timer_rate_prev)
+		timer_rate = timer_rate_prev;
+	else if ((unlikely(!screen_on)) && timer_rate == timer_rate_prev) {
+		timer_rate_prev = timer_rate;
+		timer_rate = timer_rate * 2;
+	}
+
+	/* Make sure timer_rate is timer_rate_prev on wakeup */
+	if ((unlikely(screen_on)) && timer_rate != timer_rate_prev) {
+		timer_rate = timer_rate_prev;
+	}
+
 	if (WARN_ON_ONCE(!delta_time))
 		goto rearm;
 
@@ -547,6 +567,9 @@ static int cpufreq_interactive_speedchange_task(void *data)
 					hvt = min(hvt, pjcpu->local_hvtime);
 				}
 			}
+
+			if (unlikely(!screen_on))
+				if (max_freq > screen_off_max) max_freq = screen_off_max;
 
 			if (max_freq != pcpu->policy->cur) {
 				__cpufreq_driver_target(pcpu->policy,
@@ -842,6 +865,7 @@ static ssize_t store_timer_rate(struct kobject *kobj,
 				val_round);
 
 	timer_rate = val_round;
+	timer_rate_prev = val_round;
 	return count;
 }
 
@@ -870,6 +894,28 @@ static ssize_t store_timer_slack(
 }
 
 define_one_global_rw(timer_slack);
+
+static ssize_t show_screen_off_maxfreq(struct kobject *kobj, struct attribute *attr,
+			  char *buf)
+{
+	return sprintf(buf, "%lu\n", screen_off_max);
+}
+
+static ssize_t store_screen_off_maxfreq(struct kobject *kobj, struct attribute *attr,
+			   const char *buf, size_t count)
+{
+	int ret;
+	unsigned long val;
+
+	ret = strict_strtoul(buf, 0, &val);
+	if (ret < 0) return ret;
+	if (val < 384000) screen_off_max = DEFAULT_SCREEN_OFF_MAX;
+	else screen_off_max = val;
+	return count;
+}
+
+static struct global_attr screen_off_maxfreq_attr = __ATTR(screen_off_maxfreq, 0644,
+		show_screen_off_maxfreq, store_screen_off_maxfreq);
 
 static ssize_t show_io_is_busy(struct kobject *kobj,
 			struct attribute *attr, char *buf)
@@ -924,6 +970,7 @@ static struct attribute *interactive_attributes[] = {
 	&min_sample_time_attr.attr,
 	&timer_rate_attr.attr,
 	&timer_slack.attr,
+	&screen_off_maxfreq_attr.attr,
 	&io_is_busy_attr.attr,
 	&max_freq_hysteresis_attr.attr,
 	NULL,
@@ -1004,6 +1051,9 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 			return rc;
 		}
 
+#ifdef CONFIG_INTERACTION_HINTS
+		cpufreq_want_interact_hints(1);
+#endif
 		idle_notifier_register(&cpufreq_interactive_idle_nb);
 		cpufreq_register_notifier(
 			&cpufreq_notifier_block, CPUFREQ_TRANSITION_NOTIFIER);
@@ -1029,6 +1079,9 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 
 		cpufreq_unregister_notifier(
 			&cpufreq_notifier_block, CPUFREQ_TRANSITION_NOTIFIER);
+#ifdef CONFIG_INTERACTION_HINTS
+		cpufreq_want_interact_hints(0);
+#endif
 		idle_notifier_unregister(&cpufreq_interactive_idle_nb);
 		sysfs_remove_group(cpufreq_global_kobject,
 				&interactive_attr_group);
@@ -1051,7 +1104,7 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 			spin_lock_irqsave(&pcpu->target_freq_lock, flags);
 			if (policy->max < pcpu->target_freq) {
 				pcpu->target_freq = policy->max;
-			} else if (policy->min >= pcpu->target_freq) {
+			} else if (policy->min > pcpu->target_freq) {
 				pcpu->target_freq = policy->min;
 				anyboost = 1;
 			}
@@ -1100,6 +1153,8 @@ static int __init cpufreq_interactive_init(void)
 	unsigned int i;
 	struct cpufreq_interactive_cpuinfo *pcpu;
 	struct sched_param param = { .sched_priority = MAX_RT_PRIO-1 };
+
+	screen_on = true;
 
 	/* Initalize per-cpu timers */
 	for_each_possible_cpu(i) {
