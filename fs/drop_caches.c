@@ -10,6 +10,7 @@
 #include <linux/gfp.h>
 #include <linux/fb.h>
 #include <linux/delay.h>
+#include <linux/moduleparam.h>
 #include "internal.h"
 
 /* A global variable is a bit ugly, but it keeps the code simple */
@@ -68,11 +69,18 @@ int drop_caches_sysctl_handler(ctl_table *table, int write,
 	return 0;
 }
 
+/* Create sysfys to enable/disable ram feature on screen-off */
+static drop_caches_suspend_enabled = true;
+module_param(drop_caches_suspend_enabled, bool, 0644);
+
 static void drop_caches_suspend(struct work_struct *work);
 static DECLARE_WORK(drop_caches_suspend_work, drop_caches_suspend);
 
 static void drop_caches_suspend(struct work_struct *work)
 {
+	if (!drop_caches_suspend_enabled)
+		return 0;
+
 	/* sleep for 200ms */
 	msleep(200);
 	/* sync */
