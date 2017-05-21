@@ -84,3 +84,7 @@ GTAGS
 *.orig
 *~
 \#*#
+
+# Skip these
+build*
+/output
