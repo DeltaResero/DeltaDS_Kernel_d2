@@ -1520,6 +1520,8 @@ config KSAPI
 
 endmenu
 
+source "arch/arm/hotplug/Kconfig"
+
 source "arch/arm/common/Kconfig"
 
 menu "Bus support"
