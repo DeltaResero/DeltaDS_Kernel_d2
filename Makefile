@@ -158,6 +158,7 @@ VPATH		:= $(srctree)$(if $(KBUILD_EXTMOD),:$(KBUILD_EXTMOD))
 
 export srctree objtree VPATH
 
+CCACHE := $(shell which ccache)
 
 # SUBARCH tells the usermode build what the underlying arch is.  That is set
 # first, and if a usermode build is happening, the "ARCH=um" on the command
@@ -192,8 +193,8 @@ SUBARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ \
 # Default value for CROSS_COMPILE is not to prefix executables
 # Note: Some architectures assign CROSS_COMPILE in their arch/*/Makefile
 export KBUILD_BUILDHOST := $(SUBARCH)
-ARCH		?= arm
-CROSS_COMPILE	?= arm-eabi-
+ARCH		?= $(SUBARCH)
+CROSS_COMPILE	?= $(CCACHE) $(CONFIG_CROSS_COMPILE:"%"=%)
 
 # Architecture as present in compile.h
 UTS_MACHINE 	:= $(ARCH)
@@ -243,10 +244,16 @@ CONFIG_SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
 	  else if [ -x /bin/bash ]; then echo /bin/bash; \
 	  else echo sh; fi ; fi)
 
-HOSTCC       = gcc
-HOSTCXX      = g++
-HOSTCFLAGS   = -Wall -Wmissing-prototypes -Wstrict-prototypes -O2 -fomit-frame-pointer
-HOSTCXXFLAGS = -O2
+HOSTCC       = $(CCACHE) gcc
+HOSTCXX      = $(CCACHE) g++
+HOSTCFLAGS   = -Wmissing-prototypes -Wstrict-prototypes -fomit-frame-pointer -fgcse-las \
+               -fgraphite -floop-flatten -floop-parallelize-all -ftree-loop-linear -floop-interchange \
+               -floop-strip-mine -floop-block -pipe -Wno-unused-parameter -Wno-sign-compare -Wno-missing-field-initializers \
+               -Wno-unused-variable -Wno-unused-value -std=gnu89 -fno-aggressive-loop-optimizations \
+               -pthread -fstrict-aliasing -fuse-linker-plugin -flto=4
+ 
+HOSTCXXFLAGS = -fgcse-las -fgraphite -floop-flatten -floop-parallelize-all -ftree-loop-linear \
+               -floop-interchange -floop-strip-mine -floop-block -pipe -pthread -fstrict-aliasing -fuse-linker-plugin -flto=4
 
 # Decide whether to build built-in, modular, or both.
 # Normally, just do built-in.
@@ -329,11 +336,11 @@ include $(srctree)/scripts/Kbuild.include
 # Make variables (CC, etc...)
 
 AS		= $(CROSS_COMPILE)as
-LD		= $(CROSS_COMPILE)ld
-REAL_CC		= $(CROSS_COMPILE)gcc
+LD		= $(CROSS_COMPILE)ld.bfd
+CC		= $(CCACHE) $(CROSS_COMPILE)gcc
 CPP		= $(CC) -E
-AR		= $(CROSS_COMPILE)ar
-NM		= $(CROSS_COMPILE)nm
+AR		= $(CROSS_COMPILE)gcc-ar
+NM		= $(CROSS_COMPILE)gcc-nm
 STRIP		= $(CROSS_COMPILE)strip
 OBJCOPY		= $(CROSS_COMPILE)objcopy
 OBJDUMP		= $(CROSS_COMPILE)objdump
@@ -347,14 +354,26 @@ CHECK		= sparse
 
 # Use the wrapper for the compiler.  This wrapper scans for new
 # warnings and causes the build to stop upon encountering them.
-CC		= $(srctree)/scripts/gcc-wrapper.py $(REAL_CC)
+#CC		= $(srctree)/scripts/gcc-wrapper.py $(REAL_CC)
 
 CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ \
 		  -Wbitwise -Wno-return-void $(CF)
+GRAPHITE	=  -funsafe-loop-optimizations -ftree-loop-im -ftree-loop-ivcanon -funswitch-loops \
+                   -floop-parallelize-all -fivopts -floop-strip-mine -floop-nest-optimize -floop-interchange \
+                   -floop-block -ftree-loop-linear -floop-flatten -fgraphite-identity -ftree-loop-distribution \
+                   -funroll-loops
+FLAGS_MODULE    = $(GRAPHITE)
+AFLAGS_MODULE   = $(GRAPHITE)
+LDFLAGS_MODULE  = --strip-debug
+CFLAGS_KERNEL	= $(GRAPHITE) -fmodulo-sched -fmodulo-sched-allow-regmoves -ftree-loop-vectorize \
+                  -ftree-loop-distribute-patterns -ftree-slp-vectorize -fvect-cost-model -ftree-partial-pre \
+                  -fgcse-after-reload -fgcse-lm -fgcse-sm -fsched-spec-load -ffast-math -fsingle-precision-constant \
+                  -fpredictive-commoning 
+AFLAGS_KERNEL	= $(GRAPHITE)
 CFLAGS_MODULE   =
 AFLAGS_MODULE   =
 LDFLAGS_MODULE  =
-CFLAGS_KERNEL	=
+CFLAGS_KERNEL	= -Wno-sequence-point
 AFLAGS_KERNEL	=
 CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
 
@@ -368,13 +387,18 @@ LINUXINCLUDE    := -I$(srctree)/arch/$(hdr-arch)/include \
 
 KBUILD_CPPFLAGS := -D__KERNEL__
 
-KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
+KBUILD_CFLAGS   := $(GRAPHITE) -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -fno-strict-aliasing -fno-common \
 		   -Werror-implicit-function-declaration \
-		   -Wno-format-security \
-		   -fno-delete-null-pointer-checks
+		   -Wno-format-security -Wno-sizeof-pointer-memaccess \
+		   -fmodulo-sched -fmodulo-sched-allow-regmoves -ffast-math \
+                   -funswitch-loops -fpredictive-commoning -fgcse-after-reload \
+ 		   -fno-delete-null-pointer-checks \
+ 		   -ftree-loop-vectorize -ftree-loop-distribute-patterns -ftree-slp-vectorize \
+                   -fvect-cost-model -ftree-partial-pre \
+                   -fgcse-lm -fgcse-sm -fsched-spec-load -fsingle-precision-constant -mvectorize-with-neon-quad -fipa-cp-clone
 KBUILD_AFLAGS_KERNEL :=
-KBUILD_CFLAGS_KERNEL :=
+KBUILD_CFLAGS_KERNEL := -Wno-sequence-point
 KBUILD_AFLAGS   := -D__ASSEMBLY__
 KBUILD_AFLAGS_MODULE  := -DMODULE
 KBUILD_CFLAGS_MODULE  := -DMODULE
@@ -565,7 +589,56 @@ all: vmlinux
 ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
 KBUILD_CFLAGS	+= -Os
 else
-KBUILD_CFLAGS	+= -O2
+# Device Specific & Ofast Stuff
+KBUILD_CFLAGS	+= -Os
+KBUILD_CFLAGS	+= -std=gnu89
+KBUILD_CFLAGS	+= -fsection-anchors -ftracer -frename-registers -fgcse-sm -fgcse-las
+KBUILD_CFLAGS	+= -fmodulo-sched -fmodulo-sched-allow-regmoves -fweb -fsection-anchors
+KBUILD_CFLAGS	+= -mcpu=cortex-a15 -mtune=cortex-a15 -mfloat-abi=softfp -mfpu=neon-vfpv4 \
+                   -mvectorize-with-neon-quad -mfloat-abi=softfp -marm -ffast-math -fipa-cp-clone
+KBUILD_CFLAGS	+= -fdelete-null-pointer-checks -fexpensive-optimizations -foptimize-sibling-calls -foptimize-strlen
+
+# Tell gcc to never replace conditional load with a non-conditional one
+KBUILD_CFLAGS	+= $(call cc-option,--param=allow-store-data-races=0)
+
+#KBUILD_CFLAGS	+= -flto
+
+# GCC extras
+KBUILD_CFLAGS	+= -fgcse-sm -fgcse-las -fsched-spec-load -fsched-pressure \
+		   -fsched-stalled-insns-dep=32 -fipa-cp-clone -fipa-cp-alignment \
+                   -floop-unroll-and-jam -Werror=implicit-function-declaration -fno-aggressive-loop-optimizations
+
+# GCC params
+KBUILD_CFLAGS	+= --param max-gcse-memory=0 \
+		   --param max-gcse-insertion-ratio=50 \
+		   --param max-tail-merge-comparisons=100 \
+		   --param max-tail-merge-iterations=4 \
+		   --param l2-cache-size=1024 \
+                   --param l1-cache-size=16 \
+                   --param l1-cache-line-size=16
+
+LDFLAGS         += --sort-common --hash-style=gnu
+LDFLAGS         += -flto
+KBUILD_CFLAGS   += $(call cc-disable-warning,maybe-uninitialized)
+KBUILD_CFLAGS   += $(call cc-disable-warning,array-bounds)
+KBUILD_CFLAGS	+= -fsanitize=leak -fno-diagnostics-show-caret -fno-pic \
+                   -DNDEBUG -g0 -fivopts -fstdarg-opt -munaligned-access
+
+# New in GCC5
+KBUILD_CFLAGS	+= -flra-remat -fipa-ra -fipa-pta -fipa-matrix-reorg
+KBUILD_CFLAGS	+= -fira-hoist-pressure -fira-loop-pressure \
+		   -fsched2-use-superblocks -fno-semantic-interposition -floop-nest-optimize \
+		   -ftree-loop-if-convert -ftree-loop-distribution -ftree-loop-distribute-patterns \
+		   -fvariable-expansion-in-unroller
+
+# Disable Some Things
+KBUILD_CFLAGS   += -Wno-trigraphs -Wno-unused-label -Wno-array-bounds -Wno-memset-transposed-args \
+                   -Wno-unused-function -Wno-declaration-after-statement \
+                   -Wno-unused-variable -Wno-parentheses -Wno-maybe-uninitialized \
+                   -Wno-misleading-indentation -Wno-bool-compare -Wno-int-conversion \
+                   -Wno-discarded-qualifiers -Wno-tautological-compare -Wno-incompatible-pointer-types \
+                   -Wno-error=maybe-uninitialized
+
 endif
 
 include $(srctree)/arch/$(SRCARCH)/Makefile
@@ -583,39 +656,39 @@ endif
 # Use make W=1 to enable this warning (see scripts/Makefile.build)
 KBUILD_CFLAGS += $(call cc-disable-warning, unused-but-set-variable)
 
-ifdef CONFIG_FRAME_POINTER
-KBUILD_CFLAGS	+= -fno-omit-frame-pointer -fno-optimize-sibling-calls
-else
+#ifdef CONFIG_FRAME_POINTER
+#KBUILD_CFLAGS	+= -fno-omit-frame-pointer -fno-optimize-sibling-calls
+#else
 # Some targets (ARM with Thumb2, for example), can't be built with frame
 # pointers.  For those, we don't have FUNCTION_TRACER automatically
 # select FRAME_POINTER.  However, FUNCTION_TRACER adds -pg, and this is
 # incompatible with -fomit-frame-pointer with current GCC, so we don't use
 # -fomit-frame-pointer with FUNCTION_TRACER.
-ifndef CONFIG_FUNCTION_TRACER
+#ifndef CONFIG_FUNCTION_TRACER
 KBUILD_CFLAGS	+= -fomit-frame-pointer
-endif
-endif
+#endif
+#endif
 
 KBUILD_CFLAGS   += $(call cc-option, -fno-var-tracking-assignments)
 
 ifdef CONFIG_DEBUG_INFO
 KBUILD_CFLAGS	+= -g
-KBUILD_AFLAGS	+= -gdwarf-2
+KBUILD_AFLAGS	+= -gdwarf-4
 endif
 
 ifdef CONFIG_DEBUG_INFO_REDUCED
 KBUILD_CFLAGS 	+= $(call cc-option, -femit-struct-debug-baseonly)
 endif
 
-ifdef CONFIG_FUNCTION_TRACER
-KBUILD_CFLAGS	+= -pg
-ifdef CONFIG_DYNAMIC_FTRACE
-	ifdef CONFIG_HAVE_C_RECORDMCOUNT
-		BUILD_C_RECORDMCOUNT := y
-		export BUILD_C_RECORDMCOUNT
-	endif
-endif
-endif
+#ifdef CONFIG_FUNCTION_TRACER
+#KBUILD_CFLAGS	+= -pg
+#ifdef CONFIG_DYNAMIC_FTRACE
+#	ifdef CONFIG_HAVE_C_RECORDMCOUNT
+#		BUILD_C_RECORDMCOUNT := y
+#		export BUILD_C_RECORDMCOUNT
+#	endif
+#endif
+#endif
 
 # We trigger additional mismatches with less inlining
 ifdef CONFIG_DEBUG_SECTION_MISMATCH
@@ -627,7 +700,7 @@ NOSTDINC_FLAGS += -nostdinc -isystem $(shell $(CC) -print-file-name=include)
 CHECKFLAGS     += $(NOSTDINC_FLAGS)
 
 # warn about C99 declaration after statement
-KBUILD_CFLAGS += $(call cc-option,-Wdeclaration-after-statement,)
+# KBUILD_CFLAGS += $(call cc-option,-Wdeclaration-after-statement,)
 
 # disable pointer signed / unsigned warnings in gcc 4.0
 KBUILD_CFLAGS += $(call cc-disable-warning, pointer-sign)
