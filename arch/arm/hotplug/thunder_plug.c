@@ -41,7 +41,7 @@
 #define DEFAULT_NR_CPUS_BOOSTED		     2
 #define MIN_INPUT_INTERVAL		     150 * 1000L
 
-static bool isSuspended = false;
+extern bool screen_on;
 
 static int now[8], last_time[8];
 struct cpufreq_policy old_policy[NR_CPUS];
@@ -424,8 +424,8 @@ reschedule:
 #ifdef CONFIG_STATE_NOTIFIER
 static void __ref thunderplug_suspend(void)
 {
-	if (isSuspended == false) {
-		isSuspended = true;
+	if (unlikely(!screen_on)) {
+		screen_on = false;
 		cancel_delayed_work_sync(&tplug_work);
 		offline_cpus();
 		pr_info("%s: suspend\n", THUNDERPLUG);
@@ -434,8 +434,8 @@ static void __ref thunderplug_suspend(void)
 
 static void __ref thunderplug_resume(void)
 {
-	if (isSuspended == true) {
-		isSuspended = false;
+	if (unlikely(screen_on)) {
+		screen_on = true;
 		cpus_online_all();
 		pr_info("%s: resume\n", THUNDERPLUG);
 		queue_delayed_work_on(0, tplug_wq, &tplug_work,
@@ -503,7 +503,7 @@ static void thunder_input_event(struct input_handle *handle, unsigned int type,
 {
 	u64 time_now;
 
-	if (isSuspended == true)
+	if (unlikely(!screen_on))
 		return;
 	if (!thunder_param.tplug_hp_enabled)
 		return;
@@ -737,6 +737,9 @@ static struct kobject *thunderplug_kobj;
 
 static int __init thunderplug_init(void)
 {
+	/* Screen should be on on init */
+	screen_on = true;
+
 	int ret = 0;
 	int sysfs_result;
 
