@@ -74,9 +74,7 @@
 
 #ifdef CONFIG_POWERSUSPEND
 #include <linux/powersuspend.h>
-#endif
-
-#ifdef CONFIG_HAS_EARLYSUSPEND
+#elif CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
 #endif
 
@@ -457,9 +455,7 @@ static struct power_suspend lazyplug_power_suspend_driver = {
 	.suspend = lazyplug_suspend,
 	.resume = lazyplug_resume,
 };
-#endif  /* CONFIG_POWERSUSPEND */
-
-#ifdef CONFIG_HAS_EARLYSUSPEND
+#elif CONFIG_HAS_EARLYSUSPEND
 static struct early_suspend lazyplug_early_suspend_driver = {
         .level = EARLY_SUSPEND_LEVEL_DISABLE_FB + 10,
         .suspend = lazyplug_suspend,
@@ -590,8 +586,7 @@ int __init lazyplug_init(void)
 
 #ifdef CONFIG_POWERSUSPEND
 	register_power_suspend(&lazyplug_power_suspend_driver);
-#endif
-#ifdef CONFIG_HAS_EARLYSUSPEND
+#elif CONFIG_HAS_EARLYSUSPEND
 	register_early_suspend(&lazyplug_early_suspend_driver);
 #endif
 
