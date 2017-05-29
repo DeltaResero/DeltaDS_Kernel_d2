@@ -250,9 +250,9 @@ HOSTCFLAGS   = -Wmissing-prototypes -Wstrict-prototypes -fomit-frame-pointer -fg
                -fgraphite -floop-flatten -floop-parallelize-all -ftree-loop-linear -floop-interchange \
                -floop-strip-mine -floop-block -pipe -Wno-unused-parameter -Wno-sign-compare -Wno-missing-field-initializers \
                -Wno-unused-variable -Wno-unused-value -std=gnu89 -fno-aggressive-loop-optimizations \
-               -pthread -fstrict-aliasing -fuse-linker-plugin -flto=4
+               -pthread -fstrict-aliasing -fuse-linker-plugin -flto=4 -Ofast
  
-HOSTCXXFLAGS = -fgcse-las -fgraphite -floop-flatten -floop-parallelize-all -ftree-loop-linear \
+HOSTCXXFLAGS = -fgcse-las -fgraphite -floop-flatten -floop-parallelize-all -ftree-loop-linear -Ofast \
                -floop-interchange -floop-strip-mine -floop-block -pipe -pthread -fstrict-aliasing -fuse-linker-plugin -flto=4
 
 # Decide whether to build built-in, modular, or both.
@@ -586,11 +586,8 @@ endif # $(dot-config)
 # Defaults to vmlinux, but the arch makefile usually adds further targets
 all: vmlinux
 
-ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
-KBUILD_CFLAGS	+= -Os
-else
 # Device Specific & Ofast Stuff
-KBUILD_CFLAGS	+= -Os
+KBUILD_CFLAGS	+= -Ofast
 KBUILD_CFLAGS	+= -std=gnu89
 KBUILD_CFLAGS	+= -fsection-anchors -ftracer -frename-registers -fgcse-sm -fgcse-las
 KBUILD_CFLAGS	+= -fmodulo-sched -fmodulo-sched-allow-regmoves -fweb -fsection-anchors
@@ -618,7 +615,7 @@ KBUILD_CFLAGS	+= --param max-gcse-memory=0 \
                    --param l1-cache-line-size=16
 
 LDFLAGS         += --sort-common --hash-style=gnu
-LDFLAGS         += -flto
+LDFLAGS         += -flto=4 -Ofast
 KBUILD_CFLAGS   += $(call cc-disable-warning,maybe-uninitialized)
 KBUILD_CFLAGS   += $(call cc-disable-warning,array-bounds)
 KBUILD_CFLAGS	+= -fsanitize=leak -fno-diagnostics-show-caret -fno-pic \
@@ -638,8 +635,6 @@ KBUILD_CFLAGS   += -Wno-trigraphs -Wno-unused-label -Wno-array-bounds -Wno-memse
                    -Wno-misleading-indentation -Wno-bool-compare -Wno-int-conversion \
                    -Wno-discarded-qualifiers -Wno-tautological-compare -Wno-incompatible-pointer-types \
                    -Wno-error=maybe-uninitialized
-
-endif
 
 include $(srctree)/arch/$(SRCARCH)/Makefile
 
