@@ -94,6 +94,7 @@ struct cpufreq_skateractive_tunables {
 	int usage_count;
 
 	/* Hi speed to bump to from lo speed when load burst (default max) */
+#define DEFAULT_HISPEED_FREQ 384000
 	unsigned int hispeed_freq;
 
 	/* Go to hi speed when CPU load at or above this value. */
@@ -425,7 +426,7 @@ static void cpufreq_skateractive_timer(unsigned long data)
 		tunables->timer_rate = tunables->timer_rate_prev;
 	else if ((unlikely(!screen_on)) && tunables->timer_rate == tunables->timer_rate_prev) {
 		tunables->timer_rate_prev = tunables->timer_rate;
-		tunables->timer_rate = tunables->timer_rate * 3;
+		tunables->timer_rate = tunables->timer_rate * 2;
 	}
 
 	/* Make sure timer_rate is not over timer_rate_prev on wakeup */
@@ -1341,8 +1342,8 @@ static int cpufreq_governor_skateractive(struct cpufreq_policy *policy,
 		mutex_lock(&gov_lock);
 
 		freq_table = cpufreq_frequency_get_table(policy->cpu);
-		if (!tunables->hispeed_freq)
-			tunables->hispeed_freq = policy->max;
+		if (!tunables->hispeed_freq || tunables->hispeed_freq)
+			tunables->hispeed_freq = DEFAULT_HISPEED_FREQ;
 
 		for_each_cpu(j, policy->cpus) {
 			pcpu = &per_cpu(cpuinfo, j);
@@ -1484,7 +1485,7 @@ static int __init cpufreq_skateractive_init(void)
 	return cpufreq_register_governor(&cpufreq_gov_skateractive);
 }
 
-#ifdef CONFIG_CPU_FREQ_DEFAULT_GOV_SKATERACTIVEX
+#ifdef CONFIG_CPU_FREQ_DEFAULT_GOV_SKATERACTIVE
 fs_initcall(cpufreq_skateractive_init);
 #else
 module_init(cpufreq_skateractive_init);
@@ -1511,6 +1512,6 @@ module_exit(cpufreq_skateractive_exit);
 MODULE_AUTHOR("Mike Chan <mike@android.com> \
                Lonelyoneskatter <threesixoh.skater@yahoo.com>");
 MODULE_DESCRIPTION("'cpufreq_skateractive' a full backport of the 3.10.y governor for 3.4.x kernel"
-                   "tuned for d2 devices with the ability to triple timer_rate on screen off,"
+                   "tuned for d2 devices with the ability to double timer_rate on screen off,"
                    "and set the max frequency to users choice on screen off.");
 MODULE_LICENSE("GPL");
