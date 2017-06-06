@@ -262,22 +262,13 @@ maple_latter_request(struct request_queue *q, struct request *rq)
 	return list_entry(rq->queuelist.next, struct request, queuelist);
 }
 
-static int maple_init_queue(struct request_queue *q, struct elevator_type *e)
+static int maple_init_queue(struct request_queue *q)
 {
 	struct maple_data *mdata;
-	struct elevator_queue *eq;
 
-	eq = elevator_alloc(q, e);
-	if (!eq)
-		return -ENOMEM;
-
-	/* Allocate structure */
 	mdata = kmalloc_node(sizeof(*mdata), GFP_KERNEL, q->node);
-	if (!mdata) {
-		kobject_put(&eq->kobj);
-		return -ENOMEM;
-	}
-	eq->elevator_data = mdata;
+	if (!mdata)
+		return NULL;
 
 	/* Initialize fifo lists */
 	INIT_LIST_HEAD(&mdata->fifo_list[SYNC][READ]);
@@ -294,17 +285,18 @@ static int maple_init_queue(struct request_queue *q, struct elevator_type *e)
 	mdata->fifo_batch = fifo_batch;
 	mdata->writes_starved = writes_starved;
 	mdata->sleep_latency_multiple = sleep_latency_multiple;
-
-	spin_lock_irq(q->queue_lock);
-	q->elevator = eq;
-	spin_unlock_irq(q->queue_lock);
-	return 0;
+	return mdata;
 }
 
 static void
 maple_exit_queue(struct elevator_queue *e)
 {
 	struct maple_data *mdata = e->elevator_data;
+
+	BUG_ON(!list_empty(&mdata->fifo_list[SYNC][READ]));
+	BUG_ON(!list_empty(&mdata->fifo_list[SYNC][WRITE]));
+	BUG_ON(!list_empty(&mdata->fifo_list[ASYNC][READ]));
+	BUG_ON(!list_empty(&mdata->fifo_list[ASYNC][WRITE]));
 
 	/* Free structure */
 	kfree(mdata);
