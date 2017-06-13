@@ -201,7 +201,7 @@ static void cpufreq_skateractive_timer_resched(unsigned long cpu)
 	pcpu->cpu_timer.expires = expires;
 	add_timer_on(&pcpu->cpu_timer, cpu);
 
-	if ((unlikely(screen_on)) && tunables->timer_slack_val >= 0 &&
+	if ((likely(screen_on)) && tunables->timer_slack_val >= 0 &&
 	    pcpu->target_freq > pcpu->policy->min) {
 		expires += usecs_to_jiffies(tunables->timer_slack_val);
 		del_timer(&pcpu->cpu_slack_timer);
@@ -226,7 +226,7 @@ static void cpufreq_skateractive_timer_start(
 	spin_lock_irqsave(&pcpu->load_lock, flags);
 	pcpu->cpu_timer.expires = expires;
 	add_timer_on(&pcpu->cpu_timer, cpu);
-	if ((unlikely(screen_on)) && tunables->timer_slack_val >= 0 &&
+	if ((likely(screen_on)) && tunables->timer_slack_val >= 0 &&
 	    pcpu->target_freq > pcpu->policy->min) {
 		expires += usecs_to_jiffies(tunables->timer_slack_val);
 		pcpu->cpu_slack_timer.expires = expires;
@@ -436,7 +436,7 @@ static void cpufreq_skateractive_timer(unsigned long data)
 		spin_unlock_irqrestore(&pcpu->load_lock, flags);
 
 	/* Increase timer rate if suspended */
-	if ((unlikely(screen_on)) && tunables->timer_rate != tunables->timer_rate_prev)
+	if ((likely(screen_on)) && tunables->timer_rate != tunables->timer_rate_prev)
 		tunables->timer_rate = tunables->timer_rate_prev;
 	else if ((unlikely(!screen_on)) && tunables->timer_rate == tunables->timer_rate_prev) {
 		tunables->timer_rate_prev = tunables->timer_rate;
@@ -444,15 +444,15 @@ static void cpufreq_skateractive_timer(unsigned long data)
 	}
 
 	/* Make sure timer_rate is not over timer_rate_prev on wakeup */
-	if ((unlikely(screen_on)) && tunables->timer_rate >= tunables->timer_rate_prev) {
+	if ((likely(screen_on)) && tunables->timer_rate >= tunables->timer_rate_prev) {
 		tunables->timer_rate = tunables->timer_rate_prev;
 	}
 
 	/* Disable retention mode on screen off */
 	if (unlikely(!screen_on))
-			msm_pm_sleep_mode_enable(0);
-	else if (unlikely(screen_on))
 			msm_pm_sleep_mode_enable(1);
+	else if (likely(screen_on))
+			msm_pm_sleep_mode_enable(0);
 
 		if (WARN_ON_ONCE(!delta_time))
 			goto rearm;
@@ -710,14 +710,15 @@ static int cpufreq_skateractive_speedchange_task(void *data)
 			}
 
 			if (unlikely(!screen_on))
-				if (max_freq > screen_off_max) max_freq = screen_off_max;
+				if (max_freq > screen_off_max)
+					max_freq = screen_off_max;
 
 			if (max_freq != pcpu->policy->cur) {
 				if (unlikely(!screen_on)) {
 					__cpufreq_driver_target(pcpu->policy,
 								max_freq,
 								CPUFREQ_RELATION_C);
-				} else if (unlikely(screen_on)) {
+				} else if (likely(screen_on)) {
 				__cpufreq_driver_target(pcpu->policy,
 							max_freq,
 							CPUFREQ_RELATION_H);
