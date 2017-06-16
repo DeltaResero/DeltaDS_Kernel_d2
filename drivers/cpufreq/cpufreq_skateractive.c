@@ -89,6 +89,10 @@ static unsigned int default_above_hispeed_delay[] = {
 
 #define DEFAULT_SCREEN_OFF_MAX 702000
 static unsigned long screen_off_max = DEFAULT_SCREEN_OFF_MAX;
+static unsigned long screen_off_max_prev = DEFAULT_SCREEN_OFF_MAX;
+
+#define DEFAULT_SCREEN_OFF_MAX_SINGLE_CORE 1080000
+static unsigned long screen_off_max_single_core = DEFAULT_SCREEN_OFF_MAX_SINGLE_CORE;
 
 struct cpufreq_skateractive_tunables {
 	int usage_count;
@@ -709,9 +713,18 @@ static int cpufreq_skateractive_speedchange_task(void *data)
 				}
 			}
 
-			if (unlikely(!screen_on))
+			/* On screen on, return correct value */
+			if (likely(screen_on)) {
+				screen_off_max = screen_off_max_prev;
+			/* If number of online cores is over 1, set to regular screen off frequency */
+			} else if (unlikely(!screen_on) && num_online_cpus() > 1) {
 				if (max_freq > screen_off_max)
 					max_freq = screen_off_max;
+			/* If number of online cores is 1, set to single core frequency */
+			} else if (unlikely(!screen_on) && num_online_cpus() == 1) {
+				if (max_freq > screen_off_max_single_core)
+					max_freq = screen_off_max_single_core;
+			}
 
 			if (max_freq != pcpu->policy->cur) {
 				if (unlikely(!screen_on)) {
@@ -1072,8 +1085,28 @@ static ssize_t store_screen_off_maxfreq(struct cpufreq_skateractive_tunables *tu
 
 	ret = strict_strtoul(buf, 0, &val);
 	if (ret < 0) return ret;
-	if (val < 200000) screen_off_max = DEFAULT_SCREEN_OFF_MAX;
+	if (val < 384000) screen_off_max = DEFAULT_SCREEN_OFF_MAX;
 	else screen_off_max = val;
+	screen_off_max_prev = val;
+	return count;
+}
+
+static ssize_t show_screen_off_maxfreq_single_core(struct cpufreq_skateractive_tunables *tunables,
+                char *buf)
+{
+	return sprintf(buf, "%lu\n", screen_off_max_single_core);
+}
+
+static ssize_t store_screen_off_maxfreq_single_core(struct cpufreq_skateractive_tunables *tunables,
+                const char *buf, size_t count)
+{
+	int ret;
+	unsigned long val;
+
+	ret = strict_strtoul(buf, 0, &val);
+	if (ret < 0) return ret;
+	if (val < 384000) screen_off_max_single_core = DEFAULT_SCREEN_OFF_MAX_SINGLE_CORE;
+	else screen_off_max_single_core = val;
 	return count;
 }
 
@@ -1185,6 +1218,7 @@ show_store_gov_pol_sys(io_is_busy);
 show_store_gov_pol_sys(sampling_down_factor);
 show_store_gov_pol_sys(align_windows);
 show_store_gov_pol_sys(screen_off_maxfreq);
+show_store_gov_pol_sys(screen_off_maxfreq_single_core);
 show_store_gov_pol_sys(fastlane);
 show_store_gov_pol_sys(fastlane_threshold);
 
@@ -1212,6 +1246,7 @@ gov_sys_pol_attr_rw(io_is_busy);
 gov_sys_pol_attr_rw(sampling_down_factor);
 gov_sys_pol_attr_rw(align_windows);
 gov_sys_pol_attr_rw(screen_off_maxfreq);
+gov_sys_pol_attr_rw(screen_off_maxfreq_single_core);
 gov_sys_pol_attr_rw(fastlane);
 gov_sys_pol_attr_rw(fastlane_threshold);
 
@@ -1229,6 +1264,7 @@ static struct attribute *skateractive_attributes_gov_sys[] = {
 	&sampling_down_factor_gov_sys.attr,
 	&align_windows_gov_sys.attr,
 	&screen_off_maxfreq_gov_sys.attr,
+	&screen_off_maxfreq_single_core_gov_sys.attr,
 	&fastlane_gov_sys.attr,
 	&fastlane_threshold_gov_sys.attr,
 	NULL,
@@ -1253,6 +1289,7 @@ static struct attribute *skateractive_attributes_gov_pol[] = {
 	&sampling_down_factor_gov_pol.attr,
 	&align_windows_gov_pol.attr,
 	&screen_off_maxfreq_gov_pol.attr,
+	&screen_off_maxfreq_single_core_gov_pol.attr,
 	&fastlane_gov_pol.attr,
 	&fastlane_threshold_gov_pol.attr,
 	NULL,
