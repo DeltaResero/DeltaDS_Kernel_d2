@@ -124,6 +124,11 @@ struct cpufreq_skateractive_tunables {
 	 * The sample rate of the timer used during suspend
 	 */
 	unsigned long timer_rate_prev;
+	/*
+	 * The sample rate of the timer used during suspend
+	 */
+#define DEFAULT_TIMER_RATE_MULTIPLIER 2
+	unsigned long timer_rate_multiplier;
 
 	/*
 	 * Wait this long before raising speed above hispeed, by default a
@@ -440,12 +445,7 @@ static void cpufreq_skateractive_timer(unsigned long data)
 		tunables->timer_rate = tunables->timer_rate_prev;
 	else if ((unlikely(!screen_on)) && tunables->timer_rate == tunables->timer_rate_prev) {
 		tunables->timer_rate_prev = tunables->timer_rate;
-		tunables->timer_rate = tunables->timer_rate * 2;
-	}
-
-	/* Make sure timer_rate is not over timer_rate_prev on wakeup */
-	if ((likely(screen_on)) && tunables->timer_rate >= tunables->timer_rate_prev) {
-		tunables->timer_rate = tunables->timer_rate_prev;
+		tunables->timer_rate = tunables->timer_rate * tunables->timer_rate_multiplier;
 	}
 
 	/* Disable retention mode on screen off */
@@ -1014,6 +1014,30 @@ static ssize_t store_timer_rate(struct cpufreq_skateractive_tunables *tunables,
 	return count;
 }
 
+static ssize_t show_screen_off_timer_rate_multiplier(
+		struct cpufreq_skateractive_tunables *tunables, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%d\n", tunables->timer_rate_multiplier);
+}
+
+static ssize_t store_screen_off_timer_rate_multiplier(
+			struct cpufreq_skateractive_tunables *tunables,
+			const char *buf, size_t count)
+{
+	int ret = 0;
+	unsigned int i;
+
+	ret = kstrtoul(buf, 0, &i);
+	if (ret)
+		return ret;
+
+	if (i < 1 || i > 10)
+		return -EINVAL;
+
+	tunables->timer_rate_multiplier = i;
+	return count;
+}
+
 static ssize_t show_timer_slack(struct cpufreq_skateractive_tunables *tunables,
 		char *buf)
 {
@@ -1155,6 +1179,7 @@ show_store_gov_pol_sys(hispeed_freq);
 show_store_gov_pol_sys(go_hispeed_load);
 show_store_gov_pol_sys(min_sample_time);
 show_store_gov_pol_sys(timer_rate);
+show_store_gov_pol_sys(screen_off_timer_rate_multiplier);
 show_store_gov_pol_sys(timer_slack);
 show_store_gov_pol_sys(io_is_busy);
 show_store_gov_pol_sys(sampling_down_factor);
@@ -1181,6 +1206,7 @@ gov_sys_pol_attr_rw(hispeed_freq);
 gov_sys_pol_attr_rw(go_hispeed_load);
 gov_sys_pol_attr_rw(min_sample_time);
 gov_sys_pol_attr_rw(timer_rate);
+gov_sys_pol_attr_rw(screen_off_timer_rate_multiplier);
 gov_sys_pol_attr_rw(timer_slack);
 gov_sys_pol_attr_rw(io_is_busy);
 gov_sys_pol_attr_rw(sampling_down_factor);
@@ -1197,6 +1223,7 @@ static struct attribute *skateractive_attributes_gov_sys[] = {
 	&go_hispeed_load_gov_sys.attr,
 	&min_sample_time_gov_sys.attr,
 	&timer_rate_gov_sys.attr,
+	&screen_off_timer_rate_multiplier_gov_sys.attr,
 	&timer_slack_gov_sys.attr,
 	&io_is_busy_gov_sys.attr,
 	&sampling_down_factor_gov_sys.attr,
@@ -1220,6 +1247,7 @@ static struct attribute *skateractive_attributes_gov_pol[] = {
 	&go_hispeed_load_gov_pol.attr,
 	&min_sample_time_gov_pol.attr,
 	&timer_rate_gov_pol.attr,
+	&screen_off_timer_rate_multiplier_gov_pol.attr,
 	&timer_slack_gov_pol.attr,
 	&io_is_busy_gov_pol.attr,
 	&sampling_down_factor_gov_pol.attr,
@@ -1299,6 +1327,7 @@ static struct cpufreq_skateractive_tunables *alloc_tunable(
 	tunables->min_sample_time = DEFAULT_MIN_SAMPLE_TIME;
 	tunables->timer_rate = DEFAULT_TIMER_RATE;
 	tunables->timer_rate_prev = DEFAULT_TIMER_RATE;
+	tunables->timer_rate_multiplier = DEFAULT_TIMER_RATE_MULTIPLIER;
 	tunables->timer_slack_val = DEFAULT_TIMER_SLACK;
 	tunables->align_windows = true;
 	tunables->fastlane = false;
