@@ -435,6 +435,9 @@ static void cpufreq_skateractive_timer(unsigned long data)
 	if (!pcpu->governor_enabled)
 		goto exit;
 
+	if (pcpu->policy->min == pcpu->policy->max)
+		goto rearm;
+
 	spin_lock_irqsave(&pcpu->load_lock, flags);
 	pcpu->last_evaluated_jiffy = get_jiffies_64();
 	now = update_load(data);
