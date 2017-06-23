@@ -20,6 +20,8 @@
  *
  *  v1.7 - do only run state change if change actually requests a new state
  *
+ *  v1.8 - force powersuspend to be active when screen is off, turn off when screen is on.
+ *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
  * may be copied, distributed, and modified under those terms.
@@ -37,7 +39,9 @@
 #include <linux/workqueue.h>
 
 #define MAJOR_VERSION	1
-#define MINOR_VERSION	7
+#define MINOR_VERSION	8
+
+extern bool screen_on;
 
 struct workqueue_struct *power_suspend_work_queue;
 
@@ -78,19 +82,19 @@ static void power_suspend(struct work_struct *work)
 {
 	struct power_suspend *pos;
 	unsigned long irqflags;
-	int abort = 0;
 
 	#ifdef CONFIG_POWERSUSPEND_DEBUG
 	pr_info("[POWERSUSPEND] entering suspend...\n");
 	#endif
 	mutex_lock(&power_suspend_lock);
 	spin_lock_irqsave(&state_lock, irqflags);
-	if (state == POWER_SUSPEND_INACTIVE)
-		abort = 1;
+	/* Force power_suspend if power_resume is still active */
+	if (unlikely(!screen_on) && (state != POWER_SUSPEND_ACTIVE))
+		state = POWER_SUSPEND_ACTIVE;
 	spin_unlock_irqrestore(&state_lock, irqflags);
 
-	if (abort)
-		goto abort_suspend;
+	if (unlikely(!screen_on) && (state == POWER_SUSPEND_INACTIVE))
+		goto unlock_suspend;
 
 	#ifdef CONFIG_POWERSUSPEND_DEBUG
 	pr_info("[POWERSUSPEND] suspending...\n");
@@ -103,7 +107,7 @@ static void power_suspend(struct work_struct *work)
 	#ifdef CONFIG_POWERSUSPEND_DEBUG
 	pr_info("[POWERSUSPEND] suspend completed.\n");
 	#endif
-abort_suspend:
+unlock_suspend:
 	mutex_unlock(&power_suspend_lock);
 }
 
@@ -111,19 +115,19 @@ static void power_resume(struct work_struct *work)
 {
 	struct power_suspend *pos;
 	unsigned long irqflags;
-	int abort = 0;
 
 	#ifdef CONFIG_POWERSUSPEND_DEBUG
 	pr_info("[POWERSUSPEND] entering resume...\n");
 	#endif
 	mutex_lock(&power_suspend_lock);
 	spin_lock_irqsave(&state_lock, irqflags);
-	if (state == POWER_SUSPEND_ACTIVE)
-		abort = 1;
+	/* Force power_resume if power_suspend is still active */
+	if (likely(screen_on) && (state != POWER_SUSPEND_INACTIVE))
+		state = POWER_SUSPEND_INACTIVE;
 	spin_unlock_irqrestore(&state_lock, irqflags);
 
-	if (abort)
-		goto abort_resume;
+	if (likely(screen_on) && (state == POWER_SUSPEND_ACTIVE))
+		goto unlock_resume;
 
 	#ifdef CONFIG_POWERSUSPEND_DEBUG
 	pr_info("[POWERSUSPEND] resuming...\n");
@@ -136,7 +140,7 @@ static void power_resume(struct work_struct *work)
 	#ifdef CONFIG_POWERSUSPEND_DEBUG
 	pr_info("[POWERSUSPEND] resume completed.\n");
 	#endif
-abort_resume:
+unlock_resume:
 	mutex_unlock(&power_suspend_lock);
 }
 
@@ -273,6 +277,8 @@ static struct kobject *power_suspend_kobj;
 // ------------------ sysfs interface -----------------------
 static int __init power_suspend_init(void)
 {
+
+	screen_on = true;
 
 	int sysfs_result;
 
