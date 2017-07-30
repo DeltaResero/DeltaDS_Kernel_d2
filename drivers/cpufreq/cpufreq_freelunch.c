@@ -40,6 +40,7 @@ enum interaction_flags {
 #define ISF(x) this_dbs_info->is_interactive |= IFLAG_##x
 #define IUF(x) this_dbs_info->is_interactive &= ~IFLAG_##x
 
+extern bool screen_on;
 static void do_dbs_timer(struct work_struct *work);
 
 struct cpu_dbs_info_s {
@@ -136,24 +137,25 @@ static ssize_t show_sampling_rate_min(struct kobject *kobj,
 define_one_global_ro(sampling_rate_min);
 
 /* cpufreq_freelunch Governor Tunables */
-#define show_one(file_name, object)							\
-static ssize_t show_##file_name								\
-(struct kobject *kobj, struct attribute *attr, char *buf)	\
-{															\
+#define show_one(file_name, object)					\
+static ssize_t show_##file_name						\
+(struct kobject *kobj, struct attribute *attr, char *buf)		\
+{									\
 	return sprintf(buf, "%u\n", dbs_tuners_ins.object);		\
 }
+
 #define i_am_lazy(f, min, max)						\
-show_one(f,f)										\
-static ssize_t store_##f							\
-(struct kobject *a, struct attribute *b,			\
+show_one(f,f)								\
+static ssize_t store_##f						\
+(struct kobject *a, struct attribute *b,				\
 				   const char *buf, size_t count)	\
-{													\
+{									\
 	unsigned int input; int ret;					\
 	ret = sscanf(buf, "%u", &input);				\
 	if (ret != 1 || input < min || input > max) return -EINVAL;	\
-	dbs_tuners_ins.f = input;						\
-	return count;									\
-}													\
+	dbs_tuners_ins.f = input;					\
+	return count;							\
+}									\
 define_one_global_rw(f);
 
 show_one(sampling_rate, sampling_rate);
@@ -238,10 +240,12 @@ static struct attribute_group dbs_attr_group = {
 /************************** sysfs end ************************/
 
 static void __cpuinit do_cpu_up(struct work_struct *work) {
-	if (num_online_cpus() == 1) cpu_up(1);
+	if (num_online_cpus() == 1)
+		cpu_up(1);
 }
 static void do_cpu_down(struct work_struct *work) {
-	if (num_online_cpus() > 1) cpu_down(1);
+	if (num_online_cpus() > 1)
+		cpu_down(1);
 }
 
 static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
@@ -363,8 +367,13 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 		this_dbs_info->requested_freq = fml;
 	}
 
-	__cpufreq_driver_target(policy, this_dbs_info->requested_freq,
-		CPUFREQ_RELATION_H);
+	if (unlikely(!screen_on)) {
+		__cpufreq_driver_target(policy, this_dbs_info->requested_freq,
+			CPUFREQ_RELATION_C);
+	} else if (likely(screen_on)) {
+		__cpufreq_driver_target(policy, this_dbs_info->requested_freq,
+			CPUFREQ_RELATION_H);
+	}
 }
 
 static void do_dbs_timer(struct work_struct *work)
@@ -541,6 +550,7 @@ struct cpufreq_governor cpufreq_gov_freelunch = {
 
 static int __init cpufreq_gov_dbs_init(void)
 {
+	screen_on = true;
 	hotplug_register_alg(&fl_alg);
 	INIT_WORK(&cpu_up_work, do_cpu_up);
 	INIT_WORK(&cpu_down_work, do_cpu_down);
