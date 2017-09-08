@@ -244,16 +244,15 @@ CONFIG_SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
 	  else if [ -x /bin/bash ]; then echo /bin/bash; \
 	  else echo sh; fi ; fi)
 
+GRAPHITE	= -funsafe-loop-optimizations -ftree-loop-im -ftree-loop-ivcanon -funswitch-loops \
+		  -floop-parallelize-all -fivopts -floop-strip-mine -floop-nest-optimize -floop-interchange \
+		  -floop-block -ftree-loop-linear -floop-flatten -fgraphite-identity -ftree-loop-distribution \
+		  -funroll-loops -fgraphite
+
 HOSTCC       = $(CCACHE) gcc
 HOSTCXX      = $(CCACHE) g++
-HOSTCFLAGS   = -Wmissing-prototypes -Wstrict-prototypes -fomit-frame-pointer -fgcse-las \
-               -fgraphite -floop-flatten -floop-parallelize-all -ftree-loop-linear -floop-interchange \
-               -floop-strip-mine -floop-block -pipe -Wno-unused-parameter -Wno-sign-compare -Wno-missing-field-initializers \
-               -Wno-unused-variable -Wno-unused-value -std=gnu89 -fno-aggressive-loop-optimizations \
-               -pthread -fstrict-aliasing -fuse-linker-plugin -flto=4 -Ofast
- 
-HOSTCXXFLAGS = -fgcse-las -fgraphite -floop-flatten -floop-parallelize-all -ftree-loop-linear -Ofast \
-               -floop-interchange -floop-strip-mine -floop-block -pipe -pthread -fstrict-aliasing -fuse-linker-plugin -flto=4
+HOSTCFLAGS   = -Wall -Wmissing-prototypes -Wstrict-prototypes -fomit-frame-pointer $(GRAPHITE) -Ofast
+HOSTCXXFLAGS = $(GRAPHITE) -Ofast
 
 # Decide whether to build built-in, modular, or both.
 # Normally, just do built-in.
@@ -336,11 +335,11 @@ include $(srctree)/scripts/Kbuild.include
 # Make variables (CC, etc...)
 
 AS		= $(CROSS_COMPILE)as
-LD		= $(CROSS_COMPILE)ld.bfd
+LD		= $(CROSS_COMPILE)ld
 CC		= $(CCACHE) $(CROSS_COMPILE)gcc
 CPP		= $(CC) -E
-AR		= $(CROSS_COMPILE)gcc-ar
-NM		= $(CROSS_COMPILE)gcc-nm
+AR		= $(CROSS_COMPILE)ar
+NM		= $(CROSS_COMPILE)nm
 STRIP		= $(CROSS_COMPILE)strip
 OBJCOPY		= $(CROSS_COMPILE)objcopy
 OBJDUMP		= $(CROSS_COMPILE)objdump
@@ -358,22 +357,14 @@ CHECK		= sparse
 
 CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ \
 		  -Wbitwise -Wno-return-void $(CF)
-GRAPHITE	=  -funsafe-loop-optimizations -ftree-loop-im -ftree-loop-ivcanon -funswitch-loops \
-                   -floop-parallelize-all -fivopts -floop-strip-mine -floop-nest-optimize -floop-interchange \
-                   -floop-block -ftree-loop-linear -floop-flatten -fgraphite-identity -ftree-loop-distribution \
-                   -funroll-loops
 FLAGS_MODULE    = $(GRAPHITE)
 AFLAGS_MODULE   = $(GRAPHITE)
 LDFLAGS_MODULE  = --strip-debug
-CFLAGS_KERNEL	= $(GRAPHITE) -fmodulo-sched -fmodulo-sched-allow-regmoves -ftree-loop-vectorize \
-                  -ftree-loop-distribute-patterns -ftree-slp-vectorize -fvect-cost-model -ftree-partial-pre \
-                  -fgcse-after-reload -fgcse-lm -fgcse-sm -fsched-spec-load -ffast-math -fsingle-precision-constant \
-                  -fpredictive-commoning 
-AFLAGS_KERNEL	= $(GRAPHITE)
+CFLAGS_KERNEL	= $(GRAPHITE) 
 CFLAGS_MODULE   =
 AFLAGS_MODULE   =
 LDFLAGS_MODULE  =
-CFLAGS_KERNEL	= -Wno-sequence-point
+CFLAGS_KERNEL	=  -Wno-sequence-point
 AFLAGS_KERNEL	=
 CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
 
@@ -387,18 +378,13 @@ LINUXINCLUDE    := -I$(srctree)/arch/$(hdr-arch)/include \
 
 KBUILD_CPPFLAGS := -D__KERNEL__
 
-KBUILD_CFLAGS   := $(GRAPHITE) -Wundef -Wstrict-prototypes -Wno-trigraphs \
+KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -fno-strict-aliasing -fno-common \
 		   -Werror-implicit-function-declaration \
-		   -Wno-format-security -Wno-sizeof-pointer-memaccess \
-		   -fmodulo-sched -fmodulo-sched-allow-regmoves -ffast-math \
-                   -funswitch-loops -fpredictive-commoning -fgcse-after-reload \
- 		   -fno-delete-null-pointer-checks \
- 		   -ftree-loop-vectorize -ftree-loop-distribute-patterns -ftree-slp-vectorize \
-                   -fvect-cost-model -ftree-partial-pre \
-                   -fgcse-lm -fgcse-sm -fsched-spec-load -fsingle-precision-constant -mvectorize-with-neon-quad -fipa-cp-clone
+		   -Wno-format-security \
+		   -fno-delete-null-pointer-checks
 KBUILD_AFLAGS_KERNEL :=
-KBUILD_CFLAGS_KERNEL := -Wno-sequence-point
+KBUILD_CFLAGS_KERNEL :=  -Wno-sequence-point
 KBUILD_AFLAGS   := -D__ASSEMBLY__
 KBUILD_AFLAGS_MODULE  := -DMODULE
 KBUILD_CFLAGS_MODULE  := -DMODULE
@@ -586,24 +572,29 @@ endif # $(dot-config)
 # Defaults to vmlinux, but the arch makefile usually adds further targets
 all: vmlinux
 
+# Disable trash warnings.
+KBUILD_CFLAGS	+= $(call cc-option,--param=allow-store-data-races=0)
+KBUILD_CFLAGS   += $(call cc-disable-warning,maybe-uninitialized)
+KBUILD_CFLAGS   += $(call cc-disable-warning,array-bounds)
+KBUILD_CFLAGS   += $(call cc-disable-warning,format-truncation,)
+
 # Device Specific & Ofast Stuff
 KBUILD_CFLAGS	+= -Ofast
+KBUILD_CFLAGS	+= $(GRAPHITE)
 KBUILD_CFLAGS	+= -std=gnu89
-KBUILD_CFLAGS	+= -fsection-anchors -ftracer -frename-registers -fgcse-sm -fgcse-las
-KBUILD_CFLAGS	+= -fmodulo-sched -fmodulo-sched-allow-regmoves -fweb -fsection-anchors
+KBUILD_CFLAGS	+= -frename-registers -fgcse-sm -fgcse-las -fmodulo-sched
+KBUILD_CFLAGS	+= -fmodulo-sched-allow-regmoves -fweb -fsection-anchors
 KBUILD_CFLAGS	+= -mcpu=cortex-a15 -mtune=cortex-a15 -mfloat-abi=softfp -mfpu=neon-vfpv4 \
-                   -mvectorize-with-neon-quad -mfloat-abi=softfp -marm -ffast-math -fipa-cp-clone
-KBUILD_CFLAGS	+= -fdelete-null-pointer-checks -fexpensive-optimizations -foptimize-sibling-calls -foptimize-strlen
-
-# Tell gcc to never replace conditional load with a non-conditional one
-KBUILD_CFLAGS	+= $(call cc-option,--param=allow-store-data-races=0)
-
-#KBUILD_CFLAGS	+= -flto
+                   -mvectorize-with-neon-quad -marm -ffast-math -fipa-cp-clone
+KBUILD_CFLAGS	+= -fexpensive-optimizations -foptimize-strlen
 
 # GCC extras
-KBUILD_CFLAGS	+= -fgcse-sm -fgcse-las -fsched-spec-load -fsched-pressure \
-		   -fsched-stalled-insns-dep=32 -fipa-cp-clone -fipa-cp-alignment \
-                   -floop-unroll-and-jam -Werror=implicit-function-declaration -fno-aggressive-loop-optimizations
+KBUILD_CFLAGS	+= -fsched-spec-load -fsched-pressure \
+		   -fsched-stalled-insns-dep=32 -fipa-cp-alignment \
+                   -floop-unroll-and-jam
+
+KBUILD_CFLAGS	+= -fsanitize=leak -fno-diagnostics-show-caret -fno-pic \
+                   -DNDEBUG -g0 -fstdarg-opt -munaligned-access
 
 # GCC params
 KBUILD_CFLAGS	+= --param max-gcse-memory=0 \
@@ -614,27 +605,16 @@ KBUILD_CFLAGS	+= --param max-gcse-memory=0 \
                    --param l1-cache-size=16 \
                    --param l1-cache-line-size=16
 
-LDFLAGS         += --sort-common --hash-style=gnu
-LDFLAGS         += -flto=4 -Ofast
-KBUILD_CFLAGS   += $(call cc-disable-warning,maybe-uninitialized)
-KBUILD_CFLAGS   += $(call cc-disable-warning,array-bounds)
-KBUILD_CFLAGS	+= -fsanitize=leak -fno-diagnostics-show-caret -fno-pic \
-                   -DNDEBUG -g0 -fivopts -fstdarg-opt -munaligned-access
-
 # New in GCC5
 KBUILD_CFLAGS	+= -flra-remat -fipa-ra -fipa-pta -fipa-matrix-reorg
 KBUILD_CFLAGS	+= -fira-hoist-pressure -fira-loop-pressure \
-		   -fsched2-use-superblocks -fno-semantic-interposition -floop-nest-optimize \
-		   -ftree-loop-if-convert -ftree-loop-distribution -ftree-loop-distribute-patterns \
+		   -fsched2-use-superblocks -fno-semantic-interposition \
+		   -ftree-loop-if-convert -ftree-loop-distribute-patterns \
 		   -fvariable-expansion-in-unroller
 
-# Disable Some Things
-KBUILD_CFLAGS   += -Wno-trigraphs -Wno-unused-label -Wno-array-bounds -Wno-memset-transposed-args \
-                   -Wno-unused-function -Wno-declaration-after-statement \
-                   -Wno-unused-variable -Wno-parentheses -Wno-maybe-uninitialized \
-                   -Wno-misleading-indentation -Wno-bool-compare -Wno-int-conversion \
-                   -Wno-discarded-qualifiers -Wno-tautological-compare -Wno-incompatible-pointer-types \
-                   -Wno-error=maybe-uninitialized
+LDFLAGS         += --sort-common --hash-style=gnu
+LDFLAGS         += -flto
+
 
 include $(srctree)/arch/$(SRCARCH)/Makefile
 
@@ -660,7 +640,7 @@ KBUILD_CFLAGS += $(call cc-disable-warning, unused-but-set-variable)
 # incompatible with -fomit-frame-pointer with current GCC, so we don't use
 # -fomit-frame-pointer with FUNCTION_TRACER.
 #ifndef CONFIG_FUNCTION_TRACER
-KBUILD_CFLAGS	+= -fomit-frame-pointer
+#KBUILD_CFLAGS	+= -fomit-frame-pointer
 #endif
 #endif
 
@@ -695,7 +675,7 @@ NOSTDINC_FLAGS += -nostdinc -isystem $(shell $(CC) -print-file-name=include)
 CHECKFLAGS     += $(NOSTDINC_FLAGS)
 
 # warn about C99 declaration after statement
-# KBUILD_CFLAGS += $(call cc-option,-Wdeclaration-after-statement,)
+#KBUILD_CFLAGS += $(call cc-option,-Wdeclaration-after-statement,)
 
 # disable pointer signed / unsigned warnings in gcc 4.0
 KBUILD_CFLAGS += $(call cc-disable-warning, pointer-sign)
