@@ -70,16 +70,16 @@ int drop_caches_sysctl_handler(ctl_table *table, int write,
 }
 
 /* Create sysfys to enable/disable ram feature on screen-off */
-static drop_caches_suspend_enabled = true;
-module_param(drop_caches_suspend_enabled, bool, 0644);
+static bool drop_caches = true;
+module_param(drop_caches, bool, 0644);
 
 static void drop_caches_suspend(struct work_struct *work);
 static DECLARE_WORK(drop_caches_suspend_work, drop_caches_suspend);
 
 static void drop_caches_suspend(struct work_struct *work)
 {
-	if (!drop_caches_suspend_enabled)
-		return 0;
+	if (!drop_caches)
+		return;
 
 	/* sleep for 200ms */
 	msleep(200);
