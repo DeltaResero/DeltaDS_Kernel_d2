@@ -262,7 +262,8 @@ maple_latter_request(struct request_queue *q, struct request *rq)
 	return list_entry(rq->queuelist.next, struct request, queuelist);
 }
 
-static int maple_init_queue(struct request_queue *q)
+static void *
+maple_init_queue(struct request_queue *q)
 {
 	struct maple_data *mdata;
 

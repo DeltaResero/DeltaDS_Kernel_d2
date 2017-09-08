@@ -3134,14 +3134,6 @@ static int mms_ts_suspend(struct device *dev)
 	set_power_suspend_state_panel_hook(POWER_SUSPEND_ACTIVE);
 #endif
 
-        /* Put state notifier first so if not active
-           powersuspend takes the stage */
-        if (!display_on) {
-           (state_suspended);
-        } else if (!display_on) {
-           (power_suspended);
-        };
-
 	screen_on = false;
 
 out:
@@ -3183,14 +3175,6 @@ static int mms_ts_resume(struct device *dev)
 #ifdef CONFIG_POWERSUSPEND
 	set_power_suspend_state_panel_hook(POWER_SUSPEND_INACTIVE);
 #endif
-
-        /* Put state_notifier first so if not active
-           powersuspend takes the stage */
-        if (display_on) {
-           (state_resume);
-        } else if (display_on) {
-           (!power_suspended);
-        };
 
 	screen_on = true;
 

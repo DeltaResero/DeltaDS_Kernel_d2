@@ -510,56 +510,6 @@ static void cpufreq_blu_active_idle_end(void)
 	up_read(&pcpu->enable_sem);
 }
 
-static void cpufreq_blu_active_get_policy_info(struct cpufreq_policy *policy,
-						unsigned int *pmax_freq,
-						u64 *phvt, u64 *pfvt)
-{
-	struct cpufreq_blu_active_cpuinfo *pcpu;
-	unsigned int max_freq = 0;
-	u64 hvt = ~0ULL, fvt = 0;
-	unsigned int i;
-
-	for_each_cpu(i, policy->cpus) {
-		pcpu = &per_cpu(cpuinfo, i);
-
-		fvt = max(fvt, pcpu->loc_floor_val_time);
-		if (pcpu->target_freq > max_freq) {
-			max_freq = pcpu->target_freq;
-			hvt = pcpu->loc_hispeed_val_time;
-		} else if (pcpu->target_freq == max_freq) {
-			hvt = min(hvt, pcpu->loc_hispeed_val_time);
-		}
-	}
-
-	*pmax_freq = max_freq;
-	*phvt = hvt;
-	*pfvt = fvt;
-}
-
-static void cpufreq_blu_active_adjust_cpu(unsigned int cpu,
-					   struct cpufreq_policy *policy)
-{
-	struct cpufreq_blu_active_cpuinfo *pcpu;
-	u64 hvt, fvt;
-	unsigned int max_freq;
-	int i;
-
-	cpufreq_blu_active_get_policy_info(policy, &max_freq, &hvt, &fvt);
-
-	for_each_cpu(i, policy->cpus) {
-		pcpu = &per_cpu(cpuinfo, i);
-		pcpu->pol_floor_val_time = fvt;
-	}
-
-	if (max_freq != policy->cur) {
-		__cpufreq_driver_target(policy, max_freq, CPUFREQ_RELATION_H);
-		for_each_cpu(i, policy->cpus) {
-			pcpu = &per_cpu(cpuinfo, i);
-			pcpu->pol_hispeed_val_time = hvt;
-		}
-	}
-}
-
 static int cpufreq_blu_active_speedchange_task(void *data)
 {
 	unsigned int cpu;

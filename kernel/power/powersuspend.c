@@ -277,10 +277,9 @@ static struct kobject *power_suspend_kobj;
 // ------------------ sysfs interface -----------------------
 static int __init power_suspend_init(void)
 {
+	int sysfs_result;
 
 	screen_on = true;
-
-	int sysfs_result;
 
         power_suspend_kobj = kobject_create_and_add("power_suspend",
 				kernel_kobj);

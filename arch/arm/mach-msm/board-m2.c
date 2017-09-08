@@ -3852,6 +3852,7 @@ static struct i2c_board_info pn544_info[] __initdata = {
 };
 #endif /* CONFIG_NFC_PN544	*/
 
+#if 0
 /* configuration data */
 static const u8 mxt_config_data[] = {
 	/* T6 Object */
@@ -3898,6 +3899,7 @@ static const u8 mxt_config_data[] = {
 	/* T43 Object */
 	0, 0, 0, 0, 0, 0,
 };
+#endif
 
 static void mxt_init_hw_liquid(void)
 {

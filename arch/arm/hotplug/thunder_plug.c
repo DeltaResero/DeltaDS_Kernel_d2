@@ -737,11 +737,11 @@ static struct kobject *thunderplug_kobj;
 
 static int __init thunderplug_init(void)
 {
+	int sysfs_result;
+	int ret = 0;
+
 	/* Screen should be on on init */
 	screen_on = true;
-
-	int ret = 0;
-	int sysfs_result;
 
 	printk(KERN_DEBUG "[%s]\n",__func__);
 

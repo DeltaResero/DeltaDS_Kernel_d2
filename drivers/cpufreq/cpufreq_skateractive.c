@@ -698,7 +698,7 @@ static int cpufreq_skateractive_speedchange_task(void *data)
 			unsigned int j;
 			unsigned int max_freq = 0;
 			struct cpufreq_skateractive_cpuinfo *pjcpu;
-			u64 hvt;
+			u64 hvt = 0;
 
 			pcpu = &per_cpu(cpuinfo, cpu);
 			if (!down_read_trylock(&pcpu->enable_sem))
@@ -1036,7 +1036,7 @@ static ssize_t store_timer_rate(struct cpufreq_skateractive_tunables *tunables,
 static ssize_t show_screen_off_timer_rate_multiplier(
 		struct cpufreq_skateractive_tunables *tunables, char *buf)
 {
-	return snprintf(buf, PAGE_SIZE, "%d\n", tunables->timer_rate_multiplier);
+	return snprintf(buf, PAGE_SIZE, "%lu\n", tunables->timer_rate_multiplier);
 }
 
 static ssize_t store_screen_off_timer_rate_multiplier(
@@ -1044,16 +1044,16 @@ static ssize_t store_screen_off_timer_rate_multiplier(
 			const char *buf, size_t count)
 {
 	int ret = 0;
-	unsigned int i;
+	unsigned long val;
 
-	ret = kstrtoul(buf, 0, &i);
+	ret = kstrtoul(buf, 0, &val);
 	if (ret)
 		return ret;
 
-	if (i < 1 || i > 10)
+	if (val < 1 || val > 10)
 		return -EINVAL;
 
-	tunables->timer_rate_multiplier = i;
+	tunables->timer_rate_multiplier = val;
 	return count;
 }
 

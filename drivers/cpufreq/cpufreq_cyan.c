@@ -831,7 +831,7 @@ static ssize_t show_target_loads(
 		ret += sprintf(buf + ret, "%u%s", target_loads[i],
 			       i & 0x1 ? ":" : " ");
 
-	ret += sprintf(buf + --ret, "\n");
+	ret = sprintf(buf + --ret, "\n");
 	spin_unlock_irqrestore(&target_loads_lock, flags);
 	return ret;
 }
@@ -874,7 +874,7 @@ static ssize_t show_above_hispeed_delay(
 		ret += sprintf(buf + ret, "%u%s", above_hispeed_delay[i],
 			       i & 0x1 ? ":" : " ");
 
-	ret += sprintf(buf + --ret, "\n");
+	ret = sprintf(buf + --ret, "\n");
 	spin_unlock_irqrestore(&above_hispeed_delay_lock, flags);
 	return ret;
 }
@@ -1397,9 +1397,8 @@ static int cpufreq_governor_cyan(struct cpufreq_policy *policy,
 		}
 
 		if (--active_count > 0) {
-		    if (!policy->cpu)
-			input_unregister_handler(&interactive_input_handler);
-
+			if (!policy->cpu)
+				input_unregister_handler(&interactive_input_handler);
 			mutex_unlock(&gov_lock);
 			return 0;
 		}

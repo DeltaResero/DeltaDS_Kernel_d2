@@ -189,7 +189,7 @@ static ssize_t dvfs_mon_read(struct file *file, char __user *buf,
 	for (i = 0; i != num_possible_cpus(); ++i) {
 		unsigned char load = dvfs_info->cpus[i] ?
 			dvfs_info->load_data[i].load : 0;
-		sprintf(temp, "(%d,%3d),", dvfs_info->cpus[i], load);
+		snprintf(temp, sizeof(temp), "(%d,%3d),", dvfs_info->cpus[i], load);
 		strcat(cpu_status, temp);
 	}
 

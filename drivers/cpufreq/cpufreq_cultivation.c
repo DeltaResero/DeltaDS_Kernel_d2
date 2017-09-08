@@ -647,36 +647,6 @@ static int cpufreq_cultivation_speedchange_task(void *data)
 	return 0;
 }
 
-static int load_change_callback(struct notifier_block *nb, unsigned long val,
-				void *data)
-{
-	unsigned long cpu = (unsigned long) data;
-	struct cpufreq_cultivation_cpuinfo *pcpu = &per_cpu(cpuinfo, cpu);
-	struct cpufreq_cultivation_tunables *tunables;
-
-	if (speedchange_task == current)
-		return 0;
-
-	if (!down_read_trylock(&pcpu->enable_sem))
-		return 0;
-	if (!pcpu->governor_enabled) {
-		up_read(&pcpu->enable_sem);
-		return 0;
-	}
-	tunables = pcpu->policy->governor_data;
-
-	del_timer(&pcpu->cpu_timer);
-	del_timer(&pcpu->cpu_slack_timer);
-	cpufreq_cultivation_timer(cpu);
-
-	up_read(&pcpu->enable_sem);
-	return 0;
-}
-
-static struct notifier_block load_notifier_block = {
-	.notifier_call = load_change_callback,
-};
-
 static int cpufreq_cultivation_notifier(
 	struct notifier_block *nb, unsigned long val, void *data)
 {
