@@ -48,6 +48,14 @@ config LAZYPLUG
 	  This enables the conservative hotplugging, lazyplug by arter97
 	  based on intelli_plug. Refer to the comments for more info.
 
+config SKATER_HOTPLUG
+	bool "A highly customizable hotplug, built for battery & performance"
+	default n
+	help
+	  This hotplug is based off of AutoSMP, it has many customizations to
+	  ensure that you can either tune it for performance, or insane battery life.
+	  I've taken parts of Intelliplug, MSM_Hotplug, and will be adding more to this.
+
 config STATE_HELPER
         bool "State Helper"
 	depends on STATE_NOTIFIER
