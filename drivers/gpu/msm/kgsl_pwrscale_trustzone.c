@@ -99,7 +99,7 @@ static ssize_t tz_governor_show(struct kgsl_device *device,
 #endif
 #ifdef CONFIG_MSM_KGSL_TIERED_GOV
 	else if (priv->governor == TZ_GOVERNOR_TIERED)
-		ret = snprintf(buf, 13, "interactive\n");
+		ret = snprintf(buf, 13, "tiered\n");
 #endif
 	else
 		ret = snprintf(buf, 13, "performance\n");
