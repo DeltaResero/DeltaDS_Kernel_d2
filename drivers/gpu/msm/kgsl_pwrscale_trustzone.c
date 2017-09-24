@@ -240,10 +240,14 @@ void simple_gpu_activate(void)
 	priv = saved_gpu_pwrscale->priv;
 
 	mutex_lock(&saved_gpu_dev->mutex);
-	if (simple_gpu_active)
+	if (simple_gpu_active) {
+		if (tiered_gpu_active) {
+			tiered_gpu_active = 0;
+		}
 		priv->governor = TZ_GOVERNOR_SIMPLE;
-	else
+	} else {
 		priv->governor = saved_governor;
+	}
 	mutex_unlock(&saved_gpu_dev->mutex);
 }
 #endif
@@ -261,10 +265,14 @@ void tiered_gpu_activate(void)
 	priv = saved_gpu_pwrscale->priv;
 
 	mutex_lock(&saved_gpu_dev->mutex);
-	if (tiered_gpu_active)
+	if (tiered_gpu_active) {
+		if (simple_gpu_active) {
+			simple_gpu_active = 0;
+		}
 		priv->governor = TZ_GOVERNOR_TIERED;
-	else
+	} else {
 		priv->governor = saved_governor;
+	}
 	mutex_unlock(&saved_gpu_dev->mutex);
 }
 #endif
