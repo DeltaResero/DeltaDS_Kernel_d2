@@ -50,3 +50,4 @@ obj-$(CONFIG_MSM_KGSL) += msm_kgsl_core.o
 obj-$(CONFIG_MSM_KGSL) += msm_adreno.o
 obj-$(CONFIG_MSM_KGSL_2D) += msm_z180.o
 obj-$(CONFIG_MSM_KGSL_SIMPLE_GOV) += simple_gpu_algorithm.o
+obj-$(CONFIG_MSM_KGSL_TIERED_GOV) += tiered_gpu_governor.o

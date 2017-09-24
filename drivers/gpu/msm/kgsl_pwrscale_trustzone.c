@@ -51,6 +51,10 @@ static struct kgsl_device *saved_gpu_dev;
 static struct kgsl_pwrscale *saved_gpu_pwrscale;
 #endif
 
+#ifdef CONFIG_MSM_KGSL_TIERED_GOV
+int tiered_gpu_active;
+#endif
+
 /* FLOOR is 5msec to capture up to 3 re-draws
  * per frame for 60fps content.
  */
@@ -143,6 +147,16 @@ static ssize_t tz_governor_store(struct kgsl_device *device,
 		simple_gpu_active = 0;
 	}
 #endif
+
+#ifdef CONFIG_MSM_KGSL_TIERED_GOV
+	if (priv->governor == TZ_GOVERNOR_TIERED) {
+		tiered_gpu_active = 1;
+	} else {
+		saved_governor = priv->governor;
+		tiered_gpu_active = 0;
+	}
+#endif
+
 	mutex_unlock(&device->mutex);
 	return count;
 }
@@ -228,6 +242,27 @@ void simple_gpu_activate(void)
 	mutex_lock(&saved_gpu_dev->mutex);
 	if (simple_gpu_active)
 		priv->governor = TZ_GOVERNOR_SIMPLE;
+	else
+		priv->governor = saved_governor;
+	mutex_unlock(&saved_gpu_dev->mutex);
+}
+#endif
+
+#ifdef CONFIG_MSM_KGSL_TIERED_GOV
+void tiered_gpu_activate(void)
+{
+	struct tz_priv *priv;
+
+	if (!saved_gpu_dev)
+		return;
+	if (!saved_gpu_pwrscale || !saved_gpu_pwrscale->priv)
+		return;
+
+	priv = saved_gpu_pwrscale->priv;
+
+	mutex_lock(&saved_gpu_dev->mutex);
+	if (tiered_gpu_active)
+		priv->governor = TZ_GOVERNOR_TIERED;
 	else
 		priv->governor = saved_governor;
 	mutex_unlock(&saved_gpu_dev->mutex);
