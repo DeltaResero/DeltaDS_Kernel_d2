@@ -17,4 +17,8 @@ int state_register_client(struct notifier_block *nb);
 int state_unregister_client(struct notifier_block *nb);
 int state_notifier_call_chain(unsigned long val, void *v);
 
+/* Powersuspend tweak */
+extern bool state_notifier_enabled;
+extern bool is_state_notifier_enabled(void);
+
 #endif /* _LINUX_STATE_NOTIFIER_H */

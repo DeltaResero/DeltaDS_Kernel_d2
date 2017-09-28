@@ -22,6 +22,8 @@
  *
  *  v1.8 - force powersuspend to be active when screen is off, turn off when screen is on.
  *
+ *  v1.9 - make state_notifier disable power_suspend if enabled.
+ *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
  * may be copied, distributed, and modified under those terms.
@@ -34,12 +36,13 @@
  */
 
 #include <linux/powersuspend.h>
+#include <linux/state_notifier.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/workqueue.h>
 
 #define MAJOR_VERSION	1
-#define MINOR_VERSION	8
+#define MINOR_VERSION	9
 
 extern bool screen_on;
 
@@ -56,9 +59,14 @@ static DEFINE_SPINLOCK(state_lock);
 static int state; // Yank555.lu : Current powersave state (screen on / off)
 static int mode;  // Yank555.lu : Current powersave mode  (userspace / panel)
 
+extern bool is_state_notifier_enabled(void);
+
 void register_power_suspend(struct power_suspend *handler)
 {
 	struct list_head *pos;
+
+	if (is_state_notifier_enabled() || mode == POWER_SUSPEND_USERSPACE)
+		return;
 
 	mutex_lock(&power_suspend_lock);
 	list_for_each(pos, &power_suspend_handlers) {
@@ -72,6 +80,9 @@ EXPORT_SYMBOL(register_power_suspend);
 
 void unregister_power_suspend(struct power_suspend *handler)
 {
+	if (is_state_notifier_enabled() || mode == POWER_SUSPEND_USERSPACE)
+		return;
+
 	mutex_lock(&power_suspend_lock);
 	list_del(&handler->link);
 	mutex_unlock(&power_suspend_lock);
@@ -82,6 +93,9 @@ static void power_suspend(struct work_struct *work)
 {
 	struct power_suspend *pos;
 	unsigned long irqflags;
+
+	if (is_state_notifier_enabled() || mode == POWER_SUSPEND_USERSPACE)
+		return;
 
 	mutex_lock(&power_suspend_lock);
 	spin_lock_irqsave(&state_lock, irqflags);
@@ -107,6 +121,9 @@ static void power_resume(struct work_struct *work)
 {
 	struct power_suspend *pos;
 	unsigned long irqflags;
+
+	if (is_state_notifier_enabled() || mode == POWER_SUSPEND_USERSPACE)
+		return;
 
 	mutex_lock(&power_suspend_lock);
 	spin_lock_irqsave(&state_lock, irqflags);
@@ -134,6 +151,9 @@ void set_power_suspend_state(int new_state)
 {
 	unsigned long irqflags;
 
+	if (is_state_notifier_enabled() || mode == POWER_SUSPEND_USERSPACE)
+		return;
+
 	if (state != new_state) {
 		spin_lock_irqsave(&state_lock, irqflags);
 		if (state == POWER_SUSPEND_INACTIVE && new_state == POWER_SUSPEND_ACTIVE) {
@@ -151,6 +171,10 @@ void set_power_suspend_state(int new_state)
 
 void set_power_suspend_state_panel_hook(int new_state)
 {
+
+	if (is_state_notifier_enabled() || mode == POWER_SUSPEND_USERSPACE)
+		return;
+
 	// Yank555.lu : Only allow panel hook changes in panel mode
 	if (mode == POWER_SUSPEND_PANEL)
 		set_power_suspend_state(new_state);
@@ -191,7 +215,10 @@ static struct kobj_attribute power_suspend_state_attribute =
 static ssize_t power_suspend_mode_show(struct kobject *kobj,
 		struct kobj_attribute *attr, char *buf)
 {
-        return sprintf(buf, "%u\n", mode);
+	if (is_state_notifier_enabled())
+		return sprintf(buf, "power_suspend is disabled.\n", mode);
+	else
+		return sprintf(buf, "%u\n", mode);
 }
 
 static ssize_t power_suspend_mode_store(struct kobject *kobj,

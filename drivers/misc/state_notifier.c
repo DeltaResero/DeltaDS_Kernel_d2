@@ -43,6 +43,18 @@ static bool suspend_in_progress;
 
 static BLOCKING_NOTIFIER_HEAD(state_notifier_list);
 
+bool is_state_notifier_enabled(void)
+{
+	bool state_notifier_enabled;
+
+	if (enabled != 0)
+		state_notifier_enabled = true;
+	else
+		state_notifier_enabled = false;
+
+	return state_notifier_enabled;
+}
+
 /**
  *	state_register_client - register a client notifier
  *	@nb: notifier block to callback on events
