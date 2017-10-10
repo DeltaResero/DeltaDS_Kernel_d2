@@ -41,7 +41,7 @@
 #include "avs.h"
 
 #define FREQ_TABLE_SIZE 35
-#define MIN_VDD   (600000)
+#define MIN_VDD   (500000)
 #define VMIN_VDD (1150000)
 #define MAX_VDD  (1400000)
 
@@ -1440,7 +1440,7 @@ static ssize_t show_vmin(struct kobject *kobj,
 		struct attribute *attr, char *buf) {
 	return sprintf(buf, "%u\n", final_vmin / 1000);
 }
-static struct global_attr vmin_attr = __ATTR(vmin, 0666,
+static struct global_attr vmin_attr = __ATTR(vmin, 0644,
 		show_vmin, store_vmin);
 static struct attribute *skatter_attributes[] = {
 	&vmin_attr.attr,
