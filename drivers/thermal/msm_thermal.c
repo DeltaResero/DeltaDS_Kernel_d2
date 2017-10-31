@@ -24,8 +24,13 @@
 #include <linux/of.h>
 #include <mach/cpufreq.h>
 
+extern bool screen_on;
+
 static unsigned int temp_threshold __read_mostly = 70;
 module_param(temp_threshold, int, 0644);
+
+static unsigned int temp_thres_screen_off __read_mostly = 40;
+module_param(temp_thres_screen_off, int, 0644);
 
 static unsigned int limited_max_freq = UINT_MAX;
 int limited_gpu_pwrlevel = 0;
@@ -94,9 +99,18 @@ static void check_temp(struct work_struct *work)
 
 	tsens_get_temp(&tsens_dev, &temp);
 
+	/* Make sure screen off threshold doesn't go over normal threshold */
+	if (temp_thres_screen_off > temp_threshold)
+		temp_thres_screen_off = temp_threshold;
+
 	for (i = 0; temp_limits[i].max_freq != UINT_MAX; i++) {
-		if (temp >= temp_threshold + temp_limits[i].thresh)
-			break;
+		if (unlikely(!screen_on)) {
+			if (temp >= temp_thres_screen_off + temp_limits[i].thresh)
+				break;
+		} else {
+			if (temp >= temp_threshold + temp_limits[i].thresh)
+				break;
+		}
 	}
 
 	limit_cpu_freqs(i);
@@ -106,6 +120,8 @@ static void check_temp(struct work_struct *work)
 
 int __init msm_thermal_init(struct msm_thermal_data *pdata)
 {
+	screen_on = true;
+
 	cpufreq_register_notifier(&msm_thermal_cpufreq_notifier,
 			CPUFREQ_POLICY_NOTIFIER);
 
