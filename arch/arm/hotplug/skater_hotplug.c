@@ -23,7 +23,7 @@
 #include <linux/state_notifier.h>
 
 #define SKATER_TAG			"skater_hotplug:"
-#define SKATER_ENABLED			false
+#define SKATER_ENABLED			true
 #define DEFAULT_BOOST_LOCK_DUR		1500 * 1000L
 #define DEFAULT_MAX_CPUS                NR_CPUS
 #define DEFAULT_NR_CPUS_BOOSTED		DEFAULT_MAX_CPUS
