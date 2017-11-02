@@ -676,6 +676,7 @@ unsigned long get_wchan(struct task_struct *p)
 	frame.lr = 0;			/* recovered from the stack */
 	frame.pc = thread_saved_pc(p);
 	stack_page = (unsigned long)task_stack_page(p);
+#if defined(CONFIG_ARM_UNWIND) || defined(CONFIG_FRAME_POINTER)
 	do {
 		if (frame.sp < stack_page ||
 		    frame.sp >= stack_page + THREAD_SIZE ||
@@ -684,6 +685,7 @@ unsigned long get_wchan(struct task_struct *p)
 		if (!in_sched_functions(frame.pc))
 			return frame.pc;
 	} while (count ++ < 16);
+#endif
 	return 0;
 }
 
