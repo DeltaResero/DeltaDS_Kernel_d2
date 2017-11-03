@@ -310,8 +310,6 @@ struct mms_ts_info {
 	struct mutex dvfs_lock;
 #endif
 
-	struct work_struct interaction_work;
-
 	/* protects the enabled flag */
 	struct mutex			lock;
 	bool				enabled;
@@ -480,10 +478,6 @@ static void set_dvfs_lock(struct mms_ts_info *info, uint32_t on)
 }
 #endif
 
-static void do_interaction(struct work_struct *work) {
-	cpufreq_set_interactivity(touch_is_pressed, INTERACT_ID_TOUCHSCREEN);
-}
-
 static void release_all_fingers(struct mms_ts_info *info)
 {
 #ifdef SEC_TSP_DEBUG
@@ -509,7 +503,10 @@ static void release_all_fingers(struct mms_ts_info *info)
 	set_dvfs_lock(info, 2);
 	pr_info("[TSP] dvfs_lock free.\n ");
 #endif
-	schedule_work(&info->interaction_work);
+
+#ifdef CONFIG_INTERACTION_HINTS
+	cpufreq_set_interactivity(touch_is_pressed, INTERACT_ID_TOUCHSCREEN);
+#endif
 }
 
 static void mms_set_noise_mode(struct mms_ts_info *info)
@@ -738,7 +735,9 @@ static irqreturn_t mms_ts_interrupt(int irq, void *dev_id)
 	set_dvfs_lock(info, !!touch_is_pressed);
 #endif
 
-	schedule_work(&info->interaction_work);
+#ifdef CONFIG_INTERACTION_HINTS
+	cpufreq_set_interactivity(touch_is_pressed, INTERACT_ID_TOUCHSCREEN);
+#endif
 
 out:
 	return IRQ_HANDLED;
@@ -3039,8 +3038,6 @@ static int __devinit mms_ts_probe(struct i2c_client *client,
 	INIT_DELAYED_WORK(&info->work_dvfs_chg, change_dvfs_lock);
 	info->dvfs_lock_status = false;
 #endif
-
-	INIT_WORK(&info->interaction_work, do_interaction);
 
 #if ISC_DL_MODE
 	ret = mms_ts_fw_load(info);
