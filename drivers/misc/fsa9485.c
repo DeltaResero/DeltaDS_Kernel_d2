@@ -39,6 +39,8 @@
 #include <linux/kobject.h>
 #include <linux/sysfs.h>
 
+extern bool still_booting;
+
 /* FSA9480 I2C registers */
 #define FSA9485_REG_DEVID		0x01
 #define FSA9485_REG_CTRL		0x02
@@ -1209,6 +1211,7 @@ static void fsa9485_init_detect(struct work_struct *work)
 	struct fsa9485_usbsw *usbsw = container_of(work,
 			struct fsa9485_usbsw, init_work.work);
 	int ret = 0;
+	still_booting = false;
 
 	dev_info(&usbsw->client->dev, "%s\n", __func__);
 

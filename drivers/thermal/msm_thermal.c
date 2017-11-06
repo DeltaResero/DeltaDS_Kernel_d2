@@ -22,9 +22,11 @@
 #include <linux/msm_thermal.h>
 #include <linux/platform_device.h>
 #include <linux/of.h>
+#include <linux/delay.h>
 #include <mach/cpufreq.h>
 
 extern bool screen_on;
+bool still_booting = true;
 
 static unsigned int temp_threshold __read_mostly = 70;
 module_param(temp_threshold, int, 0644);
@@ -74,6 +76,11 @@ static void limit_cpu_freqs(int idx)
 {
 	struct temp_limit *tl = &temp_limits[idx];
 	unsigned int cpu;
+
+	if (tl->max_freq < 1512000 && still_booting) {
+		msleep(5000);
+		return;
+	}
 
 	if (limited_max_freq == tl->max_freq)
 		return;
