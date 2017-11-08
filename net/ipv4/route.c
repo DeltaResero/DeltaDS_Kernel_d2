@@ -1316,12 +1316,12 @@ restart:
 			if (!in_softirq() && attempts-- > 0) {
 				static DEFINE_SPINLOCK(lock);
 
-				if (spin_trylock(&lock)) {
+				if (spin_trylock(&lock))
 					__do_rt_garbage_collect(1, 0);
-					spin_unlock(&lock);
-				} else {
-					spin_unlock_wait(&lock);
-				}
+				else
+					spin_lock(&lock);
+				spin_unlock(&lock);
+
 				goto restart;
 			}
 

@@ -165,32 +165,12 @@ static inline void arch_spin_unlock(arch_spinlock_t *lock)
  * ourself to the queue and noting our position), then waiting until the head
  * becomes equal to the the initial value of the tail.
  *
- * Unlocked value: 0
- * Locked value: now_serving != next_ticket
+ * 0xffff0000: next_ticket
+ * 0x0000ffff: now_serving
  *
- *   31             17  16    15  14                    0
- *  +----------------------------------------------------+
- *  |  now_serving          |     next_ticket            |
- *  +----------------------------------------------------+
+ * Unlocked value: now_serving == next_ticket
+ * Locked value: now_serving != next_ticket
  */
-
-#define TICKET_SHIFT	16
-#define TICKET_BITS	16
-#define	TICKET_MASK	0xFFFF
-
-/* In order to combine reads while allowing exclusive stores to the ticket
- * portion of the lock, the ticket must reside in the lowest bytes of memory,
- * regardless of endianness.
- */
-#ifdef __LITTLE_ENDIAN
-#define LOCK_TICKET(n)	(n & 0xFFFF)
-#define LOCK_SERVING(n) (n >> 16)
-#define BE(code)
-#else
-#define LOCK_TICKET(n) (n >> 16)
-#define LOCK_SERVING(n)	(n & 0xFFFF)
-#define BE(code)	code
-#endif
 
 #define arch_spin_lock_flags(lock, flags) arch_spin_lock(lock)
 
@@ -199,10 +179,10 @@ static inline void arch_spin_lock(arch_spinlock_t *lock)
 	register volatile unsigned int *lockp asm ("r0") = &lock->lock;
 	__asm__ __volatile__(
 "1:	ldrex	r1, [r0]\n"
-BE("	ror	r1, r1, #16\n")
-"	add	r1, r1, #1\n"
-"	strexh	r2, r1, [r0]\n"
-"	sub	r1, r1, #1\n"
+"	add	r1, r1, #0x10000\n"
+"	strex	r2, r1, [r0]\n"
+
+"	sub	r1, r1, #0x10000\n"
 "	teq	r2, #0\n"
 "	bne	1b\n"
 
@@ -216,19 +196,17 @@ BE("	ror	r1, r1, #16\n")
 	smp_mb();
 }
 
-static inline int arch_spin_is_locked(arch_spinlock_t *lock);
 static inline int arch_spin_trylock(arch_spinlock_t *lock)
 {
-	unsigned long tmp, ticket;
+	register unsigned long ticket, tmp;
 
 	/* Grab lock if now_serving == next_ticket and access is exclusive */
 	__asm__ __volatile__(
 "	ldrex	%[ticket], [%[lockaddr]]\n"
 "	eors	%[tmp], %[ticket], %[ticket], ror #16\n"
-BE("	lsr	%[ticket], %[ticket], #16\n")
-"	add	%[ticket], %[ticket], #1\n"
+"	add	%[ticket], %[ticket], #0x10000\n"
 "	bne	1f\n"
-"	strexh	%[tmp], %[ticket], [%[lockaddr]]\n"
+"	strex	%[tmp], %[ticket], [%[lockaddr]]\n"
 "1:\n"
 	: [ticket]"=&r" (ticket), [tmp]"=&r" (tmp)
 	: [lockaddr]"r" (&lock->lock)
@@ -241,44 +219,66 @@ BE("	lsr	%[ticket], %[ticket], #16\n")
 
 static inline void arch_spin_unlock(arch_spinlock_t *lock)
 {
+	register unsigned long ticket, tmp = 1;
+
 	smp_mb();
 
-	/* The lock itself protects the now_serving field, so as long as we
-	 * don't touch the next_ticket field, we don't need exclusive access to
-	 * unlock.
-	 */
-	((volatile uint16_t *)&lock->lock)[1]++;
+	__asm__ __volatile__(
+"1:	ldrex	%[ticket], [%[lockaddr]]\n"
+"	uadd16	%[ticket], %[ticket], %[tmp]\n"
+"	strex	%[tmp], %[ticket], [%[lockaddr]]\n"
+"	teq	%[tmp], #0\n"
+"	bne	1b\n"
+	: [ticket]"=&r" (ticket), [tmp]"+r" (tmp)
+	: [lockaddr]"r" (&lock->lock)
+	: "cc");
 
-	dsb_sev();
+	if (ticket ^ ror32(ticket, 16))
+		dsb_sev();
 }
 
 static inline int arch_spin_is_locked(arch_spinlock_t *lock)
 {
 	unsigned long tmp = ACCESS_ONCE(lock->lock);
-	return tmp ^ ror32(tmp, TICKET_SHIFT);
+	return !!(tmp ^ ror32(tmp, 16));
 }
 
 static inline int arch_spin_is_contended(arch_spinlock_t *lock)
 {
 	unsigned long tmp = ACCESS_ONCE(lock->lock);
-	return (LOCK_TICKET(tmp) - LOCK_SERVING(tmp)) > 1;
+	return (tmp - (tmp << 16)) >= 0x20000;
 }
 
 static inline void arch_spin_unlock_wait(arch_spinlock_t *lock)
 {
+	// We can't safely take the lock, so we can't get a SEV.
 	while (arch_spin_is_locked(lock))
-		wfe_safe();
+		cpu_relax();
 }
 
-#undef BE
 #endif
 
 /*
  * RWLOCKS
  *
+ * rwlocks are three conceptual parts: a single bit indicating an active write
+ * lock, a 15-bit counter for waiting writers, and a 16-bit counter for readers
+ * (active or waiting).  This allows the dsb_sev() to be conditionalized,
+ * reducing wakeups across locks.
  *
- * Write locks are easy - we just set bit 31.  When unlocking, we can
- * just write zero since the lock is exclusively held.
+ * 0xfffe0000: writer counter
+ * 0x00010000: write-lock bit
+ * 0x0000ffff: reader counter
+ *
+ * Acquiring a read lock is simple: increment the reader counter; if the
+ * write-lock bit is set, spin until it is clear.  To unlock, decrement the
+ * reader counter.
+ *
+ * Acquiring a write lock is slightly more complex: if the reader counter is
+ * zero and the write-lock bit is clear, set the write-lock bit.  Otherwise,
+ * increment the writer counter, spin until the write-lock bit and the reader
+ * counter are zero, then decrement the writer counter and set the write-lock
+ * bit.  To unlock, clear the write-lock bit.
  */
 
 static inline void arch_write_lock(arch_rwlock_t *rw)
@@ -286,14 +286,16 @@ static inline void arch_write_lock(arch_rwlock_t *rw)
 	register volatile unsigned int *lockp asm ("r0") = &rw->lock;
 	__asm__ __volatile__(
 "1:	ldrex	r1, [r0]\n"
-"	teq	r1, #0\n"
-"	bne	5f\n"
-"	mov	r1, #0x80000000\n"
+"	lsls	r2, r1, #15\n"
+"	orreq	r1, r1, #0x10000\n"
+"	addne	r1, r1, #0x20000\n"
 "	strex	r2, r1, [r0]\n"
-"	teq	r2, #0\n"
 
-"5:	mov	r2, lr\n"
-"	blne	__arch_write_lock_slowpath\n"
+"	orreq	r2, r2, #2\n"
+"	lsrs	r2, r2, #1\n"
+"	bcs	1b\n"
+"	mov	r2, lr\n"
+"	bleq	__arch_write_lock_slowpath\n"
 	:
 	: "r" (lockp)
 	: "r1", "r2", "cc");
@@ -303,14 +305,19 @@ static inline void arch_write_lock(arch_rwlock_t *rw)
 
 static inline int arch_write_trylock(arch_rwlock_t *rw)
 {
-	unsigned long tmp;
+	unsigned long tmp, tmp2;
 
 	__asm__ __volatile__(
-"1:	ldrex	%0, [%1]\n"
-"	teq	%0, #0\n"
-"	strexeq	%0, %2, [%1]"
-	: "=&r" (tmp)
-	: "r" (&rw->lock), "r" (0x80000000)
+"1:	ldrex	%1, [%2]\n"
+"	lsls	%0, %1, #15\n"
+"	bne	5f\n"
+
+"	orr	%1, %1, #0x10000\n"
+"	strex	%0, %1, [%2]\n"
+
+"5:\n"
+	: "=&r" (tmp), "=&r" (tmp2)
+	: "r" (&rw->lock)
 	: "cc");
 
 	if (!tmp)
@@ -326,32 +333,22 @@ static inline void arch_write_unlock(arch_rwlock_t *rw)
 
 	__asm__ __volatile__(
 "1:	ldrex	%0, [%2]\n"
-"	bic	%0, %0, #0x80000000\n"
+"	bic	%0, %0, #0x10000\n"
 "	strex	%1, %0, [%2]\n"
 "	teq	%1, #0\n"
-"	bne	1b"
+"	bne	1b\n"
 	: "=&r" (tmp), "=&r" (tmp2)
 	: "r" (&rw->lock)
 	: "cc");
 
-	dsb_sev();
+	// dsb_sev() if there are other readers or writers waiting
+	if (tmp)
+		dsb_sev();
 }
 
 /* write_can_lock - would write_trylock() succeed? */
-#define arch_write_can_lock(x)		((x)->lock == 0)
+#define arch_write_can_lock(x)			(!((x)->lock << 15))
 
-/*
- * Read locks are a bit more hairy:
- *  - Exclusively load the lock value.
- *  - Increment it.
- *  - Store new lock value if positive, and we still own this location.
- *    If the value is negative, we've already failed.
- *  - If we failed to store the value, we want a negative result.
- *  - If we failed, try again.
- * Unlocking is similarly hairy.  We may have multiple read locks
- * currently active.  However, we know we won't have any write
- * locks.
- */
 static inline void arch_read_lock(arch_rwlock_t *rw)
 {
 	register volatile unsigned int *lockp asm ("r0") = &rw->lock;
@@ -362,7 +359,7 @@ static inline void arch_read_lock(arch_rwlock_t *rw)
 "	teq	r2, #0\n"
 "	bne	1b\n"
 
-"	tst	r1, #0x80000000\n"
+"	tst	r1, #0x10000\n"
 "	mov	r2, lr\n"
 "	blne	__arch_read_lock_slowpath\n"
 	:
@@ -388,19 +385,21 @@ static inline void arch_read_unlock(arch_rwlock_t *rw)
 	: "r" (&rw->lock)
 	: "cc");
 
-	if (!tmp)
+	// dsb_sev() if we were the last reader and there are writers waiting
+	if (!(tmp << 16) && (tmp >> 17))
 		dsb_sev();
 }
 
 static inline int arch_read_trylock(arch_rwlock_t *rw)
 {
-	unsigned long tmp, tmp2 = 1;
+	unsigned long tmp, tmp2;
 
 	__asm__ __volatile__(
 "1:	ldrex	%0, [%2]\n"
-"	adds	%0, %0, #1\n"
-"	strexpl	%1, %0, [%2]\n"
-	: "=&r" (tmp), "+r" (tmp2)
+"	ands	%1, %0, #0x10000\n"
+"	add	%0, %0, #1\n"
+"	strexeq	%1, %0, [%2]\n"
+	: "=&r" (tmp), "=&r" (tmp2)
 	: "r" (&rw->lock)
 	: "cc");
 
@@ -410,7 +409,7 @@ static inline int arch_read_trylock(arch_rwlock_t *rw)
 }
 
 /* read_can_lock - would read_trylock() succeed? */
-#define arch_read_can_lock(x)		((x)->lock < 0x80000000)
+#define arch_read_can_lock(x)		(!((x)->lock & 0x10000))
 
 #define arch_read_lock_flags(lock, flags) arch_read_lock(lock)
 #define arch_write_lock_flags(lock, flags) arch_write_lock(lock)

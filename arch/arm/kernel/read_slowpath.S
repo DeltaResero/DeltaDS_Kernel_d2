@@ -1,16 +1,15 @@
 #include <linux/linkage.h>
 #include <asm/assembler.h>
 
+#define SPIN_OPTIM_AFTER_WFE
+
 .macro spinhead
 .endm
 
 .macro spintest loop
 	ldr	r1, [r0]
-	tst	r1, #0x80000000
+	tst	r1, #0x10000
 	bne	\loop
-.endm
-
-.macro spintail
 .endm
 
 .macro spinskipoptim skip
