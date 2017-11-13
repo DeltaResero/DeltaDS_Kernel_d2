@@ -167,10 +167,6 @@ struct cpufreq_skateractive_tunables {
 	 * frequency.
 	 */
 	unsigned int sampling_down_factor;
-
-	/* Use agressive frequency step calculation, above a given load threshold */
-	bool fastlane;
-	unsigned int fastlane_threshold;
 };
 
 /* For cases where we have single governor instance for system */
@@ -382,16 +378,6 @@ static unsigned int choose_freq(struct cpufreq_skateractive_cpuinfo *pcpu,
 	return freq;
 }
 
-static unsigned int fastlane_freq(struct cpufreq_skateractive_cpuinfo *pcpu,
-		unsigned int cpu_load)
-{
-	unsigned int freq;
-
-	freq = pcpu->policy->min + cpu_load * (pcpu->policy->max - pcpu->policy->min) / 100;
-
-	return freq;
-}
-
 static u64 update_load(int cpu)
 {
 	struct cpufreq_skateractive_cpuinfo *pcpu = &per_cpu(cpuinfo, cpu);
@@ -485,18 +471,12 @@ static void cpufreq_skateractive_timer(unsigned long data)
 		if (pcpu->policy->cur < tunables->hispeed_freq) {
 			new_freq = tunables->hispeed_freq;
 		} else {
-			if (tunables->fastlane && cpu_load > tunables->fastlane_threshold)
-				new_freq = fastlane_freq(pcpu, cpu_load);
-			else
 			new_freq = choose_freq(pcpu, loadadjfreq);
 
 			if (new_freq < tunables->hispeed_freq)
 				new_freq = tunables->hispeed_freq;
 		}
 	} else {
-		if (tunables->fastlane && cpu_load > tunables->fastlane_threshold)
-			new_freq = fastlane_freq(pcpu, cpu_load);
-		else
 		new_freq = choose_freq(pcpu, loadadjfreq);
 		if (new_freq > tunables->hispeed_freq &&
 				pcpu->target_freq < tunables->hispeed_freq)
@@ -1152,46 +1132,6 @@ static ssize_t store_io_is_busy(struct cpufreq_skateractive_tunables *tunables,
 	return count;
 }
 
-static ssize_t show_fastlane(
-		struct cpufreq_skateractive_tunables *tunables, char *buf)
-{
-	return snprintf(buf, PAGE_SIZE, "%d\n", tunables->fastlane);
-}
-
-static ssize_t store_fastlane(
-			struct cpufreq_skateractive_tunables *tunables,
-			const char *buf, size_t count)
-{
-	int ret;
-	unsigned long val;
-
-	ret = kstrtoul(buf, 0, &val);
-	if (ret < 0)
-		return ret;
-	tunables->fastlane = val;
-	return count;
-}
-
-static ssize_t show_fastlane_threshold(
-		struct cpufreq_skateractive_tunables *tunables, char *buf)
-{
-	return snprintf(buf, PAGE_SIZE, "%d\n", tunables->fastlane_threshold);
-}
-
-static ssize_t store_fastlane_threshold(
-			struct cpufreq_skateractive_tunables *tunables,
-			const char *buf, size_t count)
-{
-	int ret;
-	unsigned long val;
-
-	ret = kstrtoul(buf, 0, &val);
-	if (ret < 0 || ret > 100)
-		return ret;
-	tunables->fastlane_threshold = val;
-	return count;
-}
-
 /*
  * Create show/store routines
  * - sys: One governor instance for complete SYSTEM
@@ -1241,8 +1181,6 @@ show_store_gov_pol_sys(sampling_down_factor);
 show_store_gov_pol_sys(align_windows);
 show_store_gov_pol_sys(screen_off_maxfreq);
 show_store_gov_pol_sys(earphones_max_freq_screen_off);
-show_store_gov_pol_sys(fastlane);
-show_store_gov_pol_sys(fastlane_threshold);
 
 #define gov_sys_attr_rw(_name)						\
 static struct global_attr _name##_gov_sys =				\
@@ -1269,8 +1207,6 @@ gov_sys_pol_attr_rw(sampling_down_factor);
 gov_sys_pol_attr_rw(align_windows);
 gov_sys_pol_attr_rw(screen_off_maxfreq);
 gov_sys_pol_attr_rw(earphones_max_freq_screen_off);
-gov_sys_pol_attr_rw(fastlane);
-gov_sys_pol_attr_rw(fastlane_threshold);
 
 /* One Governor instance for entire system */
 static struct attribute *skateractive_attributes_gov_sys[] = {
@@ -1287,8 +1223,6 @@ static struct attribute *skateractive_attributes_gov_sys[] = {
 	&align_windows_gov_sys.attr,
 	&screen_off_maxfreq_gov_sys.attr,
 	&earphones_max_freq_screen_off_gov_sys.attr,
-	&fastlane_gov_sys.attr,
-	&fastlane_threshold_gov_sys.attr,
 	NULL,
 };
 
@@ -1312,8 +1246,6 @@ static struct attribute *skateractive_attributes_gov_pol[] = {
 	&align_windows_gov_pol.attr,
 	&screen_off_maxfreq_gov_pol.attr,
 	&earphones_max_freq_screen_off_gov_pol.attr,
-	&fastlane_gov_pol.attr,
-	&fastlane_threshold_gov_pol.attr,
 	NULL,
 };
 
@@ -1389,8 +1321,6 @@ static struct cpufreq_skateractive_tunables *alloc_tunable(
 	tunables->timer_rate_multiplier = DEFAULT_TIMER_RATE_MULTIPLIER;
 	tunables->timer_slack_val = DEFAULT_TIMER_SLACK;
 	tunables->align_windows = true;
-	tunables->fastlane = false;
-	tunables->fastlane_threshold = 50;
 
 	spin_lock_init(&tunables->target_loads_lock);
 	spin_lock_init(&tunables->above_hispeed_delay_lock);
