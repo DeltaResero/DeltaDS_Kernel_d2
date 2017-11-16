@@ -337,13 +337,8 @@ LD		= $(CROSS_COMPILE)ld
 REAL_CC		= $(CROSS_COMPILE)gcc
 LDFINAL		= $(LD)
 CPP		= $(CC) -E
-ifdef CONFIG_LTO_SLIM
 AR		= $(CROSS_COMPILE)gcc-ar
 NM		= $(CROSS_COMPILE)gcc-nm
-else
-AR		= $(CROSS_COMPILE)ar
-NM		= $(CROSS_COMPILE)nm
-endif
 STRIP		= $(CROSS_COMPILE)strip
 OBJCOPY		= $(CROSS_COMPILE)objcopy
 OBJDUMP		= $(CROSS_COMPILE)objdump
@@ -958,7 +953,7 @@ endif # ifdef CONFIG_KALLSYMS
 # Do modpost on a prelinked vmlinux. The finally linked vmlinux has
 # relevant sections renamed as per the linker script.
 quiet_cmd_vmlinux-modpost = LD      $@
-      cmd_vmlinux-modpost = $(LD) $(LDFLAGS) -r -o $@                          \
+      cmd_vmlinux-modpost = $(LD) $(LDFLAGS) -q -r -o $@                       \
 	 $(vmlinux-init) --start-group $(vmlinux-main) --end-group             \
 	 $(filter-out $(vmlinux-init) $(vmlinux-main) FORCE ,$^)
 define rule_vmlinux-modpost

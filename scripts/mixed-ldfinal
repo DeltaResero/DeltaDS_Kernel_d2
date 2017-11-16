@@ -1,0 +1,40 @@
+#!/bin/bash -e
+# Use GCC to link while emulating the lto-mixed binutils patches:
+# For all mixed-LTO input objects, copy the non-LTO sections into a new object
+# file and add it to the command line.
+
+ARGS=("-nostdlib")
+TEMPS=()
+trap '[[ "${TEMPS[*]}" ]] && rm "${TEMPS[@]}"' EXIT
+
+# Detect mixed object files: if a file contains both a non-empty ALLOC section
+# and a symbol matching __gnu_lto_*, it must be split before linking
+is_mixed() {
+	"$OBJDUMP" -t "$1" | grep -q '\s__gnu_lto_\S\+$' &&
+	! "$OBJDUMP" -wh "$1" | awk '{ if ($0 ~ "ALLOC" && $3 ~ "[^0]") exit 1 }'
+}
+
+while [ -n "$1" ]
+do	case "$1" in
+	(-o) ARGS+=("-o" "$2"); shift;;
+	(*.o)	if is_mixed "$1"
+		then	tmp="${1%.o}.asm.o"
+			"$OBJCOPY" -w -R '.gnu.lto_*' -N '__gnu_lto_*' "$1" "$tmp"
+			TEMPS+=("$tmp")
+			ARGS+=("$tmp")
+		fi
+		ARGS+=("$1");;
+	(--param|-T) ARGS+=("$1" "$2"); shift;;
+	(-[RFGhIezcbyYu]*|--script|--defsym|-init|-Map|--oformat|-rpath) :;&
+	(-rpath-link|--sort-section|--section-start|-Tbss|-Tdata|-Ttext) :;&
+	(--version-script|--dynamic-list|--version-exports-symbol|--wrap|-m)
+		ARGS+=("-Wl,$1,$2"); shift;;
+	(-[lorv]|-[OWdfgmp]*|-save-temps) ARGS+=("$1");;
+	(-*) ARGS+=("-Wl,$1");;
+	(*) ARGS+=("$1");;
+	esac
+	shift
+done
+
+if [[ "$KBUILD_VERBOSE" != 0 ]]; then set -x; fi
+"$CC" "${ARGS[@]}"
