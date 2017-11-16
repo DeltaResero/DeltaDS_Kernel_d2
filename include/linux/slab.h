@@ -12,6 +12,13 @@
 #include <linux/gfp.h>
 #include <linux/types.h>
 
+#ifdef __GNUC__
+#define __slab_return(n...) __attribute__((	\
+	assume_aligned(ARCH_SLAB_MINALIGN),	\
+	alloc_size(n)				\
+))
+#endif
+
 /*
  * Flags to pass to kmem_cache_create().
  * The ones marked DEBUG are only valid if CONFIG_SLAB_DEBUG is set.
@@ -156,8 +163,8 @@ unsigned int kmem_cache_size(struct kmem_cache *);
 /*
  * Common kmalloc functions provided by all allocators
  */
-void * __must_check __krealloc(const void *, size_t, gfp_t);
-void * __must_check krealloc(const void *, size_t, gfp_t);
+void * __must_check __slab_return(2) __krealloc(const void *, size_t, gfp_t);
+void * __must_check __slab_return(1) krealloc(const void *, size_t, gfp_t);
 void kfree(const void *);
 void kzfree(const void *);
 size_t ksize(const void *);
@@ -240,7 +247,8 @@ size_t ksize(const void *);
  * for general use, and so are not documented here. For a full list of
  * potential flags, always refer to linux/gfp.h.
  */
-static inline void *kmalloc_array(size_t n, size_t size, gfp_t flags)
+static inline __slab_return(1,2)
+void *kmalloc_array(size_t n, size_t size, gfp_t flags)
 {
 	if (size != 0 && n > SIZE_MAX / size)
 		return NULL;
@@ -253,7 +261,8 @@ static inline void *kmalloc_array(size_t n, size_t size, gfp_t flags)
  * @size: element size.
  * @flags: the type of memory to allocate (see kmalloc).
  */
-static inline void *kcalloc(size_t n, size_t size, gfp_t flags)
+static inline __slab_return(1,2)
+void *kcalloc(size_t n, size_t size, gfp_t flags)
 {
 	return kmalloc_array(n, size, flags | __GFP_ZERO);
 }
@@ -269,12 +278,14 @@ static inline void *kcalloc(size_t n, size_t size, gfp_t flags)
  * if available. Equivalent to kmalloc() in the non-NUMA single-node
  * case.
  */
-static inline void *kmalloc_node(size_t size, gfp_t flags, int node)
+static inline __slab_return(1)
+void *kmalloc_node(size_t size, gfp_t flags, int node)
 {
 	return kmalloc(size, flags);
 }
 
-static inline void *__kmalloc_node(size_t size, gfp_t flags, int node)
+static inline __slab_return(1)
+void *__kmalloc_node(size_t size, gfp_t flags, int node)
 {
 	return __kmalloc(size, flags);
 }
@@ -346,9 +357,27 @@ static inline void *kmem_cache_zalloc(struct kmem_cache *k, gfp_t flags)
  * @size: how many bytes of memory are required.
  * @flags: the type of memory to allocate (see kmalloc).
  */
-static inline void *kzalloc(size_t size, gfp_t flags)
+static inline void *kzalloc_inline(size_t size, gfp_t flags)
 {
+	void *ret;
+	size = (size + 3) & ~3;
+	ret = kmalloc(size, flags);
+	if (ret)
+		memset(ret, 0, size);
+	return ret;
+}
+static __always_inline __slab_return(1)
+void *kzalloc(size_t size, gfp_t flags)
+{
+#ifndef CONFIG_CC_OPTIMIZE_FOR_SIZE
+	// FIXME: the exact unroll limit depends on CPU
+	if (__builtin_constant_p(size) && size <= 32)
+		return kzalloc_inline(size, flags);
+	else
+		return kmalloc(size, flags | __GFP_ZERO);
+#else
 	return kmalloc(size, flags | __GFP_ZERO);
+#endif
 }
 
 /**
@@ -357,7 +386,8 @@ static inline void *kzalloc(size_t size, gfp_t flags)
  * @flags: the type of memory to allocate (see kmalloc).
  * @node: memory node from which to allocate
  */
-static inline void *kzalloc_node(size_t size, gfp_t flags, int node)
+static inline __slab_return(1)
+void *kzalloc_node(size_t size, gfp_t flags, int node)
 {
 	return kmalloc_node(size, flags | __GFP_ZERO, node);
 }
