@@ -59,7 +59,8 @@ comma = ,
 # char struct members incorrectly. So disable it.
 # (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=65932)
 #
-KBUILD_CFLAGS	+= $(call cc-option,-fno-ipa-sra)
+# This was fixed during the GCC 6.0 release cycle
+KBUILD_CFLAGS	+= $(call cc-ifversion,-le,0600,$(call cc-option,-fno-ipa-sra))
 
 # This selects which instruction set is used.
 # Note that GCC does not numerically define an architecture version
