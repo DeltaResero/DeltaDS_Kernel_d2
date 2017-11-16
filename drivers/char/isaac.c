@@ -87,7 +87,7 @@ static DEFINE_PER_CPU(struct isaac_ctx, cpu_seeds);
 #define STEP(mix) {				\
 	x = *m;					\
 	a = (a ^ (mix)) + *(m2++);		\
-	*(m++) = y = IND(x) + a ^ b;		\
+	*(m++) = y = IND(x) + (a ^ b);		\
 	*(r++) = b = IND(y >> RANDSIZL) ^ a + x;\
 }
 #endif

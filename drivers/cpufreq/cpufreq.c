@@ -508,12 +508,12 @@ static void do_enable_oc(struct work_struct *work) {
 	struct cpufreq_policy *policy = fw->policy;
 
 	acpuclk_enable_oc_freqs(policy->user_policy.max);
-	if (ret = cpufreq_get_policy(&new_policy, policy->cpu)) {
+	if ((ret = cpufreq_get_policy(&new_policy, policy->cpu))) {
 		printk(KERN_ERR "%s: can't get policy (%i)!\n", __func__, ret);
 		goto out;
 	}
 	policy->cpuinfo.max_freq = new_policy.max = policy->user_policy.max;
-	if (ret = __cpufreq_set_policy(policy, &new_policy))
+	if ((ret = __cpufreq_set_policy(policy, &new_policy)))
 		printk(KERN_ERR "%s: can't set policy (%i)!\n", __func__, ret);
 out:
 	kfree(work);
