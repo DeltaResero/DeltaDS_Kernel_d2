@@ -43,6 +43,7 @@
 
 extern bool earphones_connected;
 extern bool screen_on;
+extern bool bluetooth_on;
 extern void msm_pm_sleep_mode_enable(bool enable);
 
 struct cpufreq_skateractive_cpuinfo {
@@ -98,6 +99,14 @@ static unsigned long earphones_max_freq_screen_off = DEFAULT_EARPHONES_MAX_FREQ_
 /* Frequency cannot go below this if earphones are in and screen is off. */
 #define DEFAULT_EARPHONES_MIN_FREQ_LIMIT 648000
 static unsigned long earphones_min_freq_limit = DEFAULT_EARPHONES_MIN_FREQ_LIMIT;
+
+/* Max frequency to limit while bluetooth is on & screen is off. */
+#define DEFAULT_BT_MAX_FREQ_SCREEN_OFF 1080000
+static unsigned long bluetooth_max_freq_screen_off = DEFAULT_BT_MAX_FREQ_SCREEN_OFF;
+
+/* Frequency cannot go below this if bluetooth is on and screen is off. */
+#define DEFAULT_BT_MIN_FREQ_LIMIT 648000
+static unsigned long bluetooth_min_freq_limit = DEFAULT_BT_MIN_FREQ_LIMIT;
 
 struct cpufreq_skateractive_tunables {
 	int usage_count;
@@ -711,6 +720,10 @@ static int cpufreq_skateractive_speedchange_task(void *data)
 			} else if (earphones_connected && unlikely(!screen_on)) {
 				if (max_freq > earphones_max_freq_screen_off)
 					max_freq = earphones_max_freq_screen_off;
+			/* Put earphones before bluetooth just in case there plugged in while BT is on */
+			} else if (bluetooth_on && unlikely(!screen_on)) {
+				if (max_freq > bluetooth_max_freq_screen_off)
+					max_freq = bluetooth_max_freq_screen_off;
 			/* If number of online cores is over 1, set to regular screen off frequency */
 			} else if (unlikely(!screen_on)) {
 				if (max_freq > screen_off_max)
@@ -1112,6 +1125,31 @@ static ssize_t store_earphones_max_freq_screen_off(struct cpufreq_skateractive_t
 	return count;
 }
 
+static ssize_t show_bluetooth_max_freq_screen_off(struct cpufreq_skateractive_tunables *tunables,
+		char *buf)
+{
+	return sprintf(buf, "%lu\n", bluetooth_max_freq_screen_off);
+}
+
+static ssize_t store_bluetooth_max_freq_screen_off(struct cpufreq_skateractive_tunables *tunables,
+		const char *buf, size_t count)
+{
+	int ret;
+	unsigned long val;
+
+	ret = strict_strtoul(buf, 0, &val);
+	if (ret < 0)
+		return ret;
+
+	/* Return min freq limit if it reaches below this */
+	if (val < bluetooth_min_freq_limit)
+		val = bluetooth_min_freq_limit;
+
+	bluetooth_max_freq_screen_off = val;
+
+	return count;
+}
+
 static ssize_t show_io_is_busy(struct cpufreq_skateractive_tunables *tunables,
 		char *buf)
 {
@@ -1181,6 +1219,7 @@ show_store_gov_pol_sys(sampling_down_factor);
 show_store_gov_pol_sys(align_windows);
 show_store_gov_pol_sys(screen_off_maxfreq);
 show_store_gov_pol_sys(earphones_max_freq_screen_off);
+show_store_gov_pol_sys(bluetooth_max_freq_screen_off);
 
 #define gov_sys_attr_rw(_name)						\
 static struct global_attr _name##_gov_sys =				\
@@ -1207,6 +1246,7 @@ gov_sys_pol_attr_rw(sampling_down_factor);
 gov_sys_pol_attr_rw(align_windows);
 gov_sys_pol_attr_rw(screen_off_maxfreq);
 gov_sys_pol_attr_rw(earphones_max_freq_screen_off);
+gov_sys_pol_attr_rw(bluetooth_max_freq_screen_off);
 
 /* One Governor instance for entire system */
 static struct attribute *skateractive_attributes_gov_sys[] = {
@@ -1223,6 +1263,7 @@ static struct attribute *skateractive_attributes_gov_sys[] = {
 	&align_windows_gov_sys.attr,
 	&screen_off_maxfreq_gov_sys.attr,
 	&earphones_max_freq_screen_off_gov_sys.attr,
+	&bluetooth_max_freq_screen_off_gov_sys.attr,
 	NULL,
 };
 
@@ -1246,6 +1287,7 @@ static struct attribute *skateractive_attributes_gov_pol[] = {
 	&align_windows_gov_pol.attr,
 	&screen_off_maxfreq_gov_pol.attr,
 	&earphones_max_freq_screen_off_gov_pol.attr,
+	&bluetooth_max_freq_screen_off_gov_pol.attr,
 	NULL,
 };
 
@@ -1550,6 +1592,7 @@ static int __init cpufreq_skateractive_init(void)
 
 	screen_on = true;
 	earphones_connected = false;
+	bluetooth_on = false;
 
 	/* Initalize per-cpu timers */
 	for_each_possible_cpu(i) {
