@@ -127,6 +127,9 @@ static int bluesleep_hci_event(struct notifier_block *this,
 static int bluesleep_start(void);
 static void bluesleep_stop(void);
 
+/* Add bluetooth boolean */
+bool bluetooth_on = false;
+
 /*
  * Global variables
  */
@@ -299,6 +302,7 @@ static int bluesleep_write_proc_lpm(struct file *file, const char *buffer,
 
 	if (b == '0') {
 		/* HCI_DEV_UNREG */
+		bluetooth_on = false;
 		bluesleep_stop();
 		has_lpm_enabled = false;
 		bsi->uport = NULL;
@@ -307,6 +311,7 @@ static int bluesleep_write_proc_lpm(struct file *file, const char *buffer,
 		if (!has_lpm_enabled) {
 			has_lpm_enabled = true;
 			bsi->uport = bluesleep_get_uart_port();
+			bluetooth_on = true;
 			/* if bluetooth started, start bluesleep*/
 			bluesleep_start();
 		}
@@ -365,6 +370,7 @@ static int bluesleep_hci_event(struct notifier_block *this,
 			hu  = (struct hci_uart *) hdev->driver_data;
 			state = (struct uart_state *) hu->tty->driver_data;
 			bsi->uport = state->uart_port;
+			bluetooth_on = true;
 			/* if bluetooth started, start bluesleep*/
 			bluesleep_start();
 		}
@@ -372,6 +378,7 @@ static int bluesleep_hci_event(struct notifier_block *this,
 	case HCI_DEV_UNREG:
 		bluesleep_hdev = NULL;
 		bsi->uport = NULL;
+		bluetooth_on = false;
 		/* if bluetooth stopped, stop bluesleep also */
 		bluesleep_stop();
 		break;
