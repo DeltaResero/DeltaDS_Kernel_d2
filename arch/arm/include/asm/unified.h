@@ -92,7 +92,9 @@
 	.endm
 	.macro	iteee, cond
 	.endm
+	.pushsection .discard.unifiedasm, "ae"
 	__unified_macros_defined:
+	.popsection
 	.endif
 #else	/* !__ASSEMBLY__ */
 __asm__(
@@ -127,7 +129,9 @@ __asm__(
 "	.endm\n"
 "	.macro	iteee, cond\n"
 "	.endm\n"
+"	.pushsection .discard.unifiedasm, \"ae\"\n"
 "	__unified_macros_defined:\n"
+"	.popsection\n"
 "	.endif\n");
 #endif	/* __ASSEMBLY__ */
 
