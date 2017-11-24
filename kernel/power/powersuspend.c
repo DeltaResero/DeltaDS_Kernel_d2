@@ -20,9 +20,15 @@
  *
  *  v1.7 - do only run state change if change actually requests a new state
  *
- *  v1.8 - force powersuspend to be active when screen is off, turn off when screen is on.
+ *  v1.7.1 - add back hybrid and autosleep modes
  *
- *  v1.9 - make state_notifier disable power_suspend if enabled.
+ *  v1.7.2 - remove debug prints, keeps source cleaner
+ *
+ *  v1.7.3 - force powersuspend to be enabled when screen is off, disable when screen on.
+ *
+ *  v1.7.4 - make state_notifier disable power_suspend if enabled.
+ *
+ *  v1.7.5 - when state notifier is disabled, restore to previous powersuspend state.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -42,9 +48,8 @@
 #include <linux/workqueue.h>
 
 #define MAJOR_VERSION	1
-#define MINOR_VERSION	9
-
-extern bool screen_on;
+#define MINOR_VERSION	7
+#define MINOR_UPDATE	5
 
 struct workqueue_struct *power_suspend_work_queue;
 
@@ -57,7 +62,10 @@ static DECLARE_WORK(power_resume_work, power_resume);
 static DEFINE_SPINLOCK(state_lock);
 
 static int state; // Yank555.lu : Current powersave state (screen on / off)
-static int mode;  // Yank555.lu : Current powersave mode  (userspace / panel)
+static int mode;  // Yank555.lu : Current powersave mode  (userspace / panel / hybrid / autosleep)
+static int mode_prev; // Lonelyoneskatter : Save previous mode
+
+extern bool screen_on;
 
 extern bool is_state_notifier_enabled(void);
 
@@ -171,7 +179,6 @@ void set_power_suspend_state(int new_state)
 
 void set_power_suspend_state_panel_hook(int new_state)
 {
-
 	if (is_state_notifier_enabled() || mode == POWER_SUSPEND_USERSPACE)
 		return;
 
@@ -215,10 +222,11 @@ static struct kobj_attribute power_suspend_state_attribute =
 static ssize_t power_suspend_mode_show(struct kobject *kobj,
 		struct kobj_attribute *attr, char *buf)
 {
-	if (is_state_notifier_enabled())
-		return sprintf(buf, "power_suspend is disabled.\n", mode);
-	else
+	if (is_state_notifier_enabled()) {
+		return sprintf(buf, "power_suspend is disabled.%d\n", mode);
+	} else {
 		return sprintf(buf, "%u\n", mode);
+	}
 }
 
 static ssize_t power_suspend_mode_store(struct kobject *kobj,
@@ -231,6 +239,7 @@ static ssize_t power_suspend_mode_store(struct kobject *kobj,
 	switch (data) {
 		case POWER_SUSPEND_PANEL:
 		case POWER_SUSPEND_USERSPACE:	mode = data;
+						mode_prev = data;
 						return count;
 		default:
 			return -EINVAL;
@@ -246,7 +255,7 @@ static struct kobj_attribute power_suspend_mode_attribute =
 static ssize_t power_suspend_version_show(struct kobject *kobj,
 		struct kobj_attribute *attr, char *buf)
 {
-	return sprintf(buf, "version: %d.%d\n", MAJOR_VERSION, MINOR_VERSION);
+	return sprintf(buf, "version: %d.%d.%d\n", MAJOR_VERSION, MINOR_VERSION, MINOR_UPDATE);
 }
 
 static struct kobj_attribute power_suspend_version_attribute =
@@ -300,8 +309,15 @@ static int __init power_suspend_init(void)
 		return -ENOMEM;
 	}
 
-//	mode = POWER_SUSPEND_USERSPACE;	// Yank555.lu : Default to userspace mode
-	mode = POWER_SUSPEND_PANEL;	// Yank555.lu : Default to display panel mode
+	mode = POWER_SUSPEND_USERSPACE;	// Yank555.lu : Default to userspace mode
+//	mode = POWER_SUSPEND_PANEL;	// Yank555.lu : Default to display panel mode
+	mode_prev = POWER_SUSPEND_USERSPACE;
+
+	if (is_state_notifier_enabled()) {
+		mode = POWER_SUSPEND_USERSPACE;
+	} else {
+		mode = mode_prev;
+	}
 
 	return 0;
 }
