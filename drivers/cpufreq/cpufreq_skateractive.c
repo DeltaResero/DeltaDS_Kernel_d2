@@ -45,6 +45,7 @@ extern bool earphones_connected;
 extern bool screen_on;
 extern bool bluetooth_on;
 extern void msm_pm_sleep_mode_enable(bool enable);
+extern void msm_pm_retention_mode_enable(bool enable);
 
 struct cpufreq_skateractive_cpuinfo {
 	struct timer_list cpu_timer;
@@ -134,16 +135,15 @@ struct cpufreq_skateractive_tunables {
 	/*
 	 * The sample rate of the timer used to increase frequency
 	 */
-
 #define DEFAULT_TIMER_RATE 60000
 	unsigned long timer_rate;
 
 	/*
-	 * The sample rate of the timer used during suspend
+	 * Save previous value of timer_rate
 	 */
 	unsigned long timer_rate_prev;
 	/*
-	 * The sample rate of the timer used during suspend
+	 * The number of times to multiply timer_rate on screen off
 	 */
 #define DEFAULT_TIMER_RATE_MULTIPLIER 2
 	unsigned long timer_rate_multiplier;
@@ -162,7 +162,6 @@ struct cpufreq_skateractive_tunables {
 	 */
 #define DEFAULT_TIMER_SLACK 80000
 	int timer_slack_val;
-	bool io_is_busy;
 
 	/*
 	 * Whether to align timer windows across all CPUs. When
@@ -175,7 +174,7 @@ struct cpufreq_skateractive_tunables {
 	 * Stay at max freq for at least sampling_down_factor before dropping
 	 * frequency.
 	 */
-	unsigned int sampling_down_factor;
+	bool sampling_down_factor;
 };
 
 /* For cases where we have single governor instance for system */
@@ -211,8 +210,7 @@ static void cpufreq_skateractive_timer_resched(unsigned long cpu)
 	spin_lock_irqsave(&pcpu->load_lock, flags);
 	pcpu->time_in_idle =
 		get_cpu_idle_time(smp_processor_id(),
-				  &pcpu->time_in_idle_timestamp,
-				  tunables->io_is_busy);
+				  &pcpu->time_in_idle_timestamp, 0);
 	pcpu->cputime_speedadj = 0;
 	pcpu->cputime_speedadj_timestamp = pcpu->time_in_idle_timestamp;
 	expires = round_to_nw_start(pcpu->last_evaluated_jiffy, tunables);
@@ -253,8 +251,7 @@ static void cpufreq_skateractive_timer_start(
 	}
 
 	pcpu->time_in_idle =
-		get_cpu_idle_time(cpu, &pcpu->time_in_idle_timestamp,
-				  tunables->io_is_busy);
+		get_cpu_idle_time(cpu, &pcpu->time_in_idle_timestamp, 0);
 	pcpu->cputime_speedadj = 0;
 	pcpu->cputime_speedadj_timestamp = pcpu->time_in_idle_timestamp;
 	spin_unlock_irqrestore(&pcpu->load_lock, flags);
@@ -390,15 +387,14 @@ static unsigned int choose_freq(struct cpufreq_skateractive_cpuinfo *pcpu,
 static u64 update_load(int cpu)
 {
 	struct cpufreq_skateractive_cpuinfo *pcpu = &per_cpu(cpuinfo, cpu);
-	struct cpufreq_skateractive_tunables *tunables =
-		pcpu->policy->governor_data;
+
 	u64 now;
 	u64 now_idle;
 	u64 delta_idle;
 	u64 delta_time;
 	u64 active_time;
 
-	now_idle = get_cpu_idle_time(cpu, &now, tunables->io_is_busy);
+	now_idle = get_cpu_idle_time(cpu, &now, 0);
 	delta_idle = (now_idle - pcpu->time_in_idle);
 	delta_time = (now - pcpu->time_in_idle_timestamp);
 
@@ -455,12 +451,6 @@ static void cpufreq_skateractive_timer(unsigned long data)
 		tunables->timer_rate = tunables->timer_rate * tunables->timer_rate_multiplier;
 	}
 
-	/* Disable retention mode on screen off */
-	if (unlikely(!screen_on))
-			msm_pm_sleep_mode_enable(1);
-	else if (likely(screen_on))
-			msm_pm_sleep_mode_enable(0);
-
 		if (WARN_ON_ONCE(!delta_time))
 			goto rearm;
 		do_div(cputime_speedadj, delta_time);
@@ -516,8 +506,7 @@ static void cpufreq_skateractive_timer(unsigned long data)
 
 	if (pcpu->target_freq >= pcpu->policy->max
 	    && new_freq < pcpu->target_freq
-	    && now - pcpu->max_freq_idle_start_time <
-	    tunables->sampling_down_factor) {
+	    && now - pcpu->max_freq_idle_start_time < 0) {
 		trace_cpufreq_skateractive_notyet(data, cpu_load,
 			pcpu->target_freq, pcpu->policy->cur, new_freq);
 		spin_unlock_irqrestore(&pcpu->target_freq_lock, flags);
@@ -604,6 +593,15 @@ static void cpufreq_skateractive_idle_start(void)
 	}
 
 	pending = timer_pending(&pcpu->cpu_timer);
+
+	/* Enable retention mode on screen off. */
+	if (unlikely(!screen_on)) {
+		msm_pm_sleep_mode_enable(1);
+		msm_pm_retention_mode_enable(1);
+	} else {
+		msm_pm_sleep_mode_enable(0);
+		msm_pm_retention_mode_enable(0);
+	}
 
 	if (pcpu->target_freq != pcpu->policy->min) {
 		/*
@@ -945,28 +943,6 @@ static ssize_t store_hispeed_freq(struct cpufreq_skateractive_tunables *tunables
 	return count;
 }
 
-#define show_store_one(file_name)					\
-static ssize_t show_##file_name(					\
-	struct cpufreq_skateractive_tunables *tunables, char *buf)	\
-{									\
-	return snprintf(buf, PAGE_SIZE, "%u\n", tunables->file_name);	\
-}									\
-static ssize_t store_##file_name(					\
-		struct cpufreq_skateractive_tunables *tunables,		\
-		const char *buf, size_t count)				\
-{									\
-	int ret;							\
-	long unsigned int val;						\
-									\
-	ret = kstrtoul(buf, 0, &val);				\
-	if (ret < 0)							\
-		return ret;						\
-	tunables->file_name = val;					\
-	return count;							\
-}
-show_store_one(sampling_down_factor);
-show_store_one(align_windows);
-
 static ssize_t show_go_hispeed_load(struct cpufreq_skateractive_tunables
 		*tunables, char *buf)
 {
@@ -1025,6 +1001,7 @@ static ssize_t store_timer_rate(struct cpufreq_skateractive_tunables *tunables,
 	if (val != val_round)
 		pr_warn("timer_rate not aligned to jiffy. Rounded up to %lu\n",
 			val_round);
+
 	tunables->timer_rate = val_round;
 	tunables->timer_rate_prev = val_round;
 
@@ -1052,6 +1029,7 @@ static ssize_t store_screen_off_timer_rate_multiplier(
 		return -EINVAL;
 
 	tunables->timer_rate_multiplier = val;
+
 	return count;
 }
 
@@ -1072,6 +1050,7 @@ static ssize_t store_timer_slack(struct cpufreq_skateractive_tunables *tunables,
 		return ret;
 
 	tunables->timer_slack_val = val;
+
 	return count;
 }
 
@@ -1150,26 +1129,6 @@ static ssize_t store_bluetooth_max_freq_screen_off(struct cpufreq_skateractive_t
 	return count;
 }
 
-static ssize_t show_io_is_busy(struct cpufreq_skateractive_tunables *tunables,
-		char *buf)
-{
-	return sprintf(buf, "%u\n", tunables->io_is_busy);
-}
-
-static ssize_t store_io_is_busy(struct cpufreq_skateractive_tunables *tunables,
-		const char *buf, size_t count)
-{
-	int ret;
-	unsigned long val;
-
-	ret = kstrtoul(buf, 0, &val);
-	if (ret < 0)
-		return ret;
-	tunables->io_is_busy = val;
-
-	return count;
-}
-
 /*
  * Create show/store routines
  * - sys: One governor instance for complete SYSTEM
@@ -1214,9 +1173,6 @@ show_store_gov_pol_sys(min_sample_time);
 show_store_gov_pol_sys(timer_rate);
 show_store_gov_pol_sys(screen_off_timer_rate_multiplier);
 show_store_gov_pol_sys(timer_slack);
-show_store_gov_pol_sys(io_is_busy);
-show_store_gov_pol_sys(sampling_down_factor);
-show_store_gov_pol_sys(align_windows);
 show_store_gov_pol_sys(screen_off_maxfreq);
 show_store_gov_pol_sys(earphones_max_freq_screen_off);
 show_store_gov_pol_sys(bluetooth_max_freq_screen_off);
@@ -1241,9 +1197,6 @@ gov_sys_pol_attr_rw(min_sample_time);
 gov_sys_pol_attr_rw(timer_rate);
 gov_sys_pol_attr_rw(screen_off_timer_rate_multiplier);
 gov_sys_pol_attr_rw(timer_slack);
-gov_sys_pol_attr_rw(io_is_busy);
-gov_sys_pol_attr_rw(sampling_down_factor);
-gov_sys_pol_attr_rw(align_windows);
 gov_sys_pol_attr_rw(screen_off_maxfreq);
 gov_sys_pol_attr_rw(earphones_max_freq_screen_off);
 gov_sys_pol_attr_rw(bluetooth_max_freq_screen_off);
@@ -1258,9 +1211,6 @@ static struct attribute *skateractive_attributes_gov_sys[] = {
 	&timer_rate_gov_sys.attr,
 	&screen_off_timer_rate_multiplier_gov_sys.attr,
 	&timer_slack_gov_sys.attr,
-	&io_is_busy_gov_sys.attr,
-	&sampling_down_factor_gov_sys.attr,
-	&align_windows_gov_sys.attr,
 	&screen_off_maxfreq_gov_sys.attr,
 	&earphones_max_freq_screen_off_gov_sys.attr,
 	&bluetooth_max_freq_screen_off_gov_sys.attr,
@@ -1282,9 +1232,6 @@ static struct attribute *skateractive_attributes_gov_pol[] = {
 	&timer_rate_gov_pol.attr,
 	&screen_off_timer_rate_multiplier_gov_pol.attr,
 	&timer_slack_gov_pol.attr,
-	&io_is_busy_gov_pol.attr,
-	&sampling_down_factor_gov_pol.attr,
-	&align_windows_gov_pol.attr,
 	&screen_off_maxfreq_gov_pol.attr,
 	&earphones_max_freq_screen_off_gov_pol.attr,
 	&bluetooth_max_freq_screen_off_gov_pol.attr,
@@ -1363,6 +1310,7 @@ static struct cpufreq_skateractive_tunables *alloc_tunable(
 	tunables->timer_rate_multiplier = DEFAULT_TIMER_RATE_MULTIPLIER;
 	tunables->timer_slack_val = DEFAULT_TIMER_SLACK;
 	tunables->align_windows = true;
+	tunables->sampling_down_factor = false;
 
 	spin_lock_init(&tunables->target_loads_lock);
 	spin_lock_init(&tunables->above_hispeed_delay_lock);
@@ -1400,7 +1348,8 @@ static int cpufreq_governor_skateractive(struct cpufreq_policy *policy,
 	else
 		tunables = common_tunables;
 
-	BUG_ON(!tunables && (event != CPUFREQ_GOV_POLICY_INIT));
+	if (WARN_ON(!tunables && (event != CPUFREQ_GOV_POLICY_INIT)))
+		return -EINVAL;
 
 	switch (event) {
 	case CPUFREQ_GOV_POLICY_INIT:
@@ -1589,6 +1538,7 @@ static int __init cpufreq_skateractive_init(void)
 	unsigned int i;
 	struct cpufreq_skateractive_cpuinfo *pcpu;
 	struct sched_param param = { .sched_priority = MAX_RT_PRIO-1 };
+	int ret = 0;
 
 	screen_on = true;
 	earphones_connected = false;
@@ -1621,7 +1571,12 @@ static int __init cpufreq_skateractive_init(void)
 	/* NB: wake up so the thread does not look hung to the freezer */
 	wake_up_process_no_notif(speedchange_task);
 
-	return cpufreq_register_governor(&cpufreq_gov_skateractive);
+	ret = cpufreq_register_governor(&cpufreq_gov_skateractive);
+	if (ret) {
+		kthread_stop(speedchange_task);
+		put_task_struct(speedchange_task);
+	}
+	return ret;
 }
 
 #ifdef CONFIG_CPU_FREQ_DEFAULT_GOV_SKATERACTIVE
