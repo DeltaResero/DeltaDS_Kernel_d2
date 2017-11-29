@@ -64,9 +64,7 @@ static DEFINE_SPINLOCK(state_lock);
 static int state;
 static int mode;
 static int mode_prev;
-
 extern bool screen_on;
-
 extern bool is_state_notifier_enabled(void);
 
 void register_power_suspend(struct power_suspend *handler)
@@ -111,18 +109,13 @@ static void power_suspend(struct work_struct *work)
 	if (unlikely(!screen_on) && (state != POWER_SUSPEND_ACTIVE))
 		state = POWER_SUSPEND_ACTIVE;
 	spin_unlock_irqrestore(&state_lock, irqflags);
-
-	if (unlikely(!screen_on) && (state == POWER_SUSPEND_INACTIVE))
-		goto unlock_suspend;
+	mutex_unlock(&power_suspend_lock);
 
 	list_for_each_entry(pos, &power_suspend_handlers, link) {
 		if (pos->suspend != NULL) {
 			pos->suspend(pos);
 		}
 	}
-
-unlock_suspend:
-	mutex_unlock(&power_suspend_lock);
 }
 
 static void power_resume(struct work_struct *work)
@@ -139,18 +132,13 @@ static void power_resume(struct work_struct *work)
 	if (likely(screen_on) && (state != POWER_SUSPEND_INACTIVE))
 		state = POWER_SUSPEND_INACTIVE;
 	spin_unlock_irqrestore(&state_lock, irqflags);
-
-	if (likely(screen_on) && (state == POWER_SUSPEND_ACTIVE))
-		goto unlock_resume;
+	mutex_unlock(&power_suspend_lock);
 
 	list_for_each_entry_reverse(pos, &power_suspend_handlers, link) {
 		if (pos->resume != NULL) {
 			pos->resume(pos);
 		}
 	}
-
-unlock_resume:
-	mutex_unlock(&power_suspend_lock);
 }
 
 bool power_suspended = false;
@@ -167,11 +155,11 @@ void set_power_suspend_state(int new_state)
 		if (state == POWER_SUSPEND_INACTIVE && new_state == POWER_SUSPEND_ACTIVE) {
 			state = new_state;
 			power_suspended = true;
-			queue_work(power_suspend_work_queue, &power_suspend_work);
+			queue_work_on(0, power_suspend_work_queue, &power_suspend_work);
 		} else if (state == POWER_SUSPEND_ACTIVE && new_state == POWER_SUSPEND_INACTIVE) {
 			state = new_state;
 			power_suspended = true;
-			queue_work(power_suspend_work_queue, &power_resume_work);
+			queue_work_on(0, power_suspend_work_queue, &power_resume_work);
 		}
 		spin_unlock_irqrestore(&state_lock, irqflags);
 	}
@@ -185,7 +173,6 @@ void set_power_suspend_state_panel_hook(int new_state)
 	if (mode == POWER_SUSPEND_PANEL)
 		set_power_suspend_state(new_state);
 }
-
 EXPORT_SYMBOL(set_power_suspend_state_panel_hook);
 
 // ------------------------------------------ sysfs interface ------------------------------------------
