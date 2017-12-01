@@ -95,7 +95,7 @@ static unsigned long screen_off_max_prev = DEFAULT_SCREEN_OFF_MAX;
 
 /* Max frequency to limit while earphones are in & screen is off. */
 #define DEFAULT_EARPHONES_MAX_FREQ_SCREEN_OFF 1242000
-static unsigned long earphones_max_freq_screen_off = DEFAULT_EARPHONES_MAX_FREQ_SCREEN_OFF;
+static unsigned long earphones_maxfreq = DEFAULT_EARPHONES_MAX_FREQ_SCREEN_OFF;
 
 /* Frequency cannot go below this if earphones are in and screen is off. */
 #define DEFAULT_EARPHONES_MIN_FREQ_LIMIT 648000
@@ -103,7 +103,7 @@ static unsigned long earphones_min_freq_limit = DEFAULT_EARPHONES_MIN_FREQ_LIMIT
 
 /* Max frequency to limit while bluetooth is on & screen is off. */
 #define DEFAULT_BT_MAX_FREQ_SCREEN_OFF 1080000
-static unsigned long bluetooth_max_freq_screen_off = DEFAULT_BT_MAX_FREQ_SCREEN_OFF;
+static unsigned long bluetooth_maxfreq = DEFAULT_BT_MAX_FREQ_SCREEN_OFF;
 
 /* Frequency cannot go below this if bluetooth is on and screen is off. */
 #define DEFAULT_BT_MIN_FREQ_LIMIT 648000
@@ -716,12 +716,12 @@ static int cpufreq_skateractive_speedchange_task(void *data)
 				screen_off_max = screen_off_max_prev;
 			/* If earphone are plugged in & screen is off set to headset frequency settings */
 			} else if (earphones_connected && unlikely(!screen_on)) {
-				if (max_freq > earphones_max_freq_screen_off)
-					max_freq = earphones_max_freq_screen_off;
+				if (max_freq > earphones_maxfreq)
+					max_freq = earphones_maxfreq;
 			/* Put earphones before bluetooth just in case there plugged in while BT is on */
 			} else if (bluetooth_on && unlikely(!screen_on)) {
-				if (max_freq > bluetooth_max_freq_screen_off)
-					max_freq = bluetooth_max_freq_screen_off;
+				if (max_freq > bluetooth_maxfreq)
+					max_freq = bluetooth_maxfreq;
 			/* If number of online cores is over 1, set to regular screen off frequency */
 			} else if (unlikely(!screen_on)) {
 				if (max_freq > screen_off_max)
@@ -962,25 +962,6 @@ static ssize_t store_go_hispeed_load(struct cpufreq_skateractive_tunables
 	return count;
 }
 
-static ssize_t show_min_sample_time(struct cpufreq_skateractive_tunables
-		*tunables, char *buf)
-{
-	return sprintf(buf, "%lu\n", tunables->min_sample_time);
-}
-
-static ssize_t store_min_sample_time(struct cpufreq_skateractive_tunables
-		*tunables, const char *buf, size_t count)
-{
-	int ret;
-	unsigned long val;
-
-	ret = strict_strtoul(buf, 0, &val);
-	if (ret < 0)
-		return ret;
-	tunables->min_sample_time = val;
-	return count;
-}
-
 static ssize_t show_timer_rate(struct cpufreq_skateractive_tunables *tunables,
 		char *buf)
 {
@@ -1008,13 +989,13 @@ static ssize_t store_timer_rate(struct cpufreq_skateractive_tunables *tunables,
 	return count;
 }
 
-static ssize_t show_screen_off_timer_rate_multiplier(
+static ssize_t show_timer_rate_multiplier(
 		struct cpufreq_skateractive_tunables *tunables, char *buf)
 {
 	return snprintf(buf, PAGE_SIZE, "%lu\n", tunables->timer_rate_multiplier);
 }
 
-static ssize_t store_screen_off_timer_rate_multiplier(
+static ssize_t store_timer_rate_multiplier(
 			struct cpufreq_skateractive_tunables *tunables,
 			const char *buf, size_t count)
 {
@@ -1029,27 +1010,6 @@ static ssize_t store_screen_off_timer_rate_multiplier(
 		return -EINVAL;
 
 	tunables->timer_rate_multiplier = val;
-
-	return count;
-}
-
-static ssize_t show_timer_slack(struct cpufreq_skateractive_tunables *tunables,
-		char *buf)
-{
-	return sprintf(buf, "%d\n", tunables->timer_slack_val);
-}
-
-static ssize_t store_timer_slack(struct cpufreq_skateractive_tunables *tunables,
-		const char *buf, size_t count)
-{
-	int ret;
-	unsigned long val;
-
-	ret = kstrtol(buf, 10, &val);
-	if (ret < 0)
-		return ret;
-
-	tunables->timer_slack_val = val;
 
 	return count;
 }
@@ -1079,13 +1039,13 @@ static ssize_t store_screen_off_maxfreq(struct cpufreq_skateractive_tunables *tu
 	return count;
 }
 
-static ssize_t show_earphones_max_freq_screen_off(struct cpufreq_skateractive_tunables *tunables,
+static ssize_t show_earphones_maxfreq(struct cpufreq_skateractive_tunables *tunables,
 		char *buf)
 {
-	return sprintf(buf, "%lu\n", earphones_max_freq_screen_off);
+	return sprintf(buf, "%lu\n", earphones_maxfreq);
 }
 
-static ssize_t store_earphones_max_freq_screen_off(struct cpufreq_skateractive_tunables *tunables,
+static ssize_t store_earphones_maxfreq(struct cpufreq_skateractive_tunables *tunables,
 		const char *buf, size_t count)
 {
 	int ret;
@@ -1099,18 +1059,18 @@ static ssize_t store_earphones_max_freq_screen_off(struct cpufreq_skateractive_t
 	if (val < earphones_min_freq_limit)
 		val = earphones_min_freq_limit;
 
-	earphones_max_freq_screen_off = val;
+	earphones_maxfreq = val;
 
 	return count;
 }
 
-static ssize_t show_bluetooth_max_freq_screen_off(struct cpufreq_skateractive_tunables *tunables,
+static ssize_t show_bluetooth_maxfreq(struct cpufreq_skateractive_tunables *tunables,
 		char *buf)
 {
-	return sprintf(buf, "%lu\n", bluetooth_max_freq_screen_off);
+	return sprintf(buf, "%lu\n", bluetooth_maxfreq);
 }
 
-static ssize_t store_bluetooth_max_freq_screen_off(struct cpufreq_skateractive_tunables *tunables,
+static ssize_t store_bluetooth_maxfreq(struct cpufreq_skateractive_tunables *tunables,
 		const char *buf, size_t count)
 {
 	int ret;
@@ -1124,7 +1084,7 @@ static ssize_t store_bluetooth_max_freq_screen_off(struct cpufreq_skateractive_t
 	if (val < bluetooth_min_freq_limit)
 		val = bluetooth_min_freq_limit;
 
-	bluetooth_max_freq_screen_off = val;
+	bluetooth_maxfreq = val;
 
 	return count;
 }
@@ -1169,13 +1129,11 @@ show_store_gov_pol_sys(target_loads);
 show_store_gov_pol_sys(above_hispeed_delay);
 show_store_gov_pol_sys(hispeed_freq);
 show_store_gov_pol_sys(go_hispeed_load);
-show_store_gov_pol_sys(min_sample_time);
 show_store_gov_pol_sys(timer_rate);
-show_store_gov_pol_sys(screen_off_timer_rate_multiplier);
-show_store_gov_pol_sys(timer_slack);
+show_store_gov_pol_sys(timer_rate_multiplier);
 show_store_gov_pol_sys(screen_off_maxfreq);
-show_store_gov_pol_sys(earphones_max_freq_screen_off);
-show_store_gov_pol_sys(bluetooth_max_freq_screen_off);
+show_store_gov_pol_sys(earphones_maxfreq);
+show_store_gov_pol_sys(bluetooth_maxfreq);
 
 #define gov_sys_attr_rw(_name)						\
 static struct global_attr _name##_gov_sys =				\
@@ -1193,13 +1151,11 @@ gov_sys_pol_attr_rw(target_loads);
 gov_sys_pol_attr_rw(above_hispeed_delay);
 gov_sys_pol_attr_rw(hispeed_freq);
 gov_sys_pol_attr_rw(go_hispeed_load);
-gov_sys_pol_attr_rw(min_sample_time);
 gov_sys_pol_attr_rw(timer_rate);
-gov_sys_pol_attr_rw(screen_off_timer_rate_multiplier);
-gov_sys_pol_attr_rw(timer_slack);
+gov_sys_pol_attr_rw(timer_rate_multiplier);
 gov_sys_pol_attr_rw(screen_off_maxfreq);
-gov_sys_pol_attr_rw(earphones_max_freq_screen_off);
-gov_sys_pol_attr_rw(bluetooth_max_freq_screen_off);
+gov_sys_pol_attr_rw(earphones_maxfreq);
+gov_sys_pol_attr_rw(bluetooth_maxfreq);
 
 /* One Governor instance for entire system */
 static struct attribute *skateractive_attributes_gov_sys[] = {
@@ -1207,13 +1163,11 @@ static struct attribute *skateractive_attributes_gov_sys[] = {
 	&above_hispeed_delay_gov_sys.attr,
 	&hispeed_freq_gov_sys.attr,
 	&go_hispeed_load_gov_sys.attr,
-	&min_sample_time_gov_sys.attr,
 	&timer_rate_gov_sys.attr,
-	&screen_off_timer_rate_multiplier_gov_sys.attr,
-	&timer_slack_gov_sys.attr,
+	&timer_rate_multiplier_gov_sys.attr,
 	&screen_off_maxfreq_gov_sys.attr,
-	&earphones_max_freq_screen_off_gov_sys.attr,
-	&bluetooth_max_freq_screen_off_gov_sys.attr,
+	&earphones_maxfreq_gov_sys.attr,
+	&bluetooth_maxfreq_gov_sys.attr,
 	NULL,
 };
 
@@ -1228,13 +1182,11 @@ static struct attribute *skateractive_attributes_gov_pol[] = {
 	&above_hispeed_delay_gov_pol.attr,
 	&hispeed_freq_gov_pol.attr,
 	&go_hispeed_load_gov_pol.attr,
-	&min_sample_time_gov_pol.attr,
 	&timer_rate_gov_pol.attr,
-	&screen_off_timer_rate_multiplier_gov_pol.attr,
-	&timer_slack_gov_pol.attr,
+	&timer_rate_multiplier_gov_pol.attr,
 	&screen_off_maxfreq_gov_pol.attr,
-	&earphones_max_freq_screen_off_gov_pol.attr,
-	&bluetooth_max_freq_screen_off_gov_pol.attr,
+	&earphones_maxfreq_gov_pol.attr,
+	&bluetooth_maxfreq_gov_pol.attr,
 	NULL,
 };
 
