@@ -3108,6 +3108,17 @@ static int mms_ts_suspend(struct device *dev)
 	int mt_val;
 #endif
 
+	mutex_lock(&info->input_dev->mutex);
+	display_on = false;
+#ifdef CONFIG_STATE_NOTIFIER
+	state_suspend();
+#endif
+#ifdef CONFIG_POWERSUSPEND
+	set_power_suspend_state_panel_hook(POWER_SUSPEND_ACTIVE);
+#endif
+	screen_on = false;
+	mutex_unlock(&info->input_dev->mutex);
+
 	dev_notice(&info->client->dev, "%s: users=%d\n", __func__,
 			info->input_dev->users);
 	mutex_lock(&info->input_dev->mutex);
@@ -3120,19 +3131,6 @@ static int mms_ts_suspend(struct device *dev)
 	info->pdata->vdd_on(0);
 	msleep(50);
 
-
-	display_on = false;
-
-#ifdef CONFIG_STATE_NOTIFIER
-	state_suspend();
-#endif
-
-#ifdef CONFIG_POWERSUSPEND
-	set_power_suspend_state_panel_hook(POWER_SUSPEND_ACTIVE);
-#endif
-
-	screen_on = false;
-
 out:
 	mutex_unlock(&info->input_dev->mutex);
 	return 0;
@@ -3143,6 +3141,17 @@ static int mms_ts_resume(struct device *dev)
 	struct i2c_client *client = to_i2c_client(dev);
 	struct mms_ts_info *info = i2c_get_clientdata(client);
 	int ret = 0;
+
+	mutex_lock(&info->input_dev->mutex);
+	display_on = true;
+#ifdef CONFIG_STATE_NOTIFIER
+	state_resume();
+#endif
+#ifdef CONFIG_POWERSUSPEND
+	set_power_suspend_state_panel_hook(POWER_SUSPEND_INACTIVE);
+#endif
+	screen_on = true;
+	mutex_unlock(&info->input_dev->mutex);
 
 	dev_notice(&info->client->dev, "%s: users=%d\n", __func__,
 			info->input_dev->users);
@@ -3162,18 +3171,6 @@ static int mms_ts_resume(struct device *dev)
 	if (info->input_dev->users)
 		ret = mms_ts_enable(info, 0);
 	mutex_unlock(&info->input_dev->mutex);
-
-	display_on = true;
-
-#ifdef CONFIG_STATE_NOTIFIER
-	state_resume();
-#endif
-
-#ifdef CONFIG_POWERSUSPEND
-	set_power_suspend_state_panel_hook(POWER_SUSPEND_INACTIVE);
-#endif
-
-	screen_on = true;
 
 	return ret;
 }
