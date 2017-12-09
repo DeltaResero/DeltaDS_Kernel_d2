@@ -115,6 +115,7 @@ struct cpufreq_skateractive_tunables {
 	/* Hi speed to bump to from lo speed when load burst (default max) */
 #define DEFAULT_HISPEED_FREQ 384000
 	unsigned int hispeed_freq;
+	unsigned int hispeed_freq_prev;
 
 	/* Go to hi speed when CPU load at or above this value. */
 #define DEFAULT_GO_HISPEED_LOAD 99
@@ -465,6 +466,15 @@ static void cpufreq_skateractive_timer(unsigned long data)
 
 	spin_lock_irqsave(&pcpu->target_freq_lock, flags);
 	cpu_load = loadadjfreq / pcpu->policy->cur;
+
+
+	if (unlikely(!screen_on)) {
+		if (tunables->hispeed_freq != 54000)
+			tunables->hispeed_freq = 54000;
+	} else {
+		if (tunables->hispeed_freq != tunables->hispeed_freq_prev)
+			tunables->hispeed_freq = tunables->hispeed_freq_prev;
+	}
 
 	if (cpu_load >= tunables->go_hispeed_load) {
 		if (pcpu->policy->cur < tunables->hispeed_freq) {
@@ -939,7 +949,10 @@ static ssize_t store_hispeed_freq(struct cpufreq_skateractive_tunables *tunables
 	ret = strict_strtoul(buf, 0, &val);
 	if (ret < 0)
 		return ret;
+
 	tunables->hispeed_freq = val;
+	tunables->hispeed_freq_prev = val;
+
 	return count;
 }
 
@@ -1263,6 +1276,7 @@ static struct cpufreq_skateractive_tunables *alloc_tunable(
 	tunables->timer_slack_val = DEFAULT_TIMER_SLACK;
 	tunables->align_windows = true;
 	tunables->sampling_down_factor = false;
+	tunables->hispeed_freq_prev = DEFAULT_HISPEED_FREQ;
 
 	spin_lock_init(&tunables->target_loads_lock);
 	spin_lock_init(&tunables->above_hispeed_delay_lock);
@@ -1380,8 +1394,8 @@ static int cpufreq_governor_skateractive(struct cpufreq_policy *policy,
 		mutex_lock(&gov_lock);
 
 		freq_table = cpufreq_frequency_get_table(policy->cpu);
-		if (!tunables->hispeed_freq || tunables->hispeed_freq)
-			tunables->hispeed_freq = DEFAULT_HISPEED_FREQ;
+
+		tunables->hispeed_freq = DEFAULT_HISPEED_FREQ;
 
 		for_each_cpu(j, policy->cpus) {
 			pcpu = &per_cpu(cpuinfo, j);
