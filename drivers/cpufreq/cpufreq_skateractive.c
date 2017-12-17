@@ -606,11 +606,11 @@ static void cpufreq_skateractive_idle_start(void)
 
 	/* Enable retention mode on screen off. */
 	if (unlikely(!screen_on)) {
-		msm_pm_sleep_mode_enable(1);
-		msm_pm_retention_mode_enable(1);
-	} else {
 		msm_pm_sleep_mode_enable(0);
 		msm_pm_retention_mode_enable(0);
+	} else {
+		msm_pm_sleep_mode_enable(1);
+		msm_pm_retention_mode_enable(1);
 	}
 
 	if (pcpu->target_freq != pcpu->policy->min) {
