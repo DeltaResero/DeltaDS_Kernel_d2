@@ -46,6 +46,7 @@ static struct skater_hotplug_struct {
 	unsigned int cycle_down;
 	unsigned int cpus_boosted;
 	unsigned int min_boost_freq;
+	bool max_cpus_scroff;
 	u64 boost_lock_dur;
 	struct notifier_block notif;
 } skater_hotplug = {
@@ -60,10 +61,21 @@ static struct skater_hotplug_struct {
 	.min_boost_freq = DEFAULT_MIN_BOOST_FREQ,
 	.cpus_boosted = DEFAULT_NR_CPUS_BOOSTED,
 	.boost_lock_dur = DEFAULT_BOOST_LOCK_DUR,
+	.max_cpus_scroff = false,
 };
 
 static u64 last_boost_time;
 static unsigned int cycle = 0;
+
+static inline void down_all(void)
+{
+	unsigned int cpu;
+
+	for_each_online_cpu(cpu) {
+		if (cpu && num_online_cpus() > 1)
+			cpu_down(cpu);
+	}
+}
 
 static void reschedule_hotplug_work(void)
 {
@@ -159,6 +171,14 @@ static void __cpuinit skater_hotplug_work_fn(struct work_struct *work)
 
 static void skater_hotplug_suspend(void)
 {
+	unsigned int cpu;
+
+	if (skater_hotplug.max_cpus_scroff) {
+		for_each_online_cpu(cpu) {
+			down_all();
+		}
+	}
+
 	/* Flush hotplug workqueue */
 	flush_workqueue(skater_hotplug_workq);
 	cancel_delayed_work_sync(&skater_hotplug_work);
@@ -375,6 +395,7 @@ show_one(cpufreq_up, cpufreq_up);
 show_one(cpufreq_down, cpufreq_down);
 show_one(cycle_up, cycle_up);
 show_one(cycle_down, cycle_down);
+show_one(max_cpus_scroff, max_cpus_scroff);
 
 #define store_one(file_name, object)					\
 static ssize_t store_##file_name					\
@@ -399,6 +420,7 @@ store_one(cpufreq_up, cpufreq_up);
 store_one(cpufreq_down, cpufreq_down);
 store_one(cycle_up, cycle_up);
 store_one(cycle_down, cycle_down);
+store_one(max_cpus_scroff, max_cpus_scroff);
 
 static int __cpuinit set_enabled(const char *val, const struct kernel_param *kp)
 {
@@ -513,6 +535,7 @@ static struct attribute *skater_hotplug_attributes[] = {
 	&cpufreq_down.attr,
 	&cycle_up.attr,
 	&cycle_down.attr,
+	&max_cpus_scroff.attr,
 	&dev_attr_boost_lock_duration.attr,
 	&dev_attr_cpus_boosted.attr,
 	&dev_attr_min_boost_freq.attr,
