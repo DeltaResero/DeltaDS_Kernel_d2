@@ -46,6 +46,7 @@ static struct skater_hotplug_struct {
 	unsigned int cycle_down;
 	unsigned int cpus_boosted;
 	unsigned int min_boost_freq;
+	unsigned int min_boost_freq_prev;
 	bool max_cpus_scroff;
 	u64 boost_lock_dur;
 	struct notifier_block notif;
@@ -59,6 +60,7 @@ static struct skater_hotplug_struct {
 	.cycle_up = 1,
 	.cycle_down = 1,
 	.min_boost_freq = DEFAULT_MIN_BOOST_FREQ,
+	.min_boost_freq_prev = DEFAULT_MIN_BOOST_FREQ, 
 	.cpus_boosted = DEFAULT_NR_CPUS_BOOSTED,
 	.boost_lock_dur = DEFAULT_BOOST_LOCK_DUR,
 	.max_cpus_scroff = false,
@@ -169,9 +171,23 @@ static void __cpuinit skater_hotplug_work_fn(struct work_struct *work)
 	reschedule_hotplug_work();
 }
 
+static void min_boost_suspend(void)
+{
+	if (skater_hotplug.min_boost_freq != 384000)
+		skater_hotplug.min_boost_freq = 384000;
+}
+
+static void min_boost_restore(void)
+{
+	if (skater_hotplug.min_boost_freq != skater_hotplug.min_boost_freq_prev)
+		skater_hotplug.min_boost_freq = skater_hotplug.min_boost_freq_prev;
+}
+
 static void skater_hotplug_suspend(void)
 {
 	unsigned int cpu;
+
+	min_boost_suspend();
 
 	if (skater_hotplug.max_cpus_scroff) {
 		for_each_online_cpu(cpu) {
@@ -187,6 +203,8 @@ static void skater_hotplug_suspend(void)
 static void __ref skater_hotplug_resume(void)
 {
 	unsigned int cpu;
+
+	min_boost_restore();
 
 	/* Fire up all CPUs */
 	for_each_possible_cpu(cpu)
@@ -517,6 +535,7 @@ static ssize_t store_min_boost_freq(struct device *dev,
 		return -EINVAL;
 
 	skater_hotplug.min_boost_freq = val;
+	skater_hotplug.min_boost_freq_prev = val;
 
 	return count;
 }
