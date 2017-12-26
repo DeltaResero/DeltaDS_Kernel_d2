@@ -30,6 +30,8 @@
  *
  *  v1.7.5 - when state notifier is disabled, restore to previous powersuspend state.
  *
+ *  v1.7.6 - fixup global bool expressions
+ *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
  * may be copied, distributed, and modified under those terms.
@@ -49,7 +51,7 @@
 
 #define MAJOR_VERSION	1
 #define MINOR_VERSION	7
-#define MINOR_UPDATE	5
+#define MINOR_UPDATE	6
 
 struct workqueue_struct *power_suspend_work_queue;
 
@@ -66,6 +68,7 @@ static int mode;
 static int mode_prev;
 extern bool screen_on;
 extern bool is_state_notifier_enabled(void);
+bool power_suspended = false;
 
 void register_power_suspend(struct power_suspend *handler)
 {
@@ -106,8 +109,10 @@ static void power_suspend(struct work_struct *work)
 	mutex_lock(&power_suspend_lock);
 	spin_lock_irqsave(&state_lock, irqflags);
 	/* Force power_suspend if power_resume is still active */
-	if (unlikely(!screen_on) && (state != POWER_SUSPEND_ACTIVE))
+	if (unlikely(!screen_on) && (state != POWER_SUSPEND_ACTIVE)) {
 		state = POWER_SUSPEND_ACTIVE;
+		power_suspended = true;
+	}
 	spin_unlock_irqrestore(&state_lock, irqflags);
 	mutex_unlock(&power_suspend_lock);
 
@@ -129,8 +134,10 @@ static void power_resume(struct work_struct *work)
 	mutex_lock(&power_suspend_lock);
 	spin_lock_irqsave(&state_lock, irqflags);
 	/* Force power_resume if power_suspend is still active */
-	if (likely(screen_on) && (state != POWER_SUSPEND_INACTIVE))
+	if (likely(screen_on) && (state != POWER_SUSPEND_INACTIVE)) {
 		state = POWER_SUSPEND_INACTIVE;
+		power_suspended = false;
+	}
 	spin_unlock_irqrestore(&state_lock, irqflags);
 	mutex_unlock(&power_suspend_lock);
 
@@ -140,8 +147,6 @@ static void power_resume(struct work_struct *work)
 		}
 	}
 }
-
-bool power_suspended = false;
 
 void set_power_suspend_state(int new_state)
 {
@@ -154,11 +159,9 @@ void set_power_suspend_state(int new_state)
 		spin_lock_irqsave(&state_lock, irqflags);
 		if (state == POWER_SUSPEND_INACTIVE && new_state == POWER_SUSPEND_ACTIVE) {
 			state = new_state;
-			power_suspended = true;
 			queue_work_on(0, power_suspend_work_queue, &power_suspend_work);
 		} else if (state == POWER_SUSPEND_ACTIVE && new_state == POWER_SUSPEND_INACTIVE) {
 			state = new_state;
-			power_suspended = true;
 			queue_work_on(0, power_suspend_work_queue, &power_resume_work);
 		}
 		spin_unlock_irqrestore(&state_lock, irqflags);
