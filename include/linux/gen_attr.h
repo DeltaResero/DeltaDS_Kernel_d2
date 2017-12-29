@@ -65,12 +65,10 @@ struct gen_attr gattr_##name = __GENATTR( \
 // int-array attr
 #define __GATTR_ARR_NAME(var,name,min,max,cb) \
 struct gen_attr gattr_##name = __GENATTR( \
-	name, 0644, min, max, (sizeof(name)/sizeof(int)), sizeof(int), 0, \
+	name, 0644, min, max, (sizeof(var)/sizeof(int)), sizeof(int), 0, \
 	var, NULL, NULL, cb, NULL)
 
 #define __GATTR_ARR(name,min,max,cb) __GATTR_ARR_NAME(name,name,min,max,cb)
-
-// Warning: untested from here down!
 
 // single-struct attr
 #define __GATTR_STR_NAME(name,elm,str,min,max,cb) \
@@ -83,8 +81,8 @@ struct gen_attr gattr_##name = __GENATTR( \
 #define __GATTR_STR_ARR_NAME(name,elm,str,min,max,cb) \
 struct gen_attr gattr_##name = __GENATTR( \
 	name, 0644, min, max, (sizeof(str)/sizeof(str[0])), sizeof(str[0]), 0, \
-	&str.elm, NULL, NULL, cb, NULL)
+	&str[0].elm, NULL, NULL, cb, NULL)
 
-#define __GATTR_STR_ARR(name,str,min,max,cb) __GATTR_STR_NAME(name,name,str,min,max,cb)
+#define __GATTR_STR_ARR(name,str,min,max,cb) __GATTR_STR_ARR_NAME(name,name,str,min,max,cb)
 
 #endif
