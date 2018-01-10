@@ -32,6 +32,8 @@
  *
  *  v1.7.6 - fixup global bool expressions
  *
+ *  v1.7.7 - add actual PM suspend hooks.
+ *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
  * may be copied, distributed, and modified under those terms.
@@ -48,10 +50,11 @@
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/workqueue.h>
+#include "power.h"
 
 #define MAJOR_VERSION	1
 #define MINOR_VERSION	7
-#define MINOR_UPDATE	6
+#define MINOR_UPDATE	7
 
 struct workqueue_struct *power_suspend_work_queue;
 
@@ -121,6 +124,15 @@ static void power_suspend(struct work_struct *work)
 			pos->suspend(pos);
 		}
 	}
+
+	if (unlikely(!mutex_trylock(&pm_mutex))) {
+		pr_info("PM is busy. Skipping suspension\n");
+		return;
+	}
+
+	pr_info("power_suspend: calling system suspension\n");
+	pm_suspend(PM_HIBERNATION_PREPARE);
+	mutex_unlock(&pm_mutex);
 }
 
 static void power_resume(struct work_struct *work)
