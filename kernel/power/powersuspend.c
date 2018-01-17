@@ -73,11 +73,14 @@ extern bool screen_on;
 extern bool is_state_notifier_enabled(void);
 bool power_suspended = false;
 
+static bool enabled = false;
+module_param_named(enabled, enabled, bool, 0664);
+
 void register_power_suspend(struct power_suspend *handler)
 {
 	struct list_head *pos;
 
-	if (is_state_notifier_enabled() || mode == POWER_SUSPEND_USERSPACE)
+	if (!enabled || is_state_notifier_enabled())
 		return;
 
 	mutex_lock(&power_suspend_lock);
@@ -92,7 +95,7 @@ EXPORT_SYMBOL(register_power_suspend);
 
 void unregister_power_suspend(struct power_suspend *handler)
 {
-	if (is_state_notifier_enabled() || mode == POWER_SUSPEND_USERSPACE)
+	if (!enabled || is_state_notifier_enabled())
 		return;
 
 	mutex_lock(&power_suspend_lock);
@@ -106,7 +109,7 @@ static void power_suspend(struct work_struct *work)
 	struct power_suspend *pos;
 	unsigned long irqflags;
 
-	if (is_state_notifier_enabled() || mode == POWER_SUSPEND_USERSPACE)
+	if (!enabled || is_state_notifier_enabled())
 		return;
 
 	mutex_lock(&power_suspend_lock);
@@ -140,7 +143,7 @@ static void power_resume(struct work_struct *work)
 	struct power_suspend *pos;
 	unsigned long irqflags;
 
-	if (is_state_notifier_enabled() || mode == POWER_SUSPEND_USERSPACE)
+	if (!enabled || is_state_notifier_enabled())
 		return;
 
 	mutex_lock(&power_suspend_lock);
@@ -164,7 +167,7 @@ void set_power_suspend_state(int new_state)
 {
 	unsigned long irqflags;
 
-	if (is_state_notifier_enabled() || mode == POWER_SUSPEND_USERSPACE)
+	if (!enabled || is_state_notifier_enabled())
 		return;
 
 	if (state != new_state) {
@@ -182,7 +185,7 @@ void set_power_suspend_state(int new_state)
 
 void set_power_suspend_state_panel_hook(int new_state)
 {
-	if (is_state_notifier_enabled() || mode == POWER_SUSPEND_USERSPACE)
+	if (!enabled || is_state_notifier_enabled())
 		return;
 
 	if (mode == POWER_SUSPEND_PANEL)
