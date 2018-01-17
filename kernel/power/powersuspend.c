@@ -70,7 +70,6 @@ static int state;
 static int mode;
 static int mode_prev;
 extern bool screen_on;
-extern bool is_state_notifier_enabled(void);
 bool power_suspended = false;
 
 static bool enabled = false;
@@ -80,7 +79,7 @@ void register_power_suspend(struct power_suspend *handler)
 {
 	struct list_head *pos;
 
-	if (!enabled || is_state_notifier_enabled())
+	if (!enabled || state_notifier_enabled())
 		return;
 
 	mutex_lock(&power_suspend_lock);
@@ -95,7 +94,7 @@ EXPORT_SYMBOL(register_power_suspend);
 
 void unregister_power_suspend(struct power_suspend *handler)
 {
-	if (!enabled || is_state_notifier_enabled())
+	if (!enabled || state_notifier_enabled())
 		return;
 
 	mutex_lock(&power_suspend_lock);
@@ -109,7 +108,7 @@ static void power_suspend(struct work_struct *work)
 	struct power_suspend *pos;
 	unsigned long irqflags;
 
-	if (!enabled || is_state_notifier_enabled())
+	if (!enabled || state_notifier_enabled())
 		return;
 
 	mutex_lock(&power_suspend_lock);
@@ -143,7 +142,7 @@ static void power_resume(struct work_struct *work)
 	struct power_suspend *pos;
 	unsigned long irqflags;
 
-	if (!enabled || is_state_notifier_enabled())
+	if (!enabled || state_notifier_enabled())
 		return;
 
 	mutex_lock(&power_suspend_lock);
@@ -167,7 +166,7 @@ void set_power_suspend_state(int new_state)
 {
 	unsigned long irqflags;
 
-	if (!enabled || is_state_notifier_enabled())
+	if (!enabled || state_notifier_enabled())
 		return;
 
 	if (state != new_state) {
@@ -185,7 +184,7 @@ void set_power_suspend_state(int new_state)
 
 void set_power_suspend_state_panel_hook(int new_state)
 {
-	if (!enabled || is_state_notifier_enabled())
+	if (!enabled || state_notifier_enabled())
 		return;
 
 	if (mode == POWER_SUSPEND_PANEL)
@@ -225,7 +224,7 @@ static struct kobj_attribute power_suspend_state_attribute =
 static ssize_t power_suspend_mode_show(struct kobject *kobj,
 		struct kobj_attribute *attr, char *buf)
 {
-	if (is_state_notifier_enabled()) {
+	if (state_notifier_enabled()) {
 		return sprintf(buf, "power_suspend is disabled.%d\n", mode);
 	} else {
 		return sprintf(buf, "%u\n", mode);
@@ -316,7 +315,7 @@ static int __init power_suspend_init(void)
 //	mode = POWER_SUSPEND_PANEL;
 	mode_prev = POWER_SUSPEND_USERSPACE;
 
-	if (is_state_notifier_enabled()) {
+	if (state_notifier_enabled()) {
 		mode = POWER_SUSPEND_USERSPACE;
 	} else {
 		mode = mode_prev;
