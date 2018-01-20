@@ -141,7 +141,7 @@ extern bool still_booting;
 #define	ADC_OPEN		0x1f
 
 /* (1 = enabled) | (2 = state_usb) | (4 = state_fast) */
-static int force_fast_charge;
+int force_fast_charge;
 
 int uart_connecting;
 EXPORT_SYMBOL(uart_connecting);
