@@ -63,7 +63,7 @@ static struct skater_hotplug_struct {
 	.min_boost_freq_prev = DEFAULT_MIN_BOOST_FREQ, 
 	.cpus_boosted = DEFAULT_NR_CPUS_BOOSTED,
 	.boost_lock_dur = DEFAULT_BOOST_LOCK_DUR,
-	.max_cpus_scroff = false,
+	.max_cpus_scroff = true,
 };
 
 static u64 last_boost_time;
