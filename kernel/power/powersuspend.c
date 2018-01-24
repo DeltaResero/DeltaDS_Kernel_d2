@@ -34,6 +34,8 @@
  *
  *  v1.7.7 - add actual PM suspend hooks.
  *
+ *  v2.0 - a few logic changes, also add a true enable toggle.
+ *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
  * may be copied, distributed, and modified under those terms.
@@ -45,16 +47,16 @@
  *
  */
 
-#include <linux/powersuspend.h>
-#include <linux/state_notifier.h>
+#include <linux/export.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
-#include <linux/workqueue.h>
+#include <linux/powersuspend.h>
+#include <linux/state_notifier.h>
+
 #include "power.h"
 
-#define MAJOR_VERSION	1
-#define MINOR_VERSION	7
-#define MINOR_UPDATE	7
+#define MAJOR_VERSION	2
+#define MINOR_VERSION	0
 
 struct workqueue_struct *power_suspend_work_queue;
 
@@ -69,11 +71,21 @@ static DEFINE_SPINLOCK(state_lock);
 static int state;
 static int mode;
 static int mode_prev;
-extern bool screen_on;
+static int enabled = 0;
+
 bool power_suspended = false;
 
-static bool enabled = false;
-module_param_named(enabled, enabled, bool, 0664);
+bool powersuspend_enabled(void)
+{
+	bool power_suspend_enabled;
+
+	if (enabled != 0)
+		power_suspend_enabled = true;
+	else
+		power_suspend_enabled = false;
+
+	return power_suspend_enabled;
+}
 
 void register_power_suspend(struct power_suspend *handler)
 {
@@ -114,7 +126,7 @@ static void power_suspend(struct work_struct *work)
 	mutex_lock(&power_suspend_lock);
 	spin_lock_irqsave(&state_lock, irqflags);
 	/* Force power_suspend if power_resume is still active */
-	if (unlikely(!screen_on) && (state != POWER_SUSPEND_ACTIVE)) {
+	if (state != POWER_SUSPEND_ACTIVE) {
 		state = POWER_SUSPEND_ACTIVE;
 		power_suspended = true;
 	}
@@ -148,7 +160,7 @@ static void power_resume(struct work_struct *work)
 	mutex_lock(&power_suspend_lock);
 	spin_lock_irqsave(&state_lock, irqflags);
 	/* Force power_resume if power_suspend is still active */
-	if (likely(screen_on) && (state != POWER_SUSPEND_INACTIVE)) {
+	if (state != POWER_SUSPEND_INACTIVE) {
 		state = POWER_SUSPEND_INACTIVE;
 		power_suspended = false;
 	}
@@ -194,13 +206,48 @@ EXPORT_SYMBOL(set_power_suspend_state_panel_hook);
 
 // ------------------------------------------ sysfs interface ------------------------------------------
 
-static ssize_t power_suspend_state_show(struct kobject *kobj,
+static ssize_t
+show_powersuspend_enabled(struct kobject *kobj, struct kobj_attribute *attr,
+			     char *buf)
+{
+	return sprintf(buf, "%u\n", enabled);
+}
+
+static ssize_t
+store_powersuspend_enabled(struct kobject *kobj, struct kobj_attribute *attr,
+	       const char *buf, size_t count)
+{
+	int ret;
+	unsigned int val;
+
+	ret = sscanf(buf, "%u", &val);
+	if (ret != 1 || val < 0 || val > 1)
+		return -EINVAL;
+
+	if (state_notifier_enabled()) {
+		if (val != 0)
+			val = 0;
+	}
+
+	enabled = val;
+
+	return count;
+}
+
+static struct kobj_attribute enabled_attribute =
+	__ATTR(enabled, S_IRUGO|S_IWUSR,
+		show_powersuspend_enabled,
+		store_powersuspend_enabled);
+
+static ssize_t
+show_powersuspend_state(struct kobject *kobj,
 		struct kobj_attribute *attr, char *buf)
 {
 	return sprintf(buf, "%u\n", state);
 }
 
-static ssize_t power_suspend_state_store(struct kobject *kobj,
+static ssize_t
+store_powersuspend_state(struct kobject *kobj,
 		struct kobj_attribute *attr, const char *buf, size_t count)
 {
 	int new_state = 0;
@@ -210,28 +257,26 @@ static ssize_t power_suspend_state_store(struct kobject *kobj,
 
 	sscanf(buf, "%d\n", &new_state);
 
-	if(new_state == POWER_SUSPEND_ACTIVE || new_state == POWER_SUSPEND_INACTIVE)
+	if (!new_state || new_state)
 		set_power_suspend_state(new_state);
 
 	return count;
 }
 
-static struct kobj_attribute power_suspend_state_attribute =
-	__ATTR(power_suspend_state, S_IRUGO|S_IWUSR,
-		power_suspend_state_show,
-		power_suspend_state_store);
+static struct kobj_attribute state_attribute =
+	__ATTR(state, S_IRUGO|S_IWUSR,
+		show_powersuspend_state,
+		store_powersuspend_state);
 
-static ssize_t power_suspend_mode_show(struct kobject *kobj,
+static ssize_t
+show_powersuspend_mode(struct kobject *kobj,
 		struct kobj_attribute *attr, char *buf)
 {
-	if (state_notifier_enabled()) {
-		return sprintf(buf, "power_suspend is disabled.%d\n", mode);
-	} else {
-		return sprintf(buf, "%u\n", mode);
-	}
+	return sprintf(buf, "%u\n", mode);
 }
 
-static ssize_t power_suspend_mode_store(struct kobject *kobj,
+static ssize_t
+store_powersuspend_mode(struct kobject *kobj,
 		struct kobj_attribute *attr, const char *buf, size_t count)
 {
 	int data = 0;
@@ -249,27 +294,43 @@ static ssize_t power_suspend_mode_store(struct kobject *kobj,
 	
 }
 
-static struct kobj_attribute power_suspend_mode_attribute =
-	__ATTR(power_suspend_mode, S_IRUGO|S_IWUSR,
-		power_suspend_mode_show,
-		power_suspend_mode_store);
+static struct kobj_attribute mode_attribute =
+	__ATTR(mode, S_IRUGO|S_IWUSR,
+		show_powersuspend_mode,
+		store_powersuspend_mode);
 
-static ssize_t power_suspend_version_show(struct kobject *kobj,
+static ssize_t show_powersuspend_version(struct kobject *kobj,
 		struct kobj_attribute *attr, char *buf)
 {
-	return sprintf(buf, "version: %d.%d.%d\n", MAJOR_VERSION, MINOR_VERSION, MINOR_UPDATE);
+	return sprintf(buf, "version: %d.%d\n", MAJOR_VERSION, MINOR_VERSION);
 }
 
-static struct kobj_attribute power_suspend_version_attribute =
-	__ATTR(power_suspend_version, 0444,
-		power_suspend_version_show,
+static struct kobj_attribute version_attribute =
+	__ATTR(version, 0444,
+		show_powersuspend_version,
+		NULL);
+
+static ssize_t show_powersuspend_disabled(struct kobject *kobj,
+		struct kobj_attribute *attr, char *buf)
+{
+	if (!enabled || state_notifier_enabled())
+		return sprintf(buf, "%d\n", 1);
+	else
+		return sprintf(buf, "%d\n", 0);
+}
+
+static struct kobj_attribute disabled_attribute =
+	__ATTR(disabled, 0444,
+		show_powersuspend_disabled,
 		NULL);
 
 static struct attribute *power_suspend_attrs[] =
 {
-	&power_suspend_state_attribute.attr,
-	&power_suspend_mode_attribute.attr,
-	&power_suspend_version_attribute.attr,
+	&enabled_attribute.attr,
+	&disabled_attribute.attr,
+	&state_attribute.attr,
+	&mode_attribute.attr,
+	&version_attribute.attr,
 	NULL,
 };
 
@@ -281,11 +342,10 @@ static struct attribute_group power_suspend_attr_group =
 static struct kobject *power_suspend_kobj;
 
 // ------------------ sysfs interface -----------------------
+
 static int __init power_suspend_init(void)
 {
 	int sysfs_result;
-
-	screen_on = true;
 
 	power_suspend_kobj = kobject_create_and_add("power_suspend",
 				kernel_kobj);
@@ -311,14 +371,15 @@ static int __init power_suspend_init(void)
 		return -ENOMEM;
 	}
 
-	mode = POWER_SUSPEND_USERSPACE;
-//	mode = POWER_SUSPEND_PANEL;
-	mode_prev = POWER_SUSPEND_USERSPACE;
+	mode = POWER_SUSPEND_PANEL;
+	mode_prev = mode;
 
 	if (state_notifier_enabled()) {
-		mode = POWER_SUSPEND_USERSPACE;
+		if (mode != POWER_SUSPEND_USERSPACE)
+			mode = POWER_SUSPEND_USERSPACE;
 	} else {
-		mode = mode_prev;
+		if (mode != mode_prev)
+			mode = mode_prev;
 	}
 
 	return 0;
