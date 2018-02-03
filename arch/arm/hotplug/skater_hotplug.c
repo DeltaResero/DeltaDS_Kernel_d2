@@ -33,6 +33,9 @@
 
 static struct delayed_work skater_hotplug_work;
 static struct workqueue_struct *skater_hotplug_workq;
+static void down_cpu(struct work_struct *work);
+static DECLARE_WORK(down_cpu_work, down_cpu);
+
 static bool enabled_switch = SKATER_ENABLED;
 
 static struct skater_hotplug_struct {
@@ -69,13 +72,14 @@ static struct skater_hotplug_struct {
 static u64 last_boost_time;
 static unsigned int cycle = 0;
 
-static inline void down_all(void)
+static void down_cpu(struct work_struct *work)
 {
 	unsigned int cpu;
 
 	for_each_online_cpu(cpu) {
-		if (cpu && num_online_cpus() > 1)
+		if (cpu || cpu_online(cpu)) {
 			cpu_down(cpu);
+		}
 	}
 }
 
@@ -185,14 +189,10 @@ static void min_boost_restore(void)
 
 static void skater_hotplug_suspend(void)
 {
-	unsigned int cpu;
-
 	min_boost_suspend();
 
 	if (skater_hotplug.max_cpus_scroff) {
-		for_each_online_cpu(cpu) {
-			down_all();
-		}
+		schedule_work_on(0, &down_cpu_work);
 	}
 
 	/* Flush hotplug workqueue */
