@@ -15,6 +15,7 @@ obj-$(CONFIG_EARLYSUSPEND)	+= earlysuspend.o
 obj-$(CONFIG_CONSOLE_EARLYSUSPEND)	+= consoleearlysuspend.o
 obj-$(CONFIG_FB_EARLYSUSPEND)	+= fbearlysuspend.o
 obj-$(CONFIG_POWERSUSPEND)	+= powersuspend.o
+obj-$(CONFIG_STATE_NOTIFIER)	+= state_notifier.o
 obj-$(CONFIG_SUSPEND_TIME)	+= suspend_time.o
 
 obj-$(CONFIG_QUICK_WAKEUP)	+= quickwakeup.o

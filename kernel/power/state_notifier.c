@@ -15,7 +15,7 @@
 #include <linux/export.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
-#include "../../kernel/power/power.h"
+#include "power.h"
 
 #define DEFAULT_SUSPEND_DEFER_TIME 	1
 #define STATE_NOTIFIER			"state_notifier"
