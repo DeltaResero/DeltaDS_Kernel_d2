@@ -94,20 +94,12 @@ static unsigned long screen_off_max = DEFAULT_SCREEN_OFF_MAX;
 static unsigned long screen_off_max_prev = DEFAULT_SCREEN_OFF_MAX;
 
 /* Max frequency to limit while earphones are in & screen is off. */
-#define DEFAULT_EARPHONES_MAX_FREQ_SCREEN_OFF 1242000
+#define DEFAULT_EARPHONES_MAX_FREQ_SCREEN_OFF 810000
 static unsigned long earphones_maxfreq = DEFAULT_EARPHONES_MAX_FREQ_SCREEN_OFF;
 
-/* Frequency cannot go below this if earphones are in and screen is off. */
-#define DEFAULT_EARPHONES_MIN_FREQ_LIMIT 648000
-static unsigned long earphones_min_freq_limit = DEFAULT_EARPHONES_MIN_FREQ_LIMIT;
-
 /* Max frequency to limit while bluetooth is on & screen is off. */
-#define DEFAULT_BT_MAX_FREQ_SCREEN_OFF 1080000
+#define DEFAULT_BT_MAX_FREQ_SCREEN_OFF 918000
 static unsigned long bluetooth_maxfreq = DEFAULT_BT_MAX_FREQ_SCREEN_OFF;
-
-/* Frequency cannot go below this if bluetooth is on and screen is off. */
-#define DEFAULT_BT_MIN_FREQ_LIMIT 648000
-static unsigned long bluetooth_min_freq_limit = DEFAULT_BT_MIN_FREQ_LIMIT;
 
 struct cpufreq_skateractive_tunables {
 	int usage_count;
@@ -1069,8 +1061,8 @@ static ssize_t store_earphones_maxfreq(struct cpufreq_skateractive_tunables *tun
 		return ret;
 
 	/* Return min freq limit if it reaches below this */
-	if (val < earphones_min_freq_limit)
-		val = earphones_min_freq_limit;
+	if (val < 594000)
+		val = 594000;
 
 	earphones_maxfreq = val;
 
@@ -1094,8 +1086,8 @@ static ssize_t store_bluetooth_maxfreq(struct cpufreq_skateractive_tunables *tun
 		return ret;
 
 	/* Return min freq limit if it reaches below this */
-	if (val < bluetooth_min_freq_limit)
-		val = bluetooth_min_freq_limit;
+	if (val < 648000)
+		val = 648000;
 
 	bluetooth_maxfreq = val;
 
