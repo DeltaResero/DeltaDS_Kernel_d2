@@ -23,7 +23,6 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#include <linux/earlysuspend.h>
 #include <linux/init.h>
 #include <linux/cpufreq.h>
 #include <linux/workqueue.h>
@@ -36,6 +35,8 @@
 #include <linux/export.h>
 #include <linux/input.h>
 #include <linux/slab.h>
+#include <linux/state_notifier.h>
+
 #include "../mach-msm/acpuclock.h"
 
 #define DEBUG 0
@@ -122,7 +123,6 @@ extern unsigned long acpuclk_get_rate(int);
 
 unsigned int state = MSM_MPDEC_IDLE;
 bool was_paused = false;
-bool is_screen_on = true;
 static int update_cpu_min_freq(struct cpufreq_policy *cpu_policy,
 			int cpu, int new_freq);
 static void unboost_cpu(int cpu);
@@ -472,10 +472,7 @@ static void mpdec_input_event(struct input_handle *handle, unsigned int type,
 {
 	int i = 0;
 
-	if (!msm_mpdec_tuners_ins.boost_enabled)
-		return;
-
-	if (!is_screen_on)
+	if (!msm_mpdec_tuners_ins.boost_enabled || state_suspended)
 		return;
 
 	for_each_online_cpu(i) {
@@ -546,10 +543,9 @@ static struct input_handler mpdec_input_handler = {
 	.id_table = mpdec_ids,
 };
 
-static void msm_mpdec_early_suspend(struct early_suspend *h)
+static void msm_mpdec_suspend(void)
 {
 	int cpu = nr_cpu_ids;
-	is_screen_on = false;
 
 	if (!msm_mpdec_tuners_ins.scroff_single_core) {
 		pr_info(MPDEC_TAG"Screen -> off\n");
@@ -570,10 +566,9 @@ static void msm_mpdec_early_suspend(struct early_suspend *h)
 	pr_info(MPDEC_TAG"Screen -> off. Deactivated mpdecision.\n");
 }
 
-static void __ref msm_mpdec_late_resume(struct early_suspend *h)
+static void __ref msm_mpdec_resume(void)
 {
 	int cpu = nr_cpu_ids;
-	is_screen_on = true;
 
 	for_each_possible_cpu(cpu)
 		per_cpu(msm_mpdec_cpudata, cpu).device_suspended = false;
@@ -601,10 +596,26 @@ static void __ref msm_mpdec_late_resume(struct early_suspend *h)
 	}
 }
 
-static struct early_suspend msm_mpdec_early_suspend_handler = {
-	.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN,
-	.suspend = msm_mpdec_early_suspend,
-	.resume = msm_mpdec_late_resume,
+static int state_notifier_callback(struct notifier_block *this,
+				unsigned long event, void *data)
+{
+	switch (event) {
+		case STATE_NOTIFIER_ACTIVE:
+			msm_mpdec_resume();
+			break;
+		case STATE_NOTIFIER_SUSPEND:
+			msm_mpdec_suspend();
+			break;
+		default:
+			break;
+ 	}
+ 
+ 	return NOTIFY_OK;
+}
+
+static struct notifier_block notif = {
+	.notifier_call = state_notifier_callback,
+	.priority = INT_MAX,
 };
 
 /**************************** SYSFS START ****************************/
@@ -1133,7 +1144,7 @@ static int __init msm_mpdec_init(void)
 		queue_delayed_work(msm_mpdec_workq, &msm_mpdec_work,
 					msecs_to_jiffies(msm_mpdec_tuners_ins.delay));
 
-	register_early_suspend(&msm_mpdec_early_suspend_handler);
+	state_register_client(&notif);
 
 	msm_mpdec_kobject = kobject_create_and_add("msm_mpdecision", kernel_kobj);
 	if (msm_mpdec_kobject) {
