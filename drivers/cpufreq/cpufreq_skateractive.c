@@ -94,11 +94,11 @@ static unsigned long screen_off_max = DEFAULT_SCREEN_OFF_MAX;
 static unsigned long screen_off_max_prev = DEFAULT_SCREEN_OFF_MAX;
 
 /* Max frequency to limit while earphones are in & screen is off. */
-#define DEFAULT_EARPHONES_MAX_FREQ_SCREEN_OFF 810000
+#define DEFAULT_EARPHONES_MAX_FREQ_SCREEN_OFF 1080000
 static unsigned long earphones_maxfreq = DEFAULT_EARPHONES_MAX_FREQ_SCREEN_OFF;
 
 /* Max frequency to limit while bluetooth is on & screen is off. */
-#define DEFAULT_BT_MAX_FREQ_SCREEN_OFF 918000
+#define DEFAULT_BT_MAX_FREQ_SCREEN_OFF 1242000
 static unsigned long bluetooth_maxfreq = DEFAULT_BT_MAX_FREQ_SCREEN_OFF;
 
 struct cpufreq_skateractive_tunables {
@@ -731,15 +731,9 @@ static int cpufreq_skateractive_speedchange_task(void *data)
 			}
 
 			if (max_freq != pcpu->policy->cur) {
-				if (unlikely(!screen_on)) {
-					__cpufreq_driver_target(pcpu->policy,
-								max_freq,
-								CPUFREQ_RELATION_C);
-				} else if (likely(screen_on)) {
 				__cpufreq_driver_target(pcpu->policy,
 							max_freq,
 							CPUFREQ_RELATION_H);
-				}
 				for_each_cpu(j, pcpu->policy->cpus) {
 					pjcpu = &per_cpu(cpuinfo, j);
 					pjcpu->hispeed_validate_time = hvt;
