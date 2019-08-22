@@ -1,0 +1,54 @@
+#
+# Support for gcc link time optimization
+#
+
+DISABLE_LTO :=
+LTO_CFLAGS :=
+
+export DISABLE_LTO
+export LTO_CFLAGS
+
+ifdef CONFIG_LTO
+ifeq ($(call cc-ifversion, -ge, 0407,y),y)
+ifneq ($(call cc-option,-flto,n),n)
+	LTO_CFLAGS := -flto=jobserver
+	LTO_FINAL_CFLAGS := -fuse-linker-plugin
+	LTO_CFLAGS += -fno-fat-lto-objects
+	DISABLE_LTO := -fno-lto
+
+	LTO_FINAL_CFLAGS += ${LTO_CFLAGS} -fwhole-program
+
+	# workaround for http://gcc.gnu.org/PR50602
+	LTO_FINAL_CFLAGS += $(filter -freg-struct-return,${KBUILD_CFLAGS})
+
+ifdef CONFIG_LTO_DEBUG
+	LTO_FINAL_CFLAGS += -dH -fdump-ipa-cgraph -fdump-ipa-inline-details # -Wl,-plugin-save-temps -save-temps
+endif
+ifdef CONFIG_LTO_PARTITIONS
+	LTO_FINAL_CFLAGS += --param lto-partitions=${CONFIG_LTO_PARTITIONS}
+	LTO_FINAL_CFLAGS += --param lto-max-partition=2000000000
+endif
+ifdef CONFIG_LTO_INITCALL_WORKAROUND
+	LTO_FINAL_CFLAGS += -fno-toplevel-reorder
+endif
+
+	# In principle gcc should pass through options in the object files,
+	# but it doesn't always work. So do it here manually
+	LTO_FINAL_CFLAGS += $(filter -g%,${KBUILD_CFLAGS})
+	LTO_FINAL_CFLAGS += $(filter -O%,${KBUILD_CFLAGS})
+	LTO_FINAL_CFLAGS += $(filter -f%,${KBUILD_CFLAGS})
+	LTO_FINAL_CFLAGS += $(filter -m%,${KBUILD_CFLAGS})
+	LTO_FINAL_CFLAGS += $(filter -W%,${KBUILD_CFLAGS})
+	LTO_FINAL_CFLAGS += $(strip $(shell echo "${KBUILD_CFLAGS}" |\
+		sed 's/\(--param \S\+\)\|\S\+/\1/g'))
+
+	KBUILD_CFLAGS += ${LTO_CFLAGS}
+	LDFINAL := ${srctree}/scripts/mixed-ldfinal ${LTO_FINAL_CFLAGS}
+
+else
+$(warning "WARNING: Compiler/Linker does not support LTO/WHOPR with linker plugin. CONFIG_LTO disabled.")
+endif
+else
+$(warning "WARNING: GCC $(call cc-version) too old for LTO/WHOPR. CONFIG_LTO disabled")
+endif
+endif

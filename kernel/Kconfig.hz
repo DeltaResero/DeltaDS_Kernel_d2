@@ -1,0 +1,21 @@
+#
+# Timer Interrupt Frequency Configuration
+#
+
+config HZ
+	int "Timer frequency"
+	default 300
+	help
+	 Allows the configuration of the timer frequency. It is customary
+	 to have the timer interrupt run at 1000 Hz but 100 Hz may be more
+	 beneficial for servers and NUMA systems that do not need to have
+	 a fast response for user interaction and that may experience bus
+	 contention and cacheline bounces as a result of timer interrupts.
+	 Note that the timer interrupt occurs on each processor in an SMP
+	 environment leading to NR_CPUS * HZ number of timer interrupts
+	 per second.
+
+	 Typically, values of 100, 250, 300, or 1000 Hz are used.
+
+config SCHED_HRTICK
+	def_bool HIGH_RES_TIMERS && (!SMP || USE_GENERIC_SMP_HELPERS)
