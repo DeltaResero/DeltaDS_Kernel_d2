@@ -4139,6 +4139,9 @@ unsigned long default_scale_smt_power(struct sched_domain *sd, int cpu)
 	unsigned long weight = sd->span_weight;
 	unsigned long smt_gain = sd->smt_gain;
 
+	if (sched_smt_power_savings)
+		return SCHED_POWER_SCALE;
+
 	smt_gain /= weight;
 
 	return smt_gain;
