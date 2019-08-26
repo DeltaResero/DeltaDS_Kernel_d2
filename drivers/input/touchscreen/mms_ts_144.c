@@ -26,6 +26,10 @@
 #include <linux/cpufreq.h>
 #include <linux/workqueue.h>
 
+#ifdef CONFIG_POWERSUSPEND
+#include <linux/powersuspend.h>
+#endif
+
 #include <linux/platform_data/mms_ts.h>
 
 #define MAX_FINGERS		10
@@ -403,6 +407,10 @@ static int mms_ts_suspend(struct device *dev)
 		info->enabled = false;
 		release_all_fingers(info);
 	}
+#ifdef CONFIG_POWERSUSPEND
+	set_power_suspend_state_panel_hook(POWER_SUSPEND_ACTIVE);
+#endif
+
 
 	mutex_unlock(&info->input_dev->mutex);
 	return 0;
@@ -435,6 +443,10 @@ static void mms_ts_finish_resume(struct work_struct *work) {
 	}
 
 	mutex_unlock(&info->input_dev->mutex);
+#ifdef CONFIG_POWERSUSPEND
+	set_power_suspend_state_panel_hook(POWER_SUSPEND_INACTIVE);
+#endif
+
 }
 #endif
 
