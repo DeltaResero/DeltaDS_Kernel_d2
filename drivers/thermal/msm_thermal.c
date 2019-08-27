@@ -24,7 +24,7 @@
 #include <linux/of.h>
 #include <mach/cpufreq.h>
 
-static unsigned int temp_threshold __read_mostly = 50;
+static unsigned int temp_threshold __read_mostly = 70;
 module_param(temp_threshold, int, 0644);
 
 static unsigned int limited_max_freq = UINT_MAX;
