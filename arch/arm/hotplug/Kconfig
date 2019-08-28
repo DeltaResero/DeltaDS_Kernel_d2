@@ -2,6 +2,7 @@
 
 config ALUCARD_HOTPLUG
 	bool "Enable alucard-hotplug cpu hotplug driver"
+	depends on HOTPLUG_CPU
 	default y
 	help
 	  Generic Alucard-hotplug cpu hotplug driver for ARM SOCs
@@ -14,7 +15,7 @@ config DYNAMIC_HOTPLUG
 
 config BRICKED_HOTPLUG
 	bool "Enable kernel based mpdecision"
-	depends on MSM_SMP && MSM_DCVS
+	depends on MSM_SMP && MSM_DCVS && HOTPLUG_CPU
 	default n
 	help
 	  This enables kernel based multi core control.
@@ -30,6 +31,7 @@ config ASMP
  
 config LAZYPLUG
 	bool "Conservative hotplugging for generic devices"
+	depends on HOTPLUG_CPU && MSM_RUN_QUEUE_STATS_BE_CONSERVATIVE
 	default n
 	help
 	  This enables the conservative hotplugging, lazyplug by arter97
@@ -40,7 +42,8 @@ config STATE_HELPER
 	depends on STATE_NOTIFIER
 
 config THUNDER_PLUG
-      bool "Enable plugging down/up of cores using powersuspend"
-      help
+	bool "Enable plugging down/up of cores using powersuspend"
+	depends on HOTPLUG_CPU
+	help
        This driver uses powersuspend to take down the cpu cores
        on a octa core device. Tuned to work on a dual core device.
