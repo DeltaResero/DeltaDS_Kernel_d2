@@ -50,7 +50,7 @@ static DEFINE_PER_CPU(struct cpufreq_policy *, cpufreq_cpu_data);
 /* This one keeps track of the previously set governor of a removed CPU */
 struct cpufreq_cpu_save_data {
 	char gov[CPUFREQ_NAME_LEN];
-	unsigned int max, min;
+	unsigned int max, min, util_thres;
 };
 static DEFINE_PER_CPU(struct cpufreq_cpu_save_data, cpufreq_policy_save);
 #endif
@@ -480,6 +480,7 @@ show_one(scaling_min_freq, user_policy.min);
 //show_one(scaling_max_freq, max);
 show_one(scaling_cur_freq, cur);
 show_one(cpu_utilization, util);
+show_one(util_threshold, util_thres);
 
 static struct task_struct *thermald;
 static int check_current_is_thermald(void) {
@@ -775,6 +776,26 @@ static ssize_t store_scaling_setspeed(struct cpufreq_policy *policy,
 	return count;
 }
 
+static ssize_t store_util_threshold(struct cpufreq_policy *policy,
+					const char *buf, size_t count)
+{
+	unsigned int ret = -EINVAL;
+	struct cpufreq_policy new_policy;
+
+	ret = cpufreq_get_policy(&new_policy, policy->cpu);
+	if (ret)
+		return -EINVAL;
+
+	ret = sscanf(buf, "%u", &new_policy.util_thres);
+	if (ret < 1 || ret > 100)
+		return -EINVAL;
+
+	policy->user_policy.util_thres = new_policy.util_thres;
+	ret = __cpufreq_set_policy(policy, &new_policy);
+
+	return ret ? ret : count;
+}
+
 static ssize_t show_scaling_setspeed(struct cpufreq_policy *policy, char *buf)
 {
 	if (!policy->governor || !policy->governor->show_setspeed)
@@ -809,6 +830,7 @@ cpufreq_freq_attr_ro(bios_limit);
 cpufreq_freq_attr_ro(related_cpus);
 cpufreq_freq_attr_ro(affected_cpus);
 cpufreq_freq_attr_ro(cpu_utilization);
+cpufreq_freq_attr_rw(util_threshold);
 cpufreq_freq_attr_rw(scaling_min_freq);
 cpufreq_freq_attr_rw(scaling_max_freq);
 cpufreq_freq_attr_rw(scaling_governor);
@@ -823,6 +845,7 @@ static struct attribute *default_attrs[] = {
 	&scaling_max_freq.attr,
 	&affected_cpus.attr,
 	&cpu_utilization.attr,
+	&util_threshold.attr,
 	&related_cpus.attr,
 	&scaling_governor.attr,
 	&scaling_driver.attr,
@@ -982,6 +1005,10 @@ static int cpufreq_add_dev_policy(unsigned int cpu,
 	if (per_cpu(cpufreq_policy_save, cpu).max) {
 		policy->max = per_cpu(cpufreq_policy_save, cpu).max;
 		policy->user_policy.max = policy->max;
+	}
+	if (per_cpu(cpufreq_policy_save, cpu).util_thres) {
+		policy->util_thres = per_cpu(cpufreq_policy_save, cpu).util_thres;
+		policy->user_policy.util_thres = policy->util_thres;
 	}
 	pr_debug("Restoring CPU%d min %d and max %d\n",
 		cpu, policy->min, policy->max);
@@ -1262,6 +1289,9 @@ static int cpufreq_add_dev(struct device *dev, struct subsys_interface *sif)
 	policy->user_policy.min = policy->min;
 	policy->user_policy.max = policy->max;
 
+	policy->util = 0;
+	policy->user_policy.util_thres = policy->util_thres = UTIL_THRESHOLD;
+
 	blocking_notifier_call_chain(&cpufreq_policy_notifier_list,
 				     CPUFREQ_START, policy);
 
@@ -1375,6 +1405,7 @@ static int __cpufreq_remove_dev(struct device *dev, struct subsys_interface *sif
 			CPUFREQ_NAME_LEN);
 	per_cpu(cpufreq_policy_save, cpu).min = data->user_policy.min;
 	per_cpu(cpufreq_policy_save, cpu).max = data->user_policy.max;
+	per_cpu(cpufreq_policy_save, cpu).util_thres = data->user_policy.util_thres;
 	pr_debug("Saving CPU%d user policy min %d and max %d\n",
 			cpu, data->user_policy.min, data->user_policy.max);
 #endif
@@ -2082,6 +2113,7 @@ static int __cpufreq_set_policy(struct cpufreq_policy *data,
 
 	data->min = policy->min;
 	data->max = policy->max;
+	data->util_thres = policy->util_thres;
 
 	pr_debug("new min and max freqs are %u - %u kHz\n",
 					data->min, data->max);
@@ -2305,6 +2337,7 @@ int cpufreq_update_policy(unsigned int cpu)
 	memcpy(&policy, data, sizeof(struct cpufreq_policy));
 	policy.min = data->user_policy.min;
 	policy.max = data->user_policy.max;
+	policy.util_thres = data->user_policy.util_thres;
 	policy.policy = data->user_policy.policy;
 	policy.governor = data->user_policy.governor;
 
