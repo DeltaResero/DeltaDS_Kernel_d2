@@ -42,7 +42,7 @@
 #include "avs.h"
 
 #define FREQ_TABLE_SIZE 40
-#define MIN_VDD   (600000)
+#define MIN_VDD   (500000)
 #define VMIN_VDD (1150000)
 #define MAX_VDD  (1400000)
 
