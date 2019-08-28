@@ -498,7 +498,7 @@ static struct attribute_group ex_attr_group_gov_pol = {
 
 /************************** sysfs end ************************/
 
-static int ex_init(struct dbs_data *dbs_data)
+static int ex_init(struct dbs_data *dbs_data, struct cpufreq_policy *policy)
 {
 	struct ex_dbs_tuners *tuners;
 

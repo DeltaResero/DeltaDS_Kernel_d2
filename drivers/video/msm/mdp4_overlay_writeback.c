@@ -847,7 +847,7 @@ static int mdp4_wfd_dequeue_update(struct msm_fb_data_type *mfd,
 	if (node) {
 		list_del(&(node->active_entry));
 		node->state = IN_BUSY_QUEUE;
-		mfd->writeback_active_cnt++;
+		mfd->writeback_active_cnt = true;
 	}
 	mutex_unlock(&mfd->writeback_mutex);
 
@@ -862,7 +862,7 @@ static int mdp4_wfd_dequeue_update(struct msm_fb_data_type *mfd,
 			list_add_tail(&node->active_entry,
 				&mfd->writeback_free_queue);
 			node->state = IN_FREE_QUEUE;
-			mfd->writeback_active_cnt--;
+			mfd->writeback_active_cnt = false;
 			mutex_unlock(&mfd->writeback_mutex);
 		}
 
@@ -892,7 +892,7 @@ static void mdp4_wfd_queue_wakeup(struct msm_fb_data_type *mfd,
 
 	mutex_lock(&mfd->writeback_mutex);
 	list_add_tail(&node->active_entry, &mfd->writeback_busy_queue);
-	mfd->writeback_active_cnt--;
+	mfd->writeback_active_cnt = false;
 	mutex_unlock(&mfd->writeback_mutex);
 	wake_up(&mfd->wait_q);
 }

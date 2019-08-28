@@ -115,18 +115,6 @@ static void __ref state_helper_work(struct work_struct *work)
 			STATE_HELPER, info.target_cpus);
 		return;
 	}
-
-	if (helper.debug) {
-		pr_info("%s: Battery Level: %u\n",
-			STATE_HELPER, info.batt_level);
-		pr_info("%s: Current Temp: %ld\n",
-			STATE_HELPER, info.current_temp);
-		pr_info("%s: Target requested: %u\n",
-			STATE_HELPER, info.target_cpus);
-		for_each_possible_cpu(cpu)
-			pr_info("%s: CPU%u status:%u allowed:%u\n",
-				STATE_HELPER, cpu, cpu_online(cpu));
-	}
 }
 
 static void batt_level_check(void)
