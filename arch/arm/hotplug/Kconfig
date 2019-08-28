@@ -13,6 +13,13 @@ config DYNAMIC_HOTPLUG
 	help
 	  Generic Dynamic-hotplug cpu hotplug driver for ARM SOCs
 
+config BLU_PLUG
+	bool "Dynamic hotplug driver"
+	depends on HOTPLUG_CPU
+	default n
+	help
+	  The Dynamic hotplug driver automatically online/offline CPUs proportional to system load.
+
 config BRICKED_HOTPLUG
 	bool "Enable kernel based mpdecision"
 	depends on MSM_SMP && MSM_DCVS && HOTPLUG_CPU
