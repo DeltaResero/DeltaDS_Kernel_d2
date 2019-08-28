@@ -18,4 +18,5 @@ config HZ
 	 Typically, values of 100, 250, 300, or 1000 Hz are used.
 
 config SCHED_HRTICK
+	default n
 	def_bool HIGH_RES_TIMERS && (!SMP || USE_GENERIC_SMP_HELPERS)
