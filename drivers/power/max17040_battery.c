@@ -26,6 +26,10 @@
 #include <mach/sec_debug.h>
 #endif
 
+#ifdef CONFIG_STATE_HELPER
+#include <linux/state_helper.h>
+#endif
+
 #define MAX17040_VCELL_MSB	0x02
 #define MAX17040_VCELL_LSB	0x03
 #define MAX17040_SOC_MSB	0x04
@@ -774,6 +778,9 @@ static int max17040_get_property(struct power_supply *psy,
 			val->intval = chip->full_soc;
 			break;
 		}
+#ifdef CONFIG_STATE_HELPER
+		batt_level_notify(val->intval);
+#endif
 		break;
 	default:
 		return -EINVAL;

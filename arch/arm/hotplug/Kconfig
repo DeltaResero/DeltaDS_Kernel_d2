@@ -35,6 +35,10 @@ config LAZYPLUG
 	  This enables the conservative hotplugging, lazyplug by arter97
 	  based on intelli_plug. Refer to the comments for more info.
 
+config STATE_HELPER
+        bool "State Helper"
+	depends on STATE_NOTIFIER
+
 config THUNDER_PLUG
       bool "Enable plugging down/up of cores using powersuspend"
       help
