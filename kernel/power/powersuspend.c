@@ -35,6 +35,7 @@
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/workqueue.h>
+#include "power.h"
 
 #define MAJOR_VERSION	1
 #define MINOR_VERSION	7
@@ -100,6 +101,15 @@ static void power_suspend(struct work_struct *work)
 			pos->suspend(pos);
 		}
 	}
+
+	if (unlikely(!mutex_trylock(&pm_mutex))) {
+		pr_info("PM is busy. Skipping suspension\n");
+		return;
+	}
+
+	pr_info("power_suspend: calling system suspension\n");
+	pm_suspend(PM_HIBERNATION_PREPARE);
+	mutex_unlock(&pm_mutex);
 	#ifdef CONFIG_POWERSUSPEND_DEBUG
 	pr_info("[POWERSUSPEND] suspend completed.\n");
 	#endif
