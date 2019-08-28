@@ -37,6 +37,8 @@
 #define DET_CHECK_TIME_MS	100		/* 100ms */
 #define WAKE_LOCK_TIME		(HZ * 5)	/* 5 sec */
 
+bool earphones_connected = false;
+
 static bool recheck_jack;
 struct sec_jack_info {
 	struct sec_jack_platform_data *pdata;
@@ -195,6 +197,8 @@ static void sec_jack_set_type(struct sec_jack_info *hi, int jack_type)
 		return;
 	}
 
+	earphones_connected = true;
+
 	if (jack_type == SEC_HEADSET_4POLE) {
 		/* for a 4 pole headset, enable detection of send/end key */
 		if (hi->send_key_dev == NULL)
@@ -204,6 +208,7 @@ static void sec_jack_set_type(struct sec_jack_info *hi, int jack_type)
 				hi->dev_id,
 				&sec_jack_input_data,
 				sizeof(sec_jack_input_data));
+				earphones_connected = true;
 	} else {
 		/* for all other jacks, disable send/end key detection */
 		if (hi->send_key_dev != NULL) {
@@ -216,6 +221,7 @@ static void sec_jack_set_type(struct sec_jack_info *hi, int jack_type)
 	}
 
 	hi->cur_jack_type = jack_type;
+	earphones_connected = true;
 	pr_info("%s : jack_type = %d\n", __func__, jack_type);
 
 	switch_set_state(&switch_jack_detection, jack_type);
@@ -225,6 +231,7 @@ static void handle_jack_not_inserted(struct sec_jack_info *hi)
 {
 	sec_jack_set_type(hi, SEC_JACK_NO_DEVICE);
 	hi->pdata->set_micbias_state(false);
+	earphones_connected = false;
 }
 
 static void determine_jack_type(struct sec_jack_info *hi)
@@ -617,6 +624,7 @@ static int sec_jack_remove(struct platform_device *pdev)
 	input_unregister_handler(&hi->handler);
 	wake_lock_destroy(&hi->det_wake_lock);
 	switch_dev_unregister(&switch_jack_detection);
+	earphones_connected = false;
 	switch_dev_unregister(&switch_sendend);
 	gpio_free(hi->pdata->det_gpio);
 	kfree(hi);
