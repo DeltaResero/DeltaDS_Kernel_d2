@@ -146,7 +146,7 @@ extern bool still_booting;
 extern int __devinit msm_otg_is_probed(void);
 
 /* (1 = enabled) | (2 = state_usb) | (4 = state_fast) */
-static int force_fast_charge;
+int force_fast_charge;
 static int fast_charge_setting;
 
 int uart_connecting;
