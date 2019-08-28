@@ -998,35 +998,36 @@ static inline unsigned int do_avg_nr_running(struct rq *rq)
 }
 #endif
 
-static inline void inc_nr_running(struct rq *rq)
+static inline void add_nr_running(struct rq *rq, unsigned count)
 {
 #ifdef CONFIG_MSM_RUN_QUEUE_STATS_BE_CONSERVATIVE
 	struct nr_stats_s *nr_stats = &per_cpu(runqueue_stats, rq->cpu);
 #endif
-	sched_update_nr_prod(cpu_of(rq), rq->nr_running, true);
+	unsigned prev_nr = rq->nr_running;
 #ifdef CONFIG_MSM_RUN_QUEUE_STATS_BE_CONSERVATIVE
 	write_seqcount_begin(&nr_stats->ave_seqcnt);
 	nr_stats->ave_nr_running = do_avg_nr_running(rq);
 	nr_stats->nr_last_stamp = rq->clock_task;
 #endif
-	rq->nr_running++;
+	sched_update_nr_prod(cpu_of(rq), count, true);
 #ifdef CONFIG_MSM_RUN_QUEUE_STATS_BE_CONSERVATIVE
 	write_seqcount_end(&nr_stats->ave_seqcnt);
 #endif
+	rq->nr_running = prev_nr + count;
 }
 
-static inline void dec_nr_running(struct rq *rq)
+static inline void sub_nr_running(struct rq *rq, unsigned count)
 {
 #ifdef CONFIG_MSM_RUN_QUEUE_STATS_BE_CONSERVATIVE
 	struct nr_stats_s *nr_stats = &per_cpu(runqueue_stats, rq->cpu);
 #endif
-	sched_update_nr_prod(cpu_of(rq), rq->nr_running, false);
+	sched_update_nr_prod(cpu_of(rq), count, false);
 #ifdef CONFIG_MSM_RUN_QUEUE_STATS_BE_CONSERVATIVE
 	write_seqcount_begin(&nr_stats->ave_seqcnt);
 	nr_stats->ave_nr_running = do_avg_nr_running(rq);
 	nr_stats->nr_last_stamp = rq->clock_task;
 #endif
-	rq->nr_running--;
+	rq->nr_running -= count;
 #ifdef CONFIG_MSM_RUN_QUEUE_STATS_BE_CONSERVATIVE
 	write_seqcount_end(&nr_stats->ave_seqcnt);
 #endif
