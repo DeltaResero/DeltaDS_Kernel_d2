@@ -1142,9 +1142,6 @@ config PCSPKR_PLATFORM
           This option allows to disable the internal PC-Speaker
           support, saving some memory.
 
-config HAVE_PCSPKR_PLATFORM
-	bool
-
 config BASE_FULL
 	default y
 	bool "Enable full-sized data structures for core" if EXPERT
@@ -1300,6 +1297,9 @@ config EMBEDDED
 	  This option should be enabled if compiling the kernel for
 	  an embedded system so certain expert options are available
 	  for configuration.
+
+config HAVE_PCSPKR_PLATFORM
+	bool
 
 config HAVE_PERF_EVENTS
 	bool
