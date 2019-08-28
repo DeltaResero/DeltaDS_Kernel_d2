@@ -292,7 +292,9 @@ static int __init power_suspend_init(void)
                 return -ENOMEM;
         }
 
-	power_suspend_work_queue = create_singlethread_workqueue("p-suspend");
+	power_suspend_work_queue =
+	    alloc_workqueue("power_suspend",
+			    WQ_HIGHPRI | WQ_UNBOUND | WQ_MEM_RECLAIM, 0);
 
 	if (power_suspend_work_queue == NULL) {
 		return -ENOMEM;
