@@ -171,6 +171,11 @@ config CPU_FREQ_DEFAULT_GOV_LIONFISH
 	help
 	  Use the CPUFreq governor 'lionfish' as default.
 
+config CPU_FREQ_DEFAULT_GOV_DESPAIR
+	bool "despair"
+	select CPU_FREQ_GOV_DESPAIR
+	help
+
 endchoice
 
 config CPU_FREQ_GOV_PERFORMANCE
@@ -332,6 +337,10 @@ config CPU_FREQ_GOV_RELAXED
 config CPU_FREQ_GOV_ELEMENTALX
 	tristate "'elementalx' cpufreq policy governor"
 	select CPU_FREQ_TABLE
+
+config CPU_FREQ_GOV_DESPAIR
+	tristate "'despair' cpufreq governor"
+	depends on CPU_FREQ
 
 menu "Intellidemand configuration"
 depends on CPU_FREQ_GOV_INTELLIDEMAND
