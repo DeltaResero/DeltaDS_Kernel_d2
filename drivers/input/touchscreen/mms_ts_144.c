@@ -30,6 +30,10 @@
 #include <linux/powersuspend.h>
 #endif
 
+#ifdef CONFIG_STATE_NOTIFIER
+#include <linux/state_notifier.h>
+#endif
+
 #include <linux/display_state.h>
 
 #include <linux/platform_data/mms_ts.h>
@@ -419,6 +423,10 @@ static int mms_ts_suspend(struct device *dev)
 		info->enabled = false;
 		release_all_fingers(info);
 	}
+#ifdef CONFIG_STATE_NOTIFIER
+	state_suspend();
+#endif
+
 #ifdef CONFIG_POWERSUSPEND
 	set_power_suspend_state_panel_hook(POWER_SUSPEND_ACTIVE);
 #endif
@@ -456,6 +464,10 @@ static void mms_ts_finish_resume(struct work_struct *work) {
 
 	mutex_unlock(&info->input_dev->mutex);
 	display_on = true;
+
+#ifdef CONFIG_STATE_NOTIFIER
+	state_resume();
+#endif
 
 #ifdef CONFIG_POWERSUSPEND
 	set_power_suspend_state_panel_hook(POWER_SUSPEND_INACTIVE);
