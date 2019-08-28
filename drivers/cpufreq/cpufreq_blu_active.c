@@ -25,7 +25,6 @@
 #include <linux/moduleparam.h>
 #include <linux/rwsem.h>
 #include <linux/sched.h>
-#include <linux/sched/rt.h>
 #include <linux/tick.h>
 #include <linux/time.h>
 #include <linux/timer.h>
@@ -589,18 +588,42 @@ static int cpufreq_blu_active_speedchange_task(void *data)
 		spin_unlock_irqrestore(&speedchange_cpumask_lock, flags);
 
 		for_each_cpu(cpu, &tmp_mask) {
+			unsigned int j;
+			unsigned int max_freq = 0;
+			struct cpufreq_blu_active_cpuinfo *pjcpu;
+			u64 hvt = ~0ULL;
+
 			pcpu = &per_cpu(cpuinfo, cpu);
 
-			down_write(&pcpu->policy->rwsem);
-
-			if (likely(down_read_trylock(&pcpu->enable_sem))) {
-				if (likely(pcpu->governor_enabled))
-					cpufreq_blu_active_adjust_cpu(cpu,
-							pcpu->policy);
+			if (!down_read_trylock(&pcpu->enable_sem))
+				continue;
+			if (!pcpu->governor_enabled) {
 				up_read(&pcpu->enable_sem);
+				continue;
 			}
 
-			up_write(&pcpu->policy->rwsem);
+			for_each_cpu(j, pcpu->policy->cpus) {
+				pjcpu = &per_cpu(cpuinfo, j);
+
+				if (pjcpu->target_freq > max_freq) {
+					max_freq = pjcpu->target_freq;
+					hvt = pjcpu->loc_hispeed_val_time;
+				} else if (pjcpu->target_freq == max_freq) {
+					hvt = min(hvt, pjcpu->loc_hispeed_val_time);
+				}
+			}
+
+			if (max_freq != pcpu->policy->cur) {
+					__cpufreq_driver_target(pcpu->policy,
+								max_freq,
+								CPUFREQ_RELATION_H);
+				for_each_cpu(j, pcpu->policy->cpus) {
+					pjcpu = &per_cpu(cpuinfo, j);
+					pjcpu->pol_hispeed_val_time = hvt;
+				}
+			}
+
+			up_read(&pcpu->enable_sem);
 		}
 	}
 
