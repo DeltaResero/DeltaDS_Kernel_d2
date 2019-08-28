@@ -30,6 +30,8 @@
 #include <linux/powersuspend.h>
 #endif
 
+#include <linux/display_state.h>
+
 #include <linux/platform_data/mms_ts.h>
 
 #define MAX_FINGERS		10
@@ -41,6 +43,13 @@
 #define MMS_INPUT_EVENT_PKT_SZ	0x0F
 #define MMS_INPUT_EVENT0	0x10
 #define FINGER_EVENT_SZ	8
+
+bool display_on = true;
+
+bool is_display_on()
+{
+	return display_on;
+}
 
 int touch_is_pressed;
 EXPORT_SYMBOL(touch_is_pressed);
@@ -401,6 +410,9 @@ static int mms_ts_suspend(struct device *dev)
 
 	mutex_lock(&info->input_dev->mutex);
 
+	display_on = false;
+
+
 	if (info->enabled) {
 		disable_irq(info->irq);
 		info->pdata->vdd_on(0);
@@ -443,6 +455,8 @@ static void mms_ts_finish_resume(struct work_struct *work) {
 	}
 
 	mutex_unlock(&info->input_dev->mutex);
+	display_on = true;
+
 #ifdef CONFIG_POWERSUSPEND
 	set_power_suspend_state_panel_hook(POWER_SUSPEND_INACTIVE);
 #endif
