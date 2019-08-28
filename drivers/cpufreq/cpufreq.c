@@ -35,7 +35,7 @@
 #include <linux/gen_attr.h>
 #include <linux/dkp.h>
 #include <linux/sched.h>
-#include <linux/cpufreq_governor.h>
+//#include <linux/cpufreq_governor.h>
 
 #include <trace/events/power.h>
 
@@ -58,7 +58,7 @@ static DEFINE_SPINLOCK(cpufreq_driver_lock);
 
 static struct kset *cpufreq_kset;
 static struct kset *cpudev_kset;
-static DEFINE_MUTEX(cpufreq_governor_lock);
+DEFINE_MUTEX(cpufreq_governor_lock);
 
 /*
  * cpu_policy_rwsem is a per CPU reader-writer semaphore designed to cure
@@ -2424,23 +2424,6 @@ void cpufreq_set_interactivity(int on, int idbit) {
 	}
 }
 #endif
-
-/* Will return if we need to evaluate cpu load again or not */
-bool need_load_eval(struct cpu_dbs_common_info *cdbs,
-		unsigned int sampling_rate)
-{
-	if (policy_is_shared(cdbs->cur_policy)) {
-		ktime_t time_now = ktime_get();
-		s64 delta_us = ktime_us_delta(time_now, cdbs->time_stamp);
-		/* Do nothing if we recently have sampled */
-		if (delta_us < (s64)(sampling_rate / 2))
-			return false;
-		else
-			cdbs->time_stamp = time_now;
-	}
-	return true;
-}
-EXPORT_SYMBOL_GPL(need_load_eval);
 
 /*********************************************************************
  *               REGISTER / UNREGISTER CPUFREQ DRIVER                *
