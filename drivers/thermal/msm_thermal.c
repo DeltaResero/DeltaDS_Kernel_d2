@@ -23,9 +23,11 @@
 #include <linux/platform_device.h>
 #include <linux/of.h>
 #include <mach/cpufreq.h>
+#include <linux/delay.h>
 
 static unsigned int temp_threshold __read_mostly = 70;
 module_param(temp_threshold, int, 0644);
+bool still_booting = true;
 
 static unsigned int limited_max_freq = UINT_MAX;
 int limited_gpu_pwrlevel = 0;
@@ -69,6 +71,11 @@ static void limit_cpu_freqs(int idx)
 {
 	struct temp_limit *tl = &temp_limits[idx];
 	unsigned int cpu;
+
+	if (tl->max_freq < 1512000 && still_booting) {
+		msleep(5000);
+		return;
+	}
 
 	if (limited_max_freq == tl->max_freq)
 		return;
