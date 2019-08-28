@@ -167,6 +167,19 @@ config CPU_FREQ_DEFAULT_GOV_RELAXED
 	  governor. If unsure have a look at the help section of the
 	  driver. Fallback governor will be the interactive governor.
 
+config CPU_FREQ_DEFAULT_GOV_SMARTMAX
+        bool "smartmax"
+        select CPU_FREQ_GOV_SMARTMAX
+        help
+          Use the CPUFreq governor 'smartmax' as default
+
+config CPU_FREQ_DEFAULT_GOV_TIERSERVATIVE
+	bool "tierservative"
+	select CPU_FREQ_GOV_TIERSERVATIVE
+	select WMAVG
+	help
+	  Here be dragons.
+
 config CPU_FREQ_DEFAULT_GOV_ASSWAX
          bool "asswax"
          select CPU_FREQ_GOV_ASSWAX
@@ -356,6 +369,12 @@ config CPU_FREQ_GOV_RELAXED
 	help
 	  'relaxed' - similar to 'conservative', but optimized for devices
 	  that go into suspended or display off states often.
+
+config CPU_FREQ_GOV_SMARTMAX
+        tristate "'smartmax' cpufreq policy governor"
+        select CPU_FREQ_TABLE
+        help
+          'smartmax' combined ondemand and smartass2
 
 config CPU_FREQ_GOV_ELEMENTALX
 	tristate "'elementalx' cpufreq policy governor"
