@@ -122,7 +122,7 @@ static struct dbs_tuners {
 	.interaction_overestimate_khz = 225000,
 	.interaction_return_usage = 175000,
 	.interaction_return_cycles = 6,
-	.interaction_hispeed = 1080000,
+	.interaction_hispeed = 384000,
 	.interaction_panic = 1,
 };
 // }}}
