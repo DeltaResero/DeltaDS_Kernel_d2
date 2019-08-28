@@ -196,8 +196,8 @@ SUBARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ \
 # Default value for CROSS_COMPILE is not to prefix executables
 # Note: Some architectures assign CROSS_COMPILE in their arch/*/Makefile
 export KBUILD_BUILDHOST := $(SUBARCH)
-ARCH		?= arm
-CROSS_COMPILE	?= arm-eabi-
+ARCH		?= $(SUBARCH)
+CROSS_COMPILE	?= $(CONFIG_CROSS_COMPILE:"%"=%)
 
 # Architecture as present in compile.h
 UTS_MACHINE 	:= $(ARCH)
@@ -249,8 +249,11 @@ CONFIG_SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
 
 HOSTCC       = gcc
 HOSTCXX      = g++
-HOSTCFLAGS   = -Wall -Wmissing-prototypes -Wstrict-prototypes -O2 -fomit-frame-pointer
-HOSTCXXFLAGS = -O2
+HOSTCFLAGS   = -Wmissing-prototypes -Wstrict-prototypes -fomit-frame-pointer -fgcse-las \
+               -fgraphite -floop-flatten -floop-parallelize-all -ftree-loop-linear -floop-interchange \
+               -floop-strip-mine -floop-block -pipe -pthread
+HOSTCXXFLAGS = -fgcse-las -fgraphite -floop-flatten -floop-parallelize-all -ftree-loop-linear \
+               -floop-interchange -floop-strip-mine -floop-block -pipe -pthread
 
 # Decide whether to build built-in, modular, or both.
 # Normally, just do built-in.
@@ -333,7 +336,7 @@ include $(srctree)/scripts/Kbuild.include
 # Make variables (CC, etc...)
 
 AS		= $(CROSS_COMPILE)as
-LD		= $(CROSS_COMPILE)ld
+LD		= $(CROSS_COMPILE)ld.bfd
 REAL_CC		= $(CROSS_COMPILE)gcc
 LDFINAL		= $(LD)
 CPP		= $(CC) -E
@@ -353,15 +356,19 @@ CHECK		= sparse
 # Use the wrapper for the compiler.  This wrapper scans for new
 # warnings and causes the build to stop upon encountering them.
 #CC		= $(srctree)/scripts/gcc-wrapper.py $(REAL_CC)
-CC		= $(REAL_CC)
+CC		= $(CROSS_COMPILE)gcc
 
 CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ \
 		  -Wbitwise -Wno-return-void $(CF)
+GRAPHITE	=  -funsafe-loop-optimizations -ftree-loop-im -ftree-loop-ivcanon -funswitch-loops \
+                   -floop-parallelize-all -fivopts -floop-strip-mine -floop-nest-optimize -floop-interchange \
+                   -floop-block -ftree-loop-linear -floop-flatten -fgraphite-identity -ftree-loop-distribution \
+                   -funroll-loops
 CFLAGS_MODULE   =
 AFLAGS_MODULE   =
 LDFLAGS_MODULE  =
 CFLAGS_KERNEL	=
-AFLAGS_KERNEL	=
+AFLAGS_KERNEL	= $(GRAPHITE)
 CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
 
 
@@ -374,11 +381,17 @@ LINUXINCLUDE    := -I$(srctree)/arch/$(hdr-arch)/include \
 
 KBUILD_CPPFLAGS := -D__KERNEL__
 
-KBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
+KBUILD_CFLAGS   := $(GRAPHITE) -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
 		   -fno-strict-aliasing -fno-common \
 		   -Werror-implicit-function-declaration \
 		   -Wno-format-security \
-		   -fno-delete-null-pointer-checks
+		   -fdelete-null-pointer-checks -fexpensive-optimizations -foptimize-sibling-calls -foptimize-strlen \
+		   -fmodulo-sched -fmodulo-sched-allow-regmoves \
+		   -funswitch-loops -fpredictive-commoning -fgcse-after-reload \
+		   -ftree-loop-vectorize -ftree-loop-distribute-patterns -ftree-slp-vectorize \
+		   -fvect-cost-model -ftree-partial-pre \
+		   -fgcse-lm -fgcse-sm -fsched-spec-load -fsingle-precision-constant -mvectorize-with-neon-quad \
+		   -fipa-cp-alignment
 KBUILD_AFLAGS_KERNEL :=
 KBUILD_CFLAGS_KERNEL :=
 KBUILD_AFLAGS   := -D__ASSEMBLY__
@@ -572,12 +585,12 @@ ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
 # Optimize for size
 KBUILD_CFLAGS	+= -Os
 # Generic ARM flags
-KBUILD_CFLAGS	+= -mcpu=cortex-a15
+KBUILD_CFLAGS	+= -mcpu=cortex-a15 -mtune=cortex-a15 -mfloat-abi=softfp -mfpu=neon-vfpv4 -marm \
 # Loop optimizations
 KBUILD_CFLAGS	+= -fgraphite-identity -ftree-loop-distribution -floop-block -ftree-loop-linear \
 		   -ftree-loop-im -fivopts
 # Modulo scheduling
-KBUILD_CFLAGS	+= -fmodulo-sched -fmodulo-sched-allow-regmoves
+KBUILD_CFLAGS	+= -fmodulo-sched -fmodulo-sched-allow-regmoves -fweb -fsection-anchors
 # GCC extras
 KBUILD_CFLAGS	+= -fgcse-sm -fgcse-las -fsched-spec-load -fsched-stalled-insns=0
 # GCC params
@@ -585,18 +598,22 @@ KBUILD_CFLAGS	+= --param max-gcse-memory=0 \
 		   --param max-gcse-insertion-ratio=50 \
 		   --param max-tail-merge-comparisons=100 \
 		   --param max-tail-merge-iterations=4 \
-		   --param l2-cache-size=1024
+		   --param l2-cache-size=1024 \
+		   --param l1-cache-size=16 \
+		   --param l1-cache-line-size=16
+# Tell gcc to never replace conditional load with a non-conditional one
+KBUILD_CFLAGS	+= $(call cc-option,--param=allow-store-data-races=0)
 else
 # Optimize for getting stuff done
-KBUILD_CFLAGS	+= -O3
+KBUILD_CFLAGS	+= -O3 -fsection-anchors -ftracer -frename-registers
 # Generic ARM flags
-KBUILD_CFLAGS	+= -mcpu=cortex-a15
+KBUILD_CFLAGS	+= -mcpu=cortex-a15 -mtune=cortex-a15 -mfloat-abi=softfp -mfpu=neon-vfpv4 -marm \
 # Loop optimizations
 KBUILD_CFLAGS	+= -fgraphite-identity -ftree-loop-distribution -floop-block -ftree-loop-linear \
 		   -ftree-loop-im -fivopts -funswitch-loops -funroll-loops -floop-strip-mine \
 		   -ftree-loop-ivcanon
 # Modulo scheduling
-KBUILD_CFLAGS	+= -fmodulo-sched -fmodulo-sched-allow-regmoves
+KBUILD_CFLAGS	+= -fmodulo-sched -fmodulo-sched-allow-regmoves -fweb -fsection-anchors
 # GCC extras
 KBUILD_CFLAGS	+= -fgcse-sm -fgcse-las -fsched-spec-load -fsched-pressure \
 		   -fsched-stalled-insns=0 -fsched-stalled-insns-dep=32
@@ -605,7 +622,11 @@ KBUILD_CFLAGS	+= --param max-gcse-memory=0 \
 		   --param max-gcse-insertion-ratio=50 \
 		   --param max-tail-merge-comparisons=100 \
 		   --param max-tail-merge-iterations=4 \
-		   --param l2-cache-size=1024
+		   --param l2-cache-size=1024 \
+		   --param l1-cache-size=16 \
+		   --param l1-cache-line-size=16
+# Tell gcc to never replace conditional load with a non-conditional one
+KBUILD_CFLAGS	+= $(call cc-option,--param=allow-store-data-races=0)
 
 # New in GCC5
 ifeq ($(call cc-ifversion, -ge, 0501,y),y)
@@ -648,7 +669,7 @@ KBUILD_CFLAGS   += $(call cc-option, -fno-var-tracking-assignments)
 
 ifdef CONFIG_DEBUG_INFO
 KBUILD_CFLAGS	+= -g
-KBUILD_AFLAGS	+= -gdwarf-2
+KBUILD_AFLAGS	+= -gdwarf-4
 endif
 
 ifdef CONFIG_DEBUG_INFO_REDUCED
