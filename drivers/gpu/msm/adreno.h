@@ -328,6 +328,10 @@ void adreno_regread(struct kgsl_device *device, unsigned int offsetwords,
 void adreno_regwrite(struct kgsl_device *device, unsigned int offsetwords,
 				unsigned int value);
 
+void adreno_shadermem_regread(struct kgsl_device *device,
+						unsigned int offsetwords,
+						unsigned int *value);
+
 #ifdef CONFIG_DEBUG_FS
 int adreno_dump(struct kgsl_device *device, int manual);
 #else
