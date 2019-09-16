@@ -203,9 +203,10 @@ static unsigned int report_load_at_max_freq(void)
 	unsigned int max_window_size = 0;
 
 	for_each_online_cpu(cpu) {
+        unsigned long flags;
 		pcpu = &per_cpu(cpuload, cpu);
 
-		mutex_lock(&pcpu->cpu_load_lock);
+		spin_lock_irqsave(&pcpu->cpu_load_lock, flags);
 
 		update_average_load(pcpu->cur_freq, cpu);
 
@@ -214,7 +215,7 @@ static unsigned int report_load_at_max_freq(void)
 			max_window_size = pcpu->window_size;
 
 		pcpu->avg_load_maxfreq = 0;
-		mutex_unlock(&pcpu->cpu_load_lock);
+		spin_unlock_irqrestore(&pcpu->cpu_load_lock, flags);
 	}
 
 	if (max_window_size == 0)
