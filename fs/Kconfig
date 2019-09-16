@@ -8,6 +8,12 @@ menu "File systems"
 config DCACHE_WORD_ACCESS
        bool
 
+config VFS_CACHE_PRESSURE
+	int "vfs Cache Pressure"
+	default "20" if ARCH_MSM8960
+	default "100"
+	help
+
 if BLOCK
 
 source "fs/ext2/Kconfig"

@@ -82,7 +82,7 @@ static struct notifier_block dcache_state_notif;
  *   dentry1->d_lock
  *     dentry2->d_lock
  */
-int sysctl_vfs_cache_pressure __read_mostly = 100;
+int sysctl_vfs_cache_pressure __read_mostly = CONFIG_VFS_CACHE_PRESSURE;
 EXPORT_SYMBOL_GPL(sysctl_vfs_cache_pressure);
 
 #ifdef CONFIG_STATE_NOTIFIER
