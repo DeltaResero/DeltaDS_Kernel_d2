@@ -1564,9 +1564,9 @@ adreno_probe(struct platform_device *pdev)
 	status = kgsl_device_platform_probe(device);
 	if (status)
 		goto error_close_rb;
-
+#ifdef CONFIG_DEBUG_FS
 	adreno_debugfs_init(device);
-
+#endif
 	adreno_ft_init_sysfs(device);
 
 	kgsl_pwrscale_init(device);
