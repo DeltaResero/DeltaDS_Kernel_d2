@@ -585,7 +585,7 @@ ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
 # Optimize for size
 KBUILD_CFLAGS	+= -Os
 # Generic ARM flags
-KBUILD_CFLAGS	+= -mcpu=cortex-a15 -mtune=cortex-a15 -mfloat-abi=softfp -mfpu=neon-vfpv4 -marm \
+KBUILD_CFLAGS	+= -mcpu=cortex-a15 -mtune=cortex-a15 -mfloat-abi=softfp -mfpu=neon-vfpv4 -marm
 # Loop optimizations
 KBUILD_CFLAGS	+= -fgraphite-identity -ftree-loop-distribution -floop-block -ftree-loop-linear \
 		   -ftree-loop-im -fivopts
@@ -605,9 +605,9 @@ KBUILD_CFLAGS	+= --param max-gcse-memory=0 \
 KBUILD_CFLAGS	+= $(call cc-option,--param=allow-store-data-races=0)
 else
 # Optimize for getting stuff done
-KBUILD_CFLAGS	+= -O3 -fsection-anchors -ftracer -frename-registers
+KBUILD_CFLAGS	+= -O3 -fsection-anchors -frename-registers
 # Generic ARM flags
-KBUILD_CFLAGS	+= -mcpu=cortex-a15 -mtune=cortex-a15 -mfloat-abi=softfp -mfpu=neon-vfpv4 -marm \
+KBUILD_CFLAGS	+= -mcpu=cortex-a15 -mtune=cortex-a15 -mfloat-abi=softfp -mfpu=neon-vfpv4 -marm
 # Loop optimizations
 KBUILD_CFLAGS	+= -fgraphite-identity -ftree-loop-distribution -floop-block -ftree-loop-linear \
 		   -ftree-loop-im -fivopts -funswitch-loops -funroll-loops -floop-strip-mine \
