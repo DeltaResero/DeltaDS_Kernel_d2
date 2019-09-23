@@ -4,10 +4,6 @@ SUBLEVEL = 113
 EXTRAVERSION =
 NAME = Saber-toothed Squirrel
 
-# Build script hints
-DKP_LABEL = dkp for AOSP 7.1.x
-DKP_NAME = dkp-aosp71
-
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
 # More info can be located in ./README
@@ -391,7 +387,7 @@ KBUILD_CFLAGS   := $(GRAPHITE) -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs 
 		   -ftree-loop-vectorize -ftree-loop-distribute-patterns -ftree-slp-vectorize \
 		   -fvect-cost-model -ftree-partial-pre \
 		   -fgcse-lm -fgcse-sm -fsched-spec-load -fsingle-precision-constant -mvectorize-with-neon-quad \
-		   -fipa-cp-alignment
+		   -fipa-cp-alignment -fno-merge-all-constants -fmerge-constants
 KBUILD_AFLAGS_KERNEL :=
 KBUILD_CFLAGS_KERNEL :=
 KBUILD_AFLAGS   := -D__ASSEMBLY__
@@ -581,6 +577,15 @@ endif # $(dot-config)
 # Defaults to vmlinux, but the arch makefile usually adds further targets
 all: vmlinux
 
+ifdef CONFIG_CC_OPTIMIZE_DEFAULT
+KBUILD_CFLAGS	+= -O2
+endif
+ifdef CONFIG_CC_OPTIMIZE_ALOT
+KBUILD_CFLAGS  += -O3
+endif
+ifdef CONFIG_CC_OPTIMIZE_FAST
+KBUILD_CFLAGS  += -Ofast
+endif
 ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
 # Optimize for size
 KBUILD_CFLAGS	+= -Os
@@ -605,7 +610,7 @@ KBUILD_CFLAGS	+= --param max-gcse-memory=0 \
 KBUILD_CFLAGS	+= $(call cc-option,--param=allow-store-data-races=0)
 else
 # Optimize for getting stuff done
-KBUILD_CFLAGS	+= -O3 -fsection-anchors -frename-registers
+KBUILD_CFLAGS	+= -fsection-anchors -frename-registers
 # Generic ARM flags
 KBUILD_CFLAGS	+= -mcpu=cortex-a15 -mtune=cortex-a15 -mfloat-abi=softfp -mfpu=neon-vfpv4 -marm
 # Loop optimizations
