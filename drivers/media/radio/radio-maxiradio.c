@@ -60,6 +60,9 @@ MODULE_PARM_DESC(radio_nr, "Radio device number");
 
 /* TEA5757 pin mappings */
 static const int clk = 1, data = 2, wren = 4, mo_st = 8, power = 16;
+#else
+#define d;
+#endif
 
 static atomic_t maxiradio_instance = ATOMIC_INIT(0);
 

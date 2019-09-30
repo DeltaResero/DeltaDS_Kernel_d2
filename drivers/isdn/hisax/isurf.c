@@ -110,7 +110,11 @@ Start_ISAC:
 		goto Start_ISAC;
 	}
 	if (!cnt)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "ISurf IRQ LOOP\n");
+#else
+		;
+#endif
 
 	writeb(0, cs->hw.isurf.isar + ISAR_IRQBIT); mb();
 	writeb(0xFF, cs->hw.isurf.isac + ISAC_MASK); mb();
@@ -131,7 +135,11 @@ release_io_isurf(struct IsdnCardState *cs)
 static void
 reset_isurf(struct IsdnCardState *cs, u_char chips)
 {
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "ISurf: resetting card\n");
+#else
+	;
+#endif
 
 	byteout(cs->hw.isurf.reset, chips); /* Reset On */
 	mdelay(10);

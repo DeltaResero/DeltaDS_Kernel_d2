@@ -30,6 +30,7 @@
 
 
 #if 0
+#ifdef CONFIG_DEBUG_PRINTK
 #define DPRINTK(format,args...) printk(KERN_DEBUG format,##args)
 #else
 #define DPRINTK(format,args...)
@@ -44,6 +45,9 @@
 
 
 static struct timer_list poll_timer;
+#else
+#define DPRINTK(format,args...) ;
+#endif
 static struct suni_priv *sunis = NULL;
 static DEFINE_SPINLOCK(sunis_lock);
 
@@ -299,8 +303,12 @@ static void poll_los(struct atm_dev *dev)
 static void suni_int(struct atm_dev *dev)
 {
 	poll_los(dev);
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_NOTICE "%s(itf %d): signal %s\n",dev->type,dev->number,
 	    dev->signal == ATM_PHY_SIG_LOST ?  "lost" : "detected again");
+#else
+	;
+#endif
 }
 
 
@@ -319,8 +327,12 @@ static int suni_start(struct atm_dev *dev)
 		/* interrupt on loss of signal */
 	poll_los(dev); /* ... and clear SUNI interrupts */
 	if (dev->signal == ATM_PHY_SIG_LOST)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "%s(itf %d): no signal\n",dev->type,
 		    dev->number);
+#else
+		;
+#endif
 	PRIV(dev)->loop_mode = ATM_LM_NONE;
 	suni_hz(0); /* clear SUNI counters */
 	(void) fetch_stats(dev,NULL,1); /* clear kernel counters */
@@ -330,8 +342,12 @@ static int suni_start(struct atm_dev *dev)
 		poll_timer.function = suni_hz;
 		poll_timer.data = 1;
 #if 0
+#ifdef CONFIG_DEBUG_PRINTK
 printk(KERN_DEBUG "[u] p=0x%lx,n=0x%lx\n",(unsigned long) poll_timer.list.prev,
     (unsigned long) poll_timer.list.next);
+#else
+;
+#endif
 #endif
 		add_timer(&poll_timer);
 	}

@@ -823,7 +823,11 @@ l1oip_socket_open(struct l1oip *hc)
 		return err;
 	}
 	if (debug & DEBUG_L1OIP_SOCKET)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "%s: socket thread created\n", __func__);
+#else
+		;
+#endif
 
 	return 0;
 }
@@ -1020,7 +1024,11 @@ open_dchannel(struct l1oip *hc, struct dchannel *dch, struct channel_req *rq)
 	}
 	rq->ch = &dch->dev.D;
 	if (!try_module_get(THIS_MODULE))
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "%s:cannot get module\n", __func__);
+#else
+		;
+#endif
 	return 0;
 }
 
@@ -1046,7 +1054,11 @@ open_bchannel(struct l1oip *hc, struct dchannel *dch, struct channel_req *rq)
 	bch->ch.protocol = rq->protocol;
 	rq->ch = &bch->ch;
 	if (!try_module_get(THIS_MODULE))
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "%s:cannot get module\n", __func__);
+#else
+		;
+#endif
 	return 0;
 }
 
@@ -1524,7 +1536,11 @@ l1oip_init(void)
 
 		l1oip_cnt++;
 	}
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "%d virtual devices registered\n", l1oip_cnt);
+#else
+	;
+#endif
 	return 0;
 }
 

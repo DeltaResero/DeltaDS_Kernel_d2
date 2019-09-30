@@ -138,7 +138,11 @@ isdn_ppp_free(isdn_net_local *lp)
 		is->state = IPPP_OPEN;	/* fallback to 'OPEN but not ASSIGNED' state */
 
 	if (is->debug & 0x1)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "isdn_ppp_free %d %lx %lx\n", lp->ppp_slot, (long) lp, (long) is->lp);
+#else
+		;
+#endif
 
 	is->lp = NULL;          /* link is down .. set lp to NULL */
 	lp->ppp_slot = -1;      /* is this OK ?? */
@@ -187,7 +191,11 @@ isdn_ppp_bind(isdn_net_local *lp)
 	}
 
 	if (i >= ISDN_MAX_CHANNELS) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "isdn_ppp_bind: Can't find a (free) connection to the ipppd daemon.\n");
+#else
+		;
+#endif
 		retval = -1;
 		goto out;
 	}
@@ -354,7 +362,11 @@ isdn_ppp_release(int min, struct file *file)
 		return;
 	}
 	if (is->debug & 0x1)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "ippp: release, minor: %d %lx\n", min, (long) is->lp);
+#else
+		;
+#endif
 
 	if (is->lp) {           /* a lp address says: this link is still up */
 		isdn_net_dev *p = is->lp->netdev;
@@ -487,7 +499,11 @@ isdn_ppp_ioctl(int min, struct file *file, unsigned int cmd, unsigned long arg)
 	lp = is->lp;
 
 	if (is->debug & 0x1)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "isdn_ppp_ioctl: minor: %d cmd: %x state: %x\n", min, cmd, is->state);
+#else
+		;
+#endif
 
 	if (!(is->state & IPPP_OPEN))
 		return -EINVAL;
@@ -680,7 +696,11 @@ isdn_ppp_poll(struct file *file, poll_table *wait)
 	if (!(is->state & IPPP_OPEN)) {
 		if (is->state == IPPP_CLOSEWAIT)
 			return POLLHUP;
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "isdn_ppp: device not open\n");
+#else
+		;
+#endif
 		return POLLERR;
 	}
 	/* we're always ready to send .. */
@@ -713,18 +733,30 @@ isdn_ppp_fill_rq(unsigned char *buf, int len, int proto, int slot)
 	struct ippp_struct *is;
 
 	if (slot < 0 || slot >= ISDN_MAX_CHANNELS) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "ippp: illegal slot(%d).\n", slot);
+#else
+		;
+#endif
 		return 0;
 	}
 	is = ippp_table[slot];
 
 	if (!(is->state & IPPP_CONNECT)) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "ippp: device not activated.\n");
+#else
+		;
+#endif
 		return 0;
 	}
 	nbuf = kmalloc(len + 4, GFP_ATOMIC);
 	if (!nbuf) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "ippp: Can't alloc buf\n");
+#else
+		;
+#endif
 		return 0;
 	}
 	nbuf[0] = PPP_ALLSTATIONS;
@@ -738,7 +770,11 @@ isdn_ppp_fill_rq(unsigned char *buf, int len, int proto, int slot)
 	bl = is->last;
 
 	if (bf == bl) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "ippp: Queue is full; discarding first buffer\n");
+#else
+		;
+#endif
 		bf = bf->next;
 		kfree(bf->buf);
 		is->first = bf;
@@ -815,7 +851,11 @@ isdn_ppp_write(int min, struct file *file, const char __user *buf, int count)
 	/* -> push it directly to the lowlevel interface */
 
 	if (!lp)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "isdn_ppp_write: lp == NULL\n");
+#else
+		;
+#endif
 	else {
 		/*
 		 * Don't reset huptimer for
@@ -843,7 +883,11 @@ isdn_ppp_write(int min, struct file *file, const char __user *buf, int count)
 			hl = dev->drv[lp->isdn_device]->interface->hl_hdrlen;
 			skb = alloc_skb(hl + count, GFP_ATOMIC);
 			if (!skb) {
+#ifdef CONFIG_DEBUG_PRINTK
 				printk(KERN_WARNING "isdn_ppp_write: out of memory!\n");
+#else
+				;
+#endif
 				return count;
 			}
 			skb_reserve(skb, hl);
@@ -882,7 +926,11 @@ isdn_ppp_init(void)
 
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
 		if (!(ippp_table[i] = kzalloc(sizeof(struct ippp_struct), GFP_KERNEL))) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING "isdn_ppp_init: Could not alloc ippp_table\n");
+#else
+			;
+#endif
 			for (j = 0; j < i; j++)
 				kfree(ippp_table[j]);
 			return -1;
@@ -1238,7 +1286,11 @@ isdn_ppp_xmit(struct sk_buff *skb, struct net_device *netdev)
 
 	if (!(ipts->pppcfg & SC_ENABLE_IP)) {	/* PPP connected ? */
 		if (ipts->debug & 0x1)
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_INFO "%s: IP frame delayed.\n", netdev->name);
+#else
+			;
+#endif
 		retval = NETDEV_TX_BUSY;
 		goto out;
 	}
@@ -1259,7 +1311,11 @@ isdn_ppp_xmit(struct sk_buff *skb, struct net_device *netdev)
 
 	lp = isdn_net_get_locked_lp(nd);
 	if (!lp) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "%s: all channels busy - requeuing!\n", netdev->name);
+#else
+		;
+#endif
 		retval = NETDEV_TX_BUSY;
 		goto out;
 	}
@@ -1379,12 +1435,20 @@ isdn_ppp_xmit(struct sk_buff *skb, struct net_device *netdev)
 		if (ipts->compflags & SC_DECOMP_ON) {
 			skb = isdn_ppp_compress(skb, &proto, ipt, ipts, 0);
 		} else {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_DEBUG "isdn_ppp: CCP not yet up - sending as-is\n");
+#else
+			;
+#endif
 		}
 	}
 
 	if (ipt->debug & 0x24)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "xmit2 skb, len %d, proto %04x\n", (int) skb->len, proto);
+#else
+		;
+#endif
 
 #ifdef CONFIG_ISDN_MPP
 	if (ipt->mpppcfg & SC_MP_PROT) {
@@ -2254,7 +2318,11 @@ static struct ippp_ccp_reset *isdn_ppp_ccp_reset_alloc(struct ippp_struct *is)
 		       " structure - no mem\n");
 		return NULL;
 	}
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_DEBUG "ippp_ccp: allocated reset data structure %p\n", r);
+#else
+	;
+#endif
 	is->reset = r;
 	return r;
 }
@@ -2290,7 +2358,11 @@ static void isdn_ppp_ccp_reset_free_state(struct ippp_struct *is,
 		is->reset->rs[id] = NULL;
 		kfree(rs);
 	} else {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "ippp_ccp: id %d is not allocated\n", id);
+#else
+		;
+#endif
 	}
 }
 
@@ -2315,8 +2387,12 @@ static void isdn_ppp_ccp_timer_callback(unsigned long closure)
 			isdn_ppp_ccp_reset_free_state(rs->is, rs->id);
 			return;
 		}
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "ippp_ccp: CCP Reset timed out for id %d\n",
 		       rs->id);
+#else
+		;
+#endif
 		/* Push it again */
 		isdn_ppp_ccp_xmit_reset(rs->is, PPP_CCP, CCP_RESETREQ, rs->id,
 					rs->data, rs->dlen);
@@ -2324,8 +2400,12 @@ static void isdn_ppp_ccp_timer_callback(unsigned long closure)
 		rs->timer.expires = jiffies + HZ * 5;
 		add_timer(&rs->timer);
 	} else {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "ippp_ccp: timer cb in wrong state %d\n",
 		       rs->state);
+#else
+		;
+#endif
 	}
 }
 
@@ -2410,7 +2490,11 @@ static void isdn_ppp_ccp_reset_trans(struct ippp_struct *is,
 				rs->ta = 1;
 			}
 		} else {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_DEBUG "ippp_ccp: no reset sent\n");
+#else
+			;
+#endif
 		}
 	} else {
 		/* The reset params are invalid. The decompressor does not
@@ -2480,8 +2564,12 @@ static void isdn_ppp_ccp_reset_ack_rcvd(struct ippp_struct *is,
 		}
 		isdn_ppp_ccp_reset_free_state(is, id);
 	} else {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_INFO "ippp_ccp: ResetAck received for unknown id"
 		       " %d\n", id);
+#else
+		;
+#endif
 	}
 	/* Make sure the simple reset stuff uses a new id next time */
 	is->reset->lastid++;
@@ -2523,7 +2611,11 @@ static struct sk_buff *isdn_ppp_decompress(struct sk_buff *skb, struct ippp_stru
 
 	if (!ipc) {
 		// no decompressor -> we can't decompress.
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "ippp: no decompressor defined!\n");
+#else
+		;
+#endif
 		return skb;
 	}
 	BUG_ON(!stat); // if we have a compressor, stat has been set as well
@@ -2706,7 +2798,11 @@ static void isdn_ppp_receive_ccp(isdn_net_dev *net_dev, isdn_net_local *lp,
 		break;
 
 	case CCP_RESETACK:
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "Received ResetAck from peer\n");
+#else
+		;
+#endif
 		len = (skb->data[2] << 8) | skb->data[3];
 		len -= 4;
 
@@ -2739,7 +2835,11 @@ static void isdn_ppp_receive_ccp(isdn_net_dev *net_dev, isdn_net_local *lp,
 		break;
 
 	case CCP_RESETREQ:
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "Received ResetReq from peer\n");
+#else
+		;
+#endif
 		/* Receiving a ResetReq means we must reset our compressor */
 		/* Set up reset params for the reset entry */
 		memset(&rsparm, 0, sizeof(rsparm));
@@ -2779,7 +2879,11 @@ static void isdn_ppp_receive_ccp(isdn_net_dev *net_dev, isdn_net_local *lp,
 							rsparm.dtval ?
 							rsparm.dlen : 0);
 			} else {
+#ifdef CONFIG_DEBUG_PRINTK
 				printk(KERN_DEBUG "ResetAck suppressed\n");
+#else
+				;
+#endif
 			}
 		} else {
 			/* We answer with a straight reflected Ack */
@@ -2914,7 +3018,11 @@ static void isdn_ppp_send_ccp(isdn_net_dev *net_dev, isdn_net_local *lp, struct 
 		break;
 	case CCP_RESETREQ:
 		/* Just let it pass by */
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "ResetReq from daemon passed by\n");
+#else
+		;
+#endif
 		break;
 	}
 }

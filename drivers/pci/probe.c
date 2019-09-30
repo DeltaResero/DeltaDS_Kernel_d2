@@ -314,7 +314,11 @@ int __pci_read_base(struct pci_dev *dev, enum pci_bar_type type,
 		region.end = l + sz;
 		pcibios_bus_to_resource(dev->bus, res, &region);
 
+#ifdef CONFIG_DEBUG_PRINTK
 		dev_printk(KERN_DEBUG, &dev->dev, "reg %x: %pR\n", pos, res);
+#else
+		dev_;
+#endif
 	}
 
  out:
@@ -477,9 +481,13 @@ void __devinit pci_read_bridge_bases(struct pci_bus *child)
 			if (res) {
 				pci_bus_add_resource(child, res,
 						     PCI_SUBTRACTIVE_DECODE);
+#ifdef CONFIG_DEBUG_PRINTK
 				dev_printk(KERN_DEBUG, &dev->dev,
 					   "  bridge window %pR (subtractive decode)\n",
 					   res);
+#else
+				dev_;
+#endif
 			}
 		}
 	}

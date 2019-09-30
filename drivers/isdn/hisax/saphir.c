@@ -147,7 +147,11 @@ Start_ISAC:
 	if (cs->hw.saphir.timer.function)
 		mod_timer(&cs->hw.saphir.timer, jiffies + 1 * HZ);
 	else
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "saphir: Spurious timer!\n");
+#else
+		;
+#endif
 	writereg(cs->hw.saphir.ale, cs->hw.saphir.hscx, HSCX_MASK, 0xFF);
 	writereg(cs->hw.saphir.ale, cs->hw.saphir.hscx, HSCX_MASK + 0x40, 0xFF);
 	writereg(cs->hw.saphir.ale, cs->hw.saphir.isac, ISAC_MASK, 0xFF);
@@ -247,7 +251,11 @@ setup_saphir(struct IsdnCard *card)
 	char tmp[64];
 
 	strcpy(tmp, saphir_rev);
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "HiSax: HST Saphir driver Rev. %s\n", HiSax_getrev(tmp));
+#else
+	;
+#endif
 	if (cs->typ != ISDN_CTYPE_HSTSAPHIR)
 		return (0);
 

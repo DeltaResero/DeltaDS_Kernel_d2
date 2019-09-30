@@ -958,7 +958,7 @@ static int __devinit mei_probe(struct pci_dev *pdev,
 	/* enable pci dev */
 	err = pci_enable_device(pdev);
 	if (err) {
-		printk(KERN_ERR "mei: Failed to enable pci device.\n");
+;
 		goto end;
 	}
 	/* set PCI host mastering  */
@@ -966,7 +966,7 @@ static int __devinit mei_probe(struct pci_dev *pdev,
 	/* pci request regions for mei driver */
 	err = pci_request_regions(pdev, mei_driver_name);
 	if (err) {
-		printk(KERN_ERR "mei: Failed to get pci regions.\n");
+;
 		goto disable_device;
 	}
 	/* allocates and initializes the mei dev structure */
@@ -978,7 +978,7 @@ static int __devinit mei_probe(struct pci_dev *pdev,
 	/* mapping  IO device memory */
 	dev->mem_addr = pci_iomap(pdev, 0, 0);
 	if (!dev->mem_addr) {
-		printk(KERN_ERR "mei: mapping I/O device memory failure.\n");
+;
 		err = -ENOMEM;
 		goto free_device;
 	}
@@ -1041,7 +1041,7 @@ disable_device:
 	pci_disable_device(pdev);
 end:
 	mutex_unlock(&mei_mutex);
-	printk(KERN_ERR "mei: Driver initialization failed.\n");
+;
 	return err;
 }
 
@@ -1160,8 +1160,8 @@ static int mei_pci_resume(struct device *device)
 			IRQF_SHARED, mei_driver_name, dev);
 
 	if (err) {
-		printk(KERN_ERR "mei: Request_irq failure. irq = %d\n",
-		       pdev->irq);
+//		printk(KERN_ERR "mei: Request_irq failure. irq = %d\n",
+;
 		return err;
 	}
 

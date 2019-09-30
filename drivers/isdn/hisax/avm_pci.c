@@ -376,7 +376,11 @@ HDLC_irq(struct BCState *bcs, u_int stat) {
 				if (((stat & HDLC_STAT_CRCVFRRAB) == HDLC_STAT_CRCVFR) ||
 				    (bcs->mode == L1_MODE_TRANS)) {
 					if (!(skb = dev_alloc_skb(bcs->hw.hdlc.rcvidx)))
+#ifdef CONFIG_DEBUG_PRINTK
 						printk(KERN_WARNING "HDLC: receive out of memory\n");
+#else
+						;
+#endif
 					else {
 						memcpy(skb_put(skb, bcs->hw.hdlc.rcvidx),
 						       bcs->hw.hdlc.rcvbuf, bcs->hw.hdlc.rcvidx);
@@ -673,13 +677,21 @@ avm_pcipnp_interrupt(int intno, void *dev_id)
 static void
 reset_avmpcipnp(struct IsdnCardState *cs)
 {
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "AVM PCI/PnP: reset\n");
+#else
+	;
+#endif
 	outb(AVM_STATUS0_RESET | AVM_STATUS0_DIS_TIMER, cs->hw.avm.cfg_reg + 2);
 	mdelay(10);
 	outb(AVM_STATUS0_DIS_TIMER | AVM_STATUS0_RES_TIMER | AVM_STATUS0_ENA_IRQ, cs->hw.avm.cfg_reg + 2);
 	outb(AVM_STATUS1_ENA_IOM | cs->irq, cs->hw.avm.cfg_reg + 3);
 	mdelay(10);
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "AVM PCI/PnP: S1 %x\n", inb(cs->hw.avm.cfg_reg + 3));
+#else
+	;
+#endif
 }
 
 static int
@@ -875,7 +887,11 @@ setup_avm_pcipnp(struct IsdnCard *card)
 	int rc;
 
 	strcpy(tmp, avm_pci_rev);
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "HiSax: AVM PCI driver Rev. %s\n", HiSax_getrev(tmp));
+#else
+	;
+#endif
 
 	if (cs->typ != ISDN_CTYPE_FRITZPCI)
 		return (0);

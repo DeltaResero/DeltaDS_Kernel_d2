@@ -220,10 +220,10 @@ struct six_axis_t {
 static void set_full_scales(volatile struct jr3_channel *channel,
 			    struct six_axis_t full_scale)
 {
-	printk("%d %d %d %d %d %d\n",
-	       full_scale.fx,
-	       full_scale.fy,
-	       full_scale.fz, full_scale.mx, full_scale.my, full_scale.mz);
+//	printk("%d %d %d %d %d %d\n",
+//	       full_scale.fx,
+//	       full_scale.fy,
+;
 	set_s16(&channel->full_scale.fx, full_scale.fx);
 	set_s16(&channel->full_scale.fy, full_scale.fy);
 	set_s16(&channel->full_scale.fz, full_scale.fz);
@@ -517,7 +517,7 @@ static struct poll_delay_t jr3_pci_poll_subdevice(struct comedi_subdevice *s)
 		int errors = get_u16(&channel->errors);
 
 		if (errors != p->errors) {
-			printk("Errors: %x -> %x\n", p->errors, errors);
+;
 			p->errors = errors;
 		}
 		if (errors & (watch_dog | watch_dog2 | sensor_change)) {
@@ -560,10 +560,10 @@ static struct poll_delay_t jr3_pci_poll_subdevice(struct comedi_subdevice *s)
 					printk
 					    ("Setting transform for channel %d\n",
 					     p->channel_no);
-					printk("Sensor Model     = %i\n",
-					       p->model_no);
-					printk("Sensor Serial    = %i\n",
-					       p->serial_no);
+//					printk("Sensor Model     = %i\n",
+;
+//					printk("Sensor Serial    = %i\n",
+;
 
 					/*  Transformation all zeros */
 					for (i = 0; i < ARRAY_SIZE(transf.link); i++) {
@@ -666,14 +666,14 @@ static struct poll_delay_t jr3_pci_poll_subdevice(struct comedi_subdevice *s)
 					{
 						int i;
 						for (i = 0; i < 9; i++) {
-							printk("%d %d - %d\n",
-							       i,
-							       p->
-							       range[i].range.
-							       min,
-							       p->
-							       range[i].range.
-							       max);
+//							printk("%d %d - %d\n",
+//							       i,
+//							       p->
+//							       range[i].range.
+//							       min,
+//							       p->
+//							       range[i].range.
+;
 						}
 					}
 

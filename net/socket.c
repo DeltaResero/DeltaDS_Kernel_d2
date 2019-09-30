@@ -521,7 +521,7 @@ void sock_release(struct socket *sock)
 	}
 
 	if (rcu_dereference_protected(sock->wq, 1)->fasync_list)
-		printk(KERN_ERR "sock_release: fasync list not empty!\n");
+;
 
 	if (test_bit(SOCK_EXTERNALLY_ALLOCATED, &sock->flags))
 		return;
@@ -1122,7 +1122,7 @@ static int sock_close(struct inode *inode, struct file *filp)
 	 */
 
 	if (!inode) {
-		printk(KERN_DEBUG "sock_close: NULL inode\n");
+;
 		return 0;
 	}
 	sock_release(SOCKET_I(inode));
@@ -1221,8 +1221,8 @@ int __sock_create(struct net *net, int family, int type, int protocol,
 		static int warned;
 		if (!warned) {
 			warned = 1;
-			printk(KERN_INFO "%s uses obsolete (PF_INET,SOCK_PACKET)\n",
-			       current->comm);
+//			printk(KERN_INFO "%s uses obsolete (PF_INET,SOCK_PACKET)\n",
+;
 		}
 		family = PF_PACKET;
 	}
@@ -1239,7 +1239,7 @@ int __sock_create(struct net *net, int family, int type, int protocol,
 	sock = sock_alloc();
 	if (!sock) {
 		if (net_ratelimit())
-			printk(KERN_WARNING "socket: no more sockets\n");
+;
 		return -ENFILE;	/* Not exactly a match, but its the
 				   closest posix thing */
 	}
@@ -2527,8 +2527,8 @@ int sock_register(const struct net_proto_family *ops)
 	int err;
 
 	if (ops->family >= NPROTO) {
-		printk(KERN_CRIT "protocol %d >= NPROTO(%d)\n", ops->family,
-		       NPROTO);
+//		printk(KERN_CRIT "protocol %d >= NPROTO(%d)\n", ops->family,
+;
 		return -ENOBUFS;
 	}
 
@@ -2542,7 +2542,7 @@ int sock_register(const struct net_proto_family *ops)
 	}
 	spin_unlock(&net_family_lock);
 
-	printk(KERN_INFO "NET: Registered protocol family %d\n", ops->family);
+;
 	return err;
 }
 EXPORT_SYMBOL(sock_register);
@@ -2570,7 +2570,7 @@ void sock_unregister(int family)
 
 	synchronize_rcu();
 
-	printk(KERN_INFO "NET: Unregistered protocol family %d\n", family);
+;
 }
 EXPORT_SYMBOL(sock_unregister);
 

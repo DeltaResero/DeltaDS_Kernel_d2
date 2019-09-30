@@ -178,18 +178,30 @@ static int scan_header(partition_t *part)
     }
 
     if (offset == max_offset) {
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_NOTICE "ftl_cs: FTL header not found.\n");
+#else
+	;
+#endif
 	return -ENOENT;
     }
     if (header.BlockSize != 9 ||
 	(header.EraseUnitSize < 10) || (header.EraseUnitSize > 31) ||
 	(header.NumTransferUnits >= le16_to_cpu(header.NumEraseUnits))) {
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_NOTICE "ftl_cs: FTL header corrupt!\n");
+#else
+	;
+#endif
 	return -1;
     }
     if ((1 << header.EraseUnitSize) != part->mbd.mtd->erasesize) {
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_NOTICE "ftl: FTL EraseUnitSize %x != MTD erasesize %x\n",
 	       1 << header.EraseUnitSize,part->mbd.mtd->erasesize);
+#else
+	;
+#endif
 	return -1;
     }
     part->header = header;
@@ -241,8 +253,12 @@ static int build_maps(partition_t *part)
 	    xvalid++;
 	} else {
 	    if (xtrans == part->header.NumTransferUnits) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_NOTICE "ftl_cs: format error: too many "
 		       "transfer units!\n");
+#else
+		;
+#endif
 		goto out_XferInfo;
 	    }
 	    if (hdr_ok && (le16_to_cpu(header.LogicalEUN) == 0xffff)) {
@@ -262,8 +278,12 @@ static int build_maps(partition_t *part)
     header = part->header;
     if ((xtrans != header.NumTransferUnits) ||
 	(xvalid+xtrans != le16_to_cpu(header.NumEraseUnits))) {
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_NOTICE "ftl_cs: format error: erase units "
 	       "don't add up!\n");
+#else
+	;
+#endif
 	goto out_XferInfo;
     }
 
@@ -385,8 +405,12 @@ static void ftl_erase_callback(struct erase_info *erase)
 	if (part->XferInfo[i].Offset == erase->addr) break;
 
     if (i == part->header.NumTransferUnits) {
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_NOTICE "ftl_cs: internal error: "
 	       "erase lookup failed!\n");
+#else
+	;
+#endif
 	return;
     }
 
@@ -395,8 +419,12 @@ static void ftl_erase_callback(struct erase_info *erase)
 	xfer->state = XFER_ERASED;
     else {
 	xfer->state = XFER_FAILED;
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_NOTICE "ftl_cs: erase failed: state = %d\n",
 	       erase->state);
+#else
+	;
+#endif
     }
 
     kfree(erase);
@@ -493,7 +521,11 @@ static int copy_erase_unit(partition_t *part, uint16_t srcunit,
 	part->bam_index = 0xffff;
 
 	if (ret) {
+#ifdef CONFIG_DEBUG_PRINTK
 	    printk( KERN_WARNING "ftl: Failed to read BAM cache in copy_erase_unit()!\n");
+#else
+	    ;
+#endif
 	    return ret;
 	}
     }
@@ -507,7 +539,11 @@ static int copy_erase_unit(partition_t *part, uint16_t srcunit,
                     (u_char *)&unit);
 
     if (ret) {
+#ifdef CONFIG_DEBUG_PRINTK
 	printk( KERN_WARNING "ftl: Failed to write back to BAM cache in copy_erase_unit()!\n");
+#else
+	;
+#endif
 	return ret;
     }
 
@@ -526,7 +562,11 @@ static int copy_erase_unit(partition_t *part, uint16_t srcunit,
 	    ret = mtd_read(part->mbd.mtd, src, SECTOR_SIZE, &retlen,
                            (u_char *)buf);
 	    if (ret) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "ftl: Error reading old xfer unit in copy_erase_unit\n");
+#else
+		;
+#endif
 		return ret;
             }
 
@@ -534,7 +574,11 @@ static int copy_erase_unit(partition_t *part, uint16_t srcunit,
 	    ret = mtd_write(part->mbd.mtd, dest, SECTOR_SIZE, &retlen,
                             (u_char *)buf);
 	    if (ret)  {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "ftl: Error writing new xfer unit in copy_erase_unit\n");
+#else
+		;
+#endif
 		return ret;
             }
 
@@ -556,7 +600,11 @@ static int copy_erase_unit(partition_t *part, uint16_t srcunit,
                     &retlen,
                     (u_char *)part->bam_cache);
     if (ret) {
+#ifdef CONFIG_DEBUG_PRINTK
 	printk( KERN_WARNING "ftl: Error writing BAM in copy_erase_unit\n");
+#else
+	;
+#endif
 	return ret;
     }
 
@@ -566,7 +614,11 @@ static int copy_erase_unit(partition_t *part, uint16_t srcunit,
                     &retlen, (u_char *)&srcunitswap);
 
     if (ret) {
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_WARNING "ftl: Error writing new LogicalEUN in copy_erase_unit\n");
+#else
+	;
+#endif
 	return ret;
     }
 
@@ -654,8 +706,12 @@ static int reclaim_block(partition_t *part)
 	    } else {
 		static int ne = 0;
 		if (++ne < 5)
+#ifdef CONFIG_DEBUG_PRINTK
 		    printk(KERN_NOTICE "ftl_cs: reclaim failed: no "
 			   "suitable transfer units!\n");
+#else
+		    ;
+#endif
 		else
 		    pr_debug("ftl_cs: reclaim failed: no "
 			  "suitable transfer units!\n");
@@ -684,8 +740,12 @@ static int reclaim_block(partition_t *part)
 	if (best == 0) {
 	    static int ne = 0;
 	    if (++ne < 5)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_NOTICE "ftl_cs: reclaim failed: "
 		       "no free blocks!\n");
+#else
+		;
+#endif
 	    else
 		pr_debug("ftl_cs: reclaim failed: "
 		       "no free blocks!\n");
@@ -697,7 +757,11 @@ static int reclaim_block(partition_t *part)
     if (!ret)
 	erase_xfer(part, xfer);
     else
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_NOTICE "ftl_cs: copy_erase_unit failed!\n");
+#else
+	;
+#endif
     return ret;
 } /* reclaim_block */
 
@@ -715,12 +779,20 @@ static int reclaim_block(partition_t *part)
 static void dump_lists(partition_t *part)
 {
     int i;
+#ifdef CONFIG_DEBUG_PRINTK
     printk(KERN_DEBUG "ftl_cs: Free total = %d\n", part->FreeTotal);
+#else
+    ;
+#endif
     for (i = 0; i < part->DataUnits; i++)
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_DEBUG "ftl_cs:   unit %d: %d phys, %d free, "
 	       "%d deleted\n", i,
 	       part->EUNInfo[i].Offset >> part->header.EraseUnitSize,
 	       part->EUNInfo[i].Free, part->EUNInfo[i].Deleted);
+#else
+	;
+#endif
 }
 #endif
 
@@ -755,7 +827,11 @@ static uint32_t find_free(partition_t *part)
                        (u_char *)(part->bam_cache));
 
 	if (ret) {
+#ifdef CONFIG_DEBUG_PRINTK
 	    printk(KERN_WARNING"ftl: Error reading BAM in find_free\n");
+#else
+	    ;
+#endif
 	    return 0;
 	}
 	part->bam_index = eun;
@@ -770,7 +846,11 @@ static uint32_t find_free(partition_t *part)
 	if (++ne == 1)
 	    dump_lists(part);
 #endif
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_NOTICE "ftl_cs: bad free list!\n");
+#else
+	;
+#endif
 	return 0;
     }
     pr_debug("ftl_cs: found free block at %d in %d\n", blk, eun);
@@ -796,14 +876,22 @@ static int ftl_read(partition_t *part, caddr_t buffer,
     pr_debug("ftl_cs: ftl_read(0x%p, 0x%lx, %ld)\n",
 	  part, sector, nblocks);
     if (!(part->state & FTL_FORMATTED)) {
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_NOTICE "ftl_cs: bad partition\n");
+#else
+	;
+#endif
 	return -EIO;
     }
     bsize = 1 << part->header.EraseUnitSize;
 
     for (i = 0; i < nblocks; i++) {
 	if (((sector+i) * SECTOR_SIZE) >= le32_to_cpu(part->header.FormattedSize)) {
+#ifdef CONFIG_DEBUG_PRINTK
 	    printk(KERN_NOTICE "ftl_cs: bad read offset\n");
+#else
+	    ;
+#endif
 	    return -EIO;
 	}
 	log_addr = part->VirtualBlockMap[sector+i];
@@ -816,7 +904,11 @@ static int ftl_read(partition_t *part, caddr_t buffer,
                            (u_char *)buffer);
 
 	    if (ret) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "Error reading MTD device in ftl_read()\n");
+#else
+		;
+#endif
 		return ret;
 	    }
 	}
@@ -854,7 +946,11 @@ static int set_bam_entry(partition_t *part, uint32_t log_addr,
     ret = mtd_read(part->mbd.mtd, offset, sizeof(uint32_t), &retlen,
                    (u_char *)&old_addr);
     if (ret) {
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_WARNING"ftl: Error reading old_addr in set_bam_entry: %d\n",ret);
+#else
+	;
+#endif
 	return ret;
     }
     old_addr = le32_to_cpu(old_addr);
@@ -864,9 +960,17 @@ static int set_bam_entry(partition_t *part, uint32_t log_addr,
 	(!BLOCK_DELETED(virt_addr) && (old_addr != 0xfffffffe))) {
 	static int ne = 0;
 	if (++ne < 5) {
+#ifdef CONFIG_DEBUG_PRINTK
 	    printk(KERN_NOTICE "ftl_cs: set_bam_entry() inconsistency!\n");
+#else
+	    ;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 	    printk(KERN_NOTICE "ftl_cs:   log_addr = 0x%x, old = 0x%x"
 		   ", new = 0x%x\n", log_addr, old_addr, virt_addr);
+#else
+	    ;
+#endif
 	}
 	return -EIO;
     }
@@ -877,11 +981,19 @@ static int set_bam_entry(partition_t *part, uint32_t log_addr,
 	if (le32_to_cpu(part->bam_cache[blk]) != old_addr) {
 	    static int ne = 0;
 	    if (++ne < 5) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_NOTICE "ftl_cs: set_bam_entry() "
 		       "inconsistency!\n");
+#else
+		;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_NOTICE "ftl_cs:   log_addr = 0x%x, cache"
 		       " = 0x%x\n",
 		       le32_to_cpu(part->bam_cache[blk]), old_addr);
+#else
+		;
+#endif
 	    }
 	    return -EIO;
 	}
@@ -892,9 +1004,17 @@ static int set_bam_entry(partition_t *part, uint32_t log_addr,
                     (u_char *)&le_virt_addr);
 
     if (ret) {
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_NOTICE "ftl_cs: set_bam_entry() failed!\n");
+#else
+	;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_NOTICE "ftl_cs:   log_addr = 0x%x, new = 0x%x\n",
 	       log_addr, virt_addr);
+#else
+	;
+#endif
     }
     return ret;
 } /* set_bam_entry */
@@ -910,7 +1030,11 @@ static int ftl_write(partition_t *part, caddr_t buffer,
     pr_debug("ftl_cs: ftl_write(0x%p, %ld, %ld)\n",
 	  part, sector, nblocks);
     if (!(part->state & FTL_FORMATTED)) {
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_NOTICE "ftl_cs: bad partition\n");
+#else
+	;
+#endif
 	return -EIO;
     }
     /* See if we need to reclaim space, before we start */
@@ -925,7 +1049,11 @@ static int ftl_write(partition_t *part, caddr_t buffer,
     virt_addr = sector * SECTOR_SIZE | BLOCK_DATA;
     for (i = 0; i < nblocks; i++) {
 	if (virt_addr >= le32_to_cpu(part->header.FormattedSize)) {
+#ifdef CONFIG_DEBUG_PRINTK
 	    printk(KERN_NOTICE "ftl_cs: bad write offset\n");
+#else
+	    ;
+#endif
 	    return -EIO;
 	}
 
@@ -934,8 +1062,12 @@ static int ftl_write(partition_t *part, caddr_t buffer,
 	if (blk == 0) {
 	    static int ne = 0;
 	    if (++ne < 5)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_NOTICE "ftl_cs: internal error: "
 		       "no free blocks!\n");
+#else
+		;
+#endif
 	    return -ENOSPC;
 	}
 
@@ -951,10 +1083,18 @@ static int ftl_write(partition_t *part, caddr_t buffer,
 	ret = mtd_write(part->mbd.mtd, offset, SECTOR_SIZE, &retlen, buffer);
 
 	if (ret) {
+#ifdef CONFIG_DEBUG_PRINTK
 	    printk(KERN_NOTICE "ftl_cs: block write failed!\n");
+#else
+	    ;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 	    printk(KERN_NOTICE "ftl_cs:   log_addr = 0x%x, virt_addr"
 		   " = 0x%x, Offset = 0x%zx\n", log_addr, virt_addr,
 		   offset);
+#else
+	    ;
+#endif
 	    return -EIO;
 	}
 
@@ -1052,8 +1192,12 @@ static void ftl_add_mtd(struct mtd_blktrans_ops *tr, struct mtd_info *mtd)
 	partition = kzalloc(sizeof(partition_t), GFP_KERNEL);
 
 	if (!partition) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "No memory to scan for FTL on %s\n",
 		       mtd->name);
+#else
+		;
+#endif
 		return;
 	}
 
@@ -1064,8 +1208,12 @@ static void ftl_add_mtd(struct mtd_blktrans_ops *tr, struct mtd_info *mtd)
 
 		partition->state = FTL_FORMATTED;
 #ifdef PCMCIA_DEBUG
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_INFO "ftl_cs: opening %d KiB FTL partition\n",
 		       le32_to_cpu(partition->header.FormattedSize) >> 10);
+#else
+		;
+#endif
 #endif
 		partition->mbd.size = le32_to_cpu(partition->header.FormattedSize) >> 9;
 

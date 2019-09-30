@@ -62,7 +62,11 @@ release_io_hfcs(struct IsdnCardState *cs)
 static void
 reset_hfcs(struct IsdnCardState *cs)
 {
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "HFCS: resetting card\n");
+#else
+	;
+#endif
 	cs->hw.hfcD.cirm = HFCD_RESET;
 	if (cs->typ == ISDN_CTYPE_TELES3C)
 		cs->hw.hfcD.cirm |= HFCD_MEM8K;
@@ -172,7 +176,11 @@ setup_hfcs(struct IsdnCard *card)
 	char tmp[64];
 
 	strcpy(tmp, hfcs_revision);
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "HiSax: HFC-S driver Rev. %s\n", HiSax_getrev(tmp));
+#else
+	;
+#endif
 
 #ifdef __ISAPNP__
 	if (!card->para[1] && isapnp_present()) {
@@ -233,17 +241,25 @@ setup_hfcs(struct IsdnCard *card)
 	} else
 		return (0);
 	if (!request_region(cs->hw.hfcD.addr, 2, "HFCS isdn")) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING
 		       "HiSax: %s config port %x-%x already in use\n",
 		       CardType[card->typ],
 		       cs->hw.hfcD.addr,
 		       cs->hw.hfcD.addr + 2);
+#else
+		;
+#endif
 		return (0);
 	}
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO
 	       "HFCS: defined at 0x%x IRQ %d HZ %d\n",
 	       cs->hw.hfcD.addr,
 	       cs->irq, HZ);
+#else
+	;
+#endif
 	if (cs->typ == ISDN_CTYPE_TELES3C) {
 		/* Teles 16.3c IO ADR is 0x200 | YY0U (YY Bit 15/14 address) */
 		outb(0x00, cs->hw.hfcD.addr);

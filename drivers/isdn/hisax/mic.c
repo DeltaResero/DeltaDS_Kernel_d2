@@ -195,7 +195,11 @@ setup_mic(struct IsdnCard *card)
 	char tmp[64];
 
 	strcpy(tmp, mic_revision);
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "HiSax: mic driver Rev. %s\n", HiSax_getrev(tmp));
+#else
+	;
+#endif
 	if (cs->typ != ISDN_CTYPE_MIC)
 		return (0);
 

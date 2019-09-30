@@ -145,14 +145,22 @@ void cb_in_1(struct pcbit_dev *dev, struct pcbit_chan *chan,
 	 */
 
 	if (cbdata->data.setup.CallingPN == NULL) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "NULL CallingPN to phone; using 0\n");
+#else
+		;
+#endif
 		strcpy(ictl.parm.setup.phone, "0");
 	}
 	else {
 		strcpy(ictl.parm.setup.phone, cbdata->data.setup.CallingPN);
 	}
 	if (cbdata->data.setup.CalledPN == NULL) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "NULL CalledPN to eazmsn; using 0\n");
+#else
+		;
+#endif
 		strcpy(ictl.parm.setup.eazmsn, "0");
 	}
 	else {

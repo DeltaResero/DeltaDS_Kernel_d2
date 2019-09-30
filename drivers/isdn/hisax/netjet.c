@@ -381,7 +381,11 @@ static void got_frame(struct BCState *bcs, int count) {
 	struct sk_buff *skb;
 
 	if (!(skb = dev_alloc_skb(count)))
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "TIGER: receive out of memory\n");
+#else
+		;
+#endif
 	else {
 		memcpy(skb_put(skb, count), bcs->hw.tiger.rcvbuf, count);
 		skb_queue_tail(&bcs->rqueue, skb);
@@ -874,13 +878,21 @@ open_tigerstate(struct IsdnCardState *cs, struct BCState *bcs)
 {
 	if (!test_and_set_bit(BC_FLG_INIT, &bcs->Flag)) {
 		if (!(bcs->hw.tiger.rcvbuf = kmalloc(HSCX_BUFMAX, GFP_ATOMIC))) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING
 			       "HiSax: No memory for tiger.rcvbuf\n");
+#else
+			;
+#endif
 			return (1);
 		}
 		if (!(bcs->hw.tiger.sendbuf = kmalloc(RAW_BUFMAX, GFP_ATOMIC))) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING
 			       "HiSax: No memory for tiger.sendbuf\n");
+#else
+			;
+#endif
 			return (1);
 		}
 		skb_queue_head_init(&bcs->rqueue);

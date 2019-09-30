@@ -57,7 +57,11 @@ static int dvb_dmxdev_buffer_write(struct dvb_ringbuffer *buf,
 
 	free = dvb_ringbuffer_free(buf);
 	if (len > free) {
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk("dmxdev: buffer overflow\n");
+#else
+		d;
+#endif
 		return -EOVERFLOW;
 	}
 
@@ -960,7 +964,11 @@ static int dvb_dvr_set_buffer_size(struct dmxdev *dmxdev,
 	spinlock_t *lock;
 	enum dmx_buffer_mode buffer_mode;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk("function : %s\n", __func__);
+#else
+	d;
+#endif
 
 	if ((f_flags & O_ACCMODE) == O_RDONLY) {
 		buf = &dmxdev->dvr_buffer;
@@ -3453,7 +3461,11 @@ static unsigned int dvb_dvr_poll(struct file *file, poll_table *wait)
 	struct dmxdev *dmxdev = dvbdev->priv;
 	unsigned int mask = 0;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk("function : %s\n", __func__);
+#else
+	d;
+#endif
 
 	if ((file->f_flags & O_ACCMODE) == O_RDONLY) {
 		poll_wait(file, &dmxdev->dvr_buffer.queue, wait);

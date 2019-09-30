@@ -222,7 +222,11 @@ static int pdc2027x_cable_detect(struct ata_port *ap)
 
 	return ATA_CBL_PATA80;
 cbl40:
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO DRV_NAME ": 40-conductor cable detected on port %d\n", ap->port_no);
+#else
+	;
+#endif
 	return ATA_CBL_PATA40;
 }
 

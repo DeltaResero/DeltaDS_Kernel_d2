@@ -948,7 +948,7 @@ static void cycx_x25_irq_disconnect(struct cycx_device *card,
 	u8 lcn;
 
 	cycx_peek(&card->hw, cmd->buf, &lcn, sizeof(lcn));
-	dprintk(1, KERN_INFO "%s:lcn=%d\n", __func__, lcn);
+;
 
 	dev = cycx_x25_get_dev_by_lcn(wandev, lcn);
 	if (dev) {
@@ -1332,8 +1332,8 @@ static int cycx_x25_chan_connect(struct net_device *dev)
 		if (!chan->addr[0])
 			return -EINVAL; /* no destination address */
 
-		dprintk(1, KERN_INFO "%s: placing X.25 call to %s...\n",
-				  card->devname, chan->addr);
+//		dprintk(1, KERN_INFO "%s: placing X.25 call to %s...\n",
+;
 
 		if (x25_place_call(card, chan))
 			return -EIO;

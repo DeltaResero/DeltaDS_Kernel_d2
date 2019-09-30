@@ -56,8 +56,12 @@ static int read_eraseblock_by_page(int ebnum)
 		if (ret == -EUCLEAN)
 			ret = 0;
 		if (ret || read != pgsize) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(PRINT_PREF "error: read failed at %#llx\n",
 			       (long long)addr);
+#else
+			;
+#endif
 			if (!err)
 				err = ret;
 			if (!err)
@@ -99,7 +103,11 @@ static void dump_eraseblock(int ebnum)
 	char line[128];
 	int pg, oob;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "dumping eraseblock %d\n", ebnum);
+#else
+	;
+#endif
 	n = mtd->erasesize;
 	for (i = 0; i < n;) {
 		char *p = line;
@@ -107,12 +115,20 @@ static void dump_eraseblock(int ebnum)
 		p += sprintf(p, "%05x: ", i);
 		for (j = 0; j < 32 && i < n; j++, i++)
 			p += sprintf(p, "%02x", (unsigned int)iobuf[i]);
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_CRIT "%s\n", line);
+#else
+		;
+#endif
 		cond_resched();
 	}
 	if (!mtd->oobsize)
 		return;
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "dumping oob from eraseblock %d\n", ebnum);
+#else
+	;
+#endif
 	n = mtd->oobsize;
 	for (pg = 0, i = 0; pg < pgcnt; pg++)
 		for (oob = 0; oob < n;) {
@@ -122,7 +138,11 @@ static void dump_eraseblock(int ebnum)
 			for (j = 0; j < 32 && oob < n; j++, oob++, i++)
 				p += sprintf(p, "%02x",
 					     (unsigned int)iobuf1[i]);
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_CRIT "%s\n", line);
+#else
+			;
+#endif
 			cond_resched();
 		}
 }
@@ -134,7 +154,11 @@ static int is_block_bad(int ebnum)
 
 	ret = mtd_block_isbad(mtd, addr);
 	if (ret)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "block %d is bad\n", ebnum);
+#else
+		;
+#endif
 	return ret;
 }
 
@@ -144,21 +168,33 @@ static int scan_for_bad_eraseblocks(void)
 
 	bbt = kzalloc(ebcnt, GFP_KERNEL);
 	if (!bbt) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "error: cannot allocate memory\n");
+#else
+		;
+#endif
 		return -ENOMEM;
 	}
 
 	if (!mtd_can_have_bb(mtd))
 		return 0;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "scanning for bad eraseblocks\n");
+#else
+	;
+#endif
 	for (i = 0; i < ebcnt; ++i) {
 		bbt[i] = is_block_bad(i) ? 1 : 0;
 		if (bbt[i])
 			bad += 1;
 		cond_resched();
 	}
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "scanned %d eraseblocks, %d are bad\n", i, bad);
+#else
+	;
+#endif
 	return 0;
 }
 
@@ -196,21 +232,33 @@ static int __init mtd_readtest_init(void)
 	ebcnt = tmp;
 	pgcnt = mtd->erasesize / pgsize;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "MTD device size %llu, eraseblock size %u, "
 	       "page size %u, count of eraseblocks %u, pages per "
 	       "eraseblock %u, OOB size %u\n",
 	       (unsigned long long)mtd->size, mtd->erasesize,
 	       pgsize, ebcnt, pgcnt, mtd->oobsize);
+#else
+	;
+#endif
 
 	err = -ENOMEM;
 	iobuf = kmalloc(mtd->erasesize, GFP_KERNEL);
 	if (!iobuf) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "error: cannot allocate memory\n");
+#else
+		;
+#endif
 		goto out;
 	}
 	iobuf1 = kmalloc(mtd->erasesize, GFP_KERNEL);
 	if (!iobuf1) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "error: cannot allocate memory\n");
+#else
+		;
+#endif
 		goto out;
 	}
 
@@ -219,7 +267,11 @@ static int __init mtd_readtest_init(void)
 		goto out;
 
 	/* Read all eraseblocks 1 page at a time */
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "testing page read\n");
+#else
+	;
+#endif
 	for (i = 0; i < ebcnt; ++i) {
 		int ret;
 
@@ -235,9 +287,17 @@ static int __init mtd_readtest_init(void)
 	}
 
 	if (err)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "finished with errors\n");
+#else
+		;
+#endif
 	else
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "finished\n");
+#else
+		;
+#endif
 
 out:
 
@@ -246,8 +306,16 @@ out:
 	kfree(bbt);
 	put_mtd_device(mtd);
 	if (err)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "error %d occurred\n", err);
+#else
+		;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "=================================================\n");
+#else
+	;
+#endif
 	return err;
 }
 module_init(mtd_readtest_init);

@@ -664,7 +664,11 @@ static int bsd_decompress(void *state, struct sk_buff *skb_in, struct sk_buff *s
 	n_bits   = db->n_bits;
 	tgtbitno = 32 - n_bits;	/* bitno when we have a code */
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_DEBUG "bsd_decompress called\n");
+#else
+	;
+#endif
 
 	if (!skb_in || !skb_out) {
 		printk(KERN_ERR "bsd_decompress called with NULL parameter\n");
@@ -737,7 +741,11 @@ static int bsd_decompress(void *state, struct sk_buff *skb_in, struct sk_buff *s
 		if (incode == CLEAR) {
 			if (ilen > 0) {
 				if (db->debug)
+#ifdef CONFIG_DEBUG_PRINTK
 					printk(KERN_DEBUG "bsd_decomp%d: bad CLEAR\n", db->unit);
+#else
+					;
+#endif
 				return DECOMP_FATALERROR;	/* probably a bug */
 			}
 			bsd_clear(db);

@@ -426,7 +426,7 @@ static void sa1100_irda_fir_error(struct sa1100_irda *si, struct net_device *dev
 	unsigned int len, stat, data;
 
 	if (!skb) {
-		printk(KERN_ERR "sa1100_ir: SKB is NULL!\n");
+;
 		return;
 	}
 
@@ -701,7 +701,7 @@ sa1100_irda_ioctl(struct net_device *dev, struct ifreq *ifreq, int cmd)
 				ret = sa1100_irda_set_speed(si,
 						rq->ifr_baudrate);
 			} else {
-				printk("sa1100_irda_ioctl: SIOCSBANDWIDTH: !netif_running\n");
+;
 				ret = 0;
 			}
 		}

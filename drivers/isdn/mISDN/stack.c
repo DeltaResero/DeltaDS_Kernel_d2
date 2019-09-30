@@ -74,7 +74,11 @@ send_socklist(struct mISDN_sock_list *sl, struct sk_buff *skb)
 		if (!cskb)
 			cskb = skb_copy(skb, GFP_KERNEL);
 		if (!cskb) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING "%s no skb\n", __func__);
+#else
+			;
+#endif
 			break;
 		}
 		if (!sock_queue_rcv_skb(sk, cskb))
@@ -538,14 +542,22 @@ create_l2entity(struct mISDNdevice *dev, struct mISDNchannel *ch,
 		ch->st = dev->D.st;
 		rq.adr.channel = 0;
 		err = dev->D.ctrl(&dev->D, OPEN_CHANNEL, &rq);
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "%s: ret 1 %d\n", __func__, err);
+#else
+		;
+#endif
 		if (err)
 			break;
 		rq.protocol = protocol;
 		rq.adr = *adr;
 		rq.ch = ch;
 		err = dev->teimgr->ctrl(dev->teimgr, OPEN_CHANNEL, &rq);
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "%s: ret 2 %d\n", __func__, err);
+#else
+		;
+#endif
 		if (!err) {
 			if ((protocol == ISDN_P_LAPD_NT) && !rq.ch)
 				break;

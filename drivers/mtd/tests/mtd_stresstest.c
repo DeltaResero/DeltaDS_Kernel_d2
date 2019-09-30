@@ -114,13 +114,21 @@ static int erase_eraseblock(int ebnum)
 
 	err = mtd_erase(mtd, &ei);
 	if (unlikely(err)) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "error %d while erasing EB %d\n", err, ebnum);
+#else
+		;
+#endif
 		return err;
 	}
 
 	if (unlikely(ei.state == MTD_ERASE_FAILED)) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "some erase error occurred at EB %d\n",
 		       ebnum);
+#else
+		;
+#endif
 		return -EIO;
 	}
 
@@ -134,7 +142,11 @@ static int is_block_bad(int ebnum)
 
 	ret = mtd_block_isbad(mtd, addr);
 	if (ret)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "block %d is bad\n", ebnum);
+#else
+		;
+#endif
 	return ret;
 }
 
@@ -157,8 +169,12 @@ static int do_read(void)
 	if (mtd_is_bitflip(err))
 		err = 0;
 	if (unlikely(err || read != len)) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "error: read failed at 0x%llx\n",
 		       (long long)addr);
+#else
+		;
+#endif
 		if (!err)
 			err = -EINVAL;
 		return err;
@@ -194,8 +210,12 @@ static int do_write(void)
 	addr = eb * mtd->erasesize + offs;
 	err = mtd_write(mtd, addr, len, &written, writebuf);
 	if (unlikely(err || written != len)) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "error: write failed at 0x%llx\n",
 		       (long long)addr);
+#else
+		;
+#endif
 		if (!err)
 			err = -EINVAL;
 		return err;
@@ -223,21 +243,33 @@ static int scan_for_bad_eraseblocks(void)
 
 	bbt = kzalloc(ebcnt, GFP_KERNEL);
 	if (!bbt) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "error: cannot allocate memory\n");
+#else
+		;
+#endif
 		return -ENOMEM;
 	}
 
 	if (!mtd_can_have_bb(mtd))
 		return 0;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "scanning for bad eraseblocks\n");
+#else
+	;
+#endif
 	for (i = 0; i < ebcnt; ++i) {
 		bbt[i] = is_block_bad(i) ? 1 : 0;
 		if (bbt[i])
 			bad += 1;
 		cond_resched();
 	}
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "scanned %d eraseblocks, %d are bad\n", i, bad);
+#else
+	;
+#endif
 	return 0;
 }
 
@@ -277,14 +309,22 @@ static int __init mtd_stresstest_init(void)
 	ebcnt = tmp;
 	pgcnt = mtd->erasesize / pgsize;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "MTD device size %llu, eraseblock size %u, "
 	       "page size %u, count of eraseblocks %u, pages per "
 	       "eraseblock %u, OOB size %u\n",
 	       (unsigned long long)mtd->size, mtd->erasesize,
 	       pgsize, ebcnt, pgcnt, mtd->oobsize);
+#else
+	;
+#endif
 
 	if (ebcnt < 2) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "error: need at least 2 eraseblocks\n");
+#else
+		;
+#endif
 		err = -ENOSPC;
 		goto out_put_mtd;
 	}
@@ -297,7 +337,11 @@ static int __init mtd_stresstest_init(void)
 	writebuf = vmalloc(bufsize);
 	offsets = kmalloc(ebcnt * sizeof(int), GFP_KERNEL);
 	if (!readbuf || !writebuf || !offsets) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "error: cannot allocate memory\n");
+#else
+		;
+#endif
 		goto out;
 	}
 	for (i = 0; i < ebcnt; i++)
@@ -311,16 +355,28 @@ static int __init mtd_stresstest_init(void)
 		goto out;
 
 	/* Do operations */
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "doing operations\n");
+#else
+	;
+#endif
 	for (op = 0; op < count; op++) {
 		if ((op & 1023) == 0)
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(PRINT_PREF "%d operations done\n", op);
+#else
+			;
+#endif
 		err = do_operation();
 		if (err)
 			goto out;
 		cond_resched();
 	}
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "finished, %d operations done\n", op);
+#else
+	;
+#endif
 
 out:
 	kfree(offsets);
@@ -330,8 +386,16 @@ out:
 out_put_mtd:
 	put_mtd_device(mtd);
 	if (err)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "error %d occurred\n", err);
+#else
+		;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "=================================================\n");
+#else
+	;
+#endif
 	return err;
 }
 module_init(mtd_stresstest_init);

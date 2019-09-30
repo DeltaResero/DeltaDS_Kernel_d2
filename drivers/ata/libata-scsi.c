@@ -780,31 +780,107 @@ static void ata_dump_status(unsigned id, struct ata_taskfile *tf)
 {
 	u8 stat = tf->command, err = tf->feature;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_WARNING "ata%u: status=0x%02x { ", id, stat);
+#else
+	;
+#endif
 	if (stat & ATA_BUSY) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk("Busy }\n");	/* Data is not valid in this case */
+#else
+		;
+#endif
 	} else {
+#ifdef CONFIG_DEBUG_PRINTK
 		if (stat & 0x40)	printk("DriveReady ");
+#else
+		if (stat & 0x40)	;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 		if (stat & 0x20)	printk("DeviceFault ");
+#else
+		if (stat & 0x20)	;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 		if (stat & 0x10)	printk("SeekComplete ");
+#else
+		if (stat & 0x10)	;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 		if (stat & 0x08)	printk("DataRequest ");
+#else
+		if (stat & 0x08)	;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 		if (stat & 0x04)	printk("CorrectedError ");
+#else
+		if (stat & 0x04)	;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 		if (stat & 0x02)	printk("Index ");
+#else
+		if (stat & 0x02)	;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 		if (stat & 0x01)	printk("Error ");
+#else
+		if (stat & 0x01)	;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 		printk("}\n");
+#else
+		;
+#endif
 
 		if (err) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING "ata%u: error=0x%02x { ", id, err);
+#else
+			;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 			if (err & 0x04)		printk("DriveStatusError ");
+#else
+			if (err & 0x04)		;
+#endif
 			if (err & 0x80) {
+#ifdef CONFIG_DEBUG_PRINTK
 				if (err & 0x04)	printk("BadCRC ");
+#else
+				if (err & 0x04)	;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 				else		printk("Sector ");
+#else
+				else		;
+#endif
 			}
+#ifdef CONFIG_DEBUG_PRINTK
 			if (err & 0x40)		printk("UncorrectableError ");
+#else
+			if (err & 0x40)		;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 			if (err & 0x10)		printk("SectorIdNotFound ");
+#else
+			if (err & 0x10)		;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 			if (err & 0x02)		printk("TrackZeroNotFound ");
+#else
+			if (err & 0x02)		;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 			if (err & 0x01)		printk("AddrMarkNotFound ");
+#else
+			if (err & 0x01)		;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 			printk("}\n");
+#else
+			;
+#endif
 		}
 	}
 }
@@ -893,8 +969,12 @@ static void ata_to_sense_error(unsigned id, u8 drv_stat, u8 drv_err, u8 *sk,
 		}
 		/* No immediate match */
 		if (verbose)
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING "ata%u: no sense translation for "
 			       "error 0x%02x\n", id, drv_err);
+#else
+			;
+#endif
 	}
 
 	/* Fall back to interpreting status bits */
@@ -908,8 +988,12 @@ static void ata_to_sense_error(unsigned id, u8 drv_stat, u8 drv_err, u8 *sk,
 	}
 	/* No error?  Undecoded? */
 	if (verbose)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "ata%u: no sense translation for "
 		       "status: 0x%02x\n", id, drv_stat);
+#else
+		;
+#endif
 
 	/* We need a sensible error return here, which is tricky, and one
 	   that won't cause people to do things like return a disk wrongly */

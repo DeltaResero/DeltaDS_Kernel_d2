@@ -80,8 +80,12 @@ static irqreturn_t mpcore_wdt_fire(int irq, void *arg)
 
 	/* Check it really was our interrupt */
 	if (readl(wdt->base + TWD_WDOG_INTSTAT)) {
+#ifdef CONFIG_DEBUG_PRINTK
 		dev_printk(KERN_CRIT, wdt->dev,
 					"Triggered - Reboot ignored.\n");
+#else
+		dev_;
+#endif
 		/* Clear the interrupt on the watchdog */
 		writel(1, wdt->base + TWD_WDOG_INTSTAT);
 		return IRQ_HANDLED;
@@ -123,7 +127,11 @@ static void mpcore_wdt_stop(struct mpcore_wdt *wdt)
 
 static void mpcore_wdt_start(struct mpcore_wdt *wdt)
 {
+#ifdef CONFIG_DEBUG_PRINTK
 	dev_printk(KERN_INFO, wdt->dev, "enabling watchdog.\n");
+#else
+	dev_;
+#endif
 
 	/* This loads the count register but does NOT start the count yet */
 	mpcore_wdt_keepalive(wdt);
@@ -180,8 +188,12 @@ static int mpcore_wdt_release(struct inode *inode, struct file *file)
 	if (wdt->expect_close == 42)
 		mpcore_wdt_stop(wdt);
 	else {
+#ifdef CONFIG_DEBUG_PRINTK
 		dev_printk(KERN_CRIT, wdt->dev,
 				"unexpected close, not stopping watchdog!\n");
+#else
+		dev_;
+#endif
 		mpcore_wdt_keepalive(wdt);
 	}
 	clear_bit(0, &wdt->timer_alive);

@@ -205,7 +205,7 @@ static pvc_device* add_pvc(struct net_device *dev, u16 dlci)
 
 	pvc = kzalloc(sizeof(pvc_device), GFP_ATOMIC);
 #ifdef DEBUG_PVC
-	printk(KERN_DEBUG "add_pvc: allocated pvc %p, frad %p\n", pvc, dev);
+;
 #endif
 	if (!pvc)
 		return NULL;
@@ -252,7 +252,7 @@ static inline void delete_unused_pvcs(hdlc_device *hdlc)
 		if (!pvc_is_used(*pvc_p)) {
 			pvc_device *pvc = *pvc_p;
 #ifdef DEBUG_PVC
-			printk(KERN_DEBUG "freeing unused pvc: %p\n", pvc);
+;
 #endif
 			*pvc_p = pvc->next;
 			kfree(pvc);
@@ -903,16 +903,16 @@ static int fr_rx(struct sk_buff *skb)
 
 	if (pvc->state.fecn != fh->fecn) {
 #ifdef DEBUG_ECN
-		printk(KERN_DEBUG "%s: DLCI %d FECN O%s\n", frad->name,
-		       dlci, fh->fecn ? "N" : "FF");
+//		printk(KERN_DEBUG "%s: DLCI %d FECN O%s\n", frad->name,
+;
 #endif
 		pvc->state.fecn ^= 1;
 	}
 
 	if (pvc->state.becn != fh->becn) {
 #ifdef DEBUG_ECN
-		printk(KERN_DEBUG "%s: DLCI %d BECN O%s\n", frad->name,
-		       dlci, fh->becn ? "N" : "FF");
+//		printk(KERN_DEBUG "%s: DLCI %d BECN O%s\n", frad->name,
+;
 #endif
 		pvc->state.becn ^= 1;
 	}
@@ -991,7 +991,7 @@ static void fr_start(struct net_device *dev)
 {
 	hdlc_device *hdlc = dev_to_hdlc(dev);
 #ifdef DEBUG_LINK
-	printk(KERN_DEBUG "fr_start\n");
+;
 #endif
 	if (state(hdlc)->settings.lmi != LMI_NONE) {
 		state(hdlc)->reliable = 0;
@@ -1017,7 +1017,7 @@ static void fr_stop(struct net_device *dev)
 {
 	hdlc_device *hdlc = dev_to_hdlc(dev);
 #ifdef DEBUG_LINK
-	printk(KERN_DEBUG "fr_stop\n");
+;
 #endif
 	if (state(hdlc)->settings.lmi != LMI_NONE)
 		del_timer_sync(&state(hdlc)->timer);

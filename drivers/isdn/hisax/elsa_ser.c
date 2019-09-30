@@ -209,7 +209,11 @@ static void mshutdown(struct IsdnCardState *cs)
 {
 
 #ifdef SERIAL_DEBUG_OPEN
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_DEBUG"Shutting down serial ....");
+#else
+	;
+#endif
 #endif
 
 	/*
@@ -232,7 +236,11 @@ static void mshutdown(struct IsdnCardState *cs)
 	serial_inp(cs, UART_RX);    /* read data port to reset things */
 
 #ifdef SERIAL_DEBUG_OPEN
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(" done\n");
+#else
+	;
+#endif
 #endif
 }
 
@@ -373,7 +381,11 @@ static inline void transmit_chars(struct IsdnCardState *cs, int *intr_done)
 		modem_fill(cs->hw.elsa.bcs);
 
 #ifdef SERIAL_DEBUG_INTR
+#ifdef CONFIG_DEBUG_PRINTK
 	printk("THRE...");
+#else
+	;
+#endif
 #endif
 	if (intr_done)
 		*intr_done = 0;
@@ -415,7 +427,11 @@ static void rs_interrupt_elsa(struct IsdnCardState *cs)
 		}
 	} while (!(iir & UART_IIR_NO_INT));
 #ifdef SERIAL_DEBUG_INTR
+#ifdef CONFIG_DEBUG_PRINTK
 	printk("end.\n");
+#else
+	;
+#endif
 #endif
 }
 

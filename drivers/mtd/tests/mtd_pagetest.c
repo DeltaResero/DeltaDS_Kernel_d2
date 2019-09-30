@@ -79,13 +79,21 @@ static int erase_eraseblock(int ebnum)
 
 	err = mtd_erase(mtd, &ei);
 	if (err) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "error %d while erasing EB %d\n", err, ebnum);
+#else
+		;
+#endif
 		return err;
 	}
 
 	if (ei.state == MTD_ERASE_FAILED) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "some erase error occurred at EB %d\n",
 		       ebnum);
+#else
+		;
+#endif
 		return -EIO;
 	}
 
@@ -102,8 +110,12 @@ static int write_eraseblock(int ebnum)
 	cond_resched();
 	err = mtd_write(mtd, addr, mtd->erasesize, &written, writebuf);
 	if (err || written != mtd->erasesize)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "error: write failed at %#llx\n",
 		       (long long)addr);
+#else
+		;
+#endif
 
 	return err;
 }
@@ -148,13 +160,21 @@ static int verify_eraseblock(int ebnum)
 		if (mtd_is_bitflip(err))
 			err = 0;
 		if (err || read != bufsize) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(PRINT_PREF "error: read failed at %#llx\n",
 			       (long long)addr);
+#else
+			;
+#endif
 			break;
 		}
 		if (memcmp(twopages, writebuf + (j * pgsize), bufsize)) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(PRINT_PREF "error: verify failed at %#llx\n",
 			       (long long)addr);
+#else
+			;
+#endif
 			errcnt += 1;
 		}
 	}
@@ -183,15 +203,23 @@ static int verify_eraseblock(int ebnum)
 		if (mtd_is_bitflip(err))
 			err = 0;
 		if (err || read != bufsize) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(PRINT_PREF "error: read failed at %#llx\n",
 			       (long long)addr);
+#else
+			;
+#endif
 			return err;
 		}
 		memcpy(boundary, writebuf + mtd->erasesize - pgsize, pgsize);
 		set_random_data(boundary + pgsize, pgsize);
 		if (memcmp(twopages, boundary, bufsize)) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(PRINT_PREF "error: verify failed at %#llx\n",
 			       (long long)addr);
+#else
+			;
+#endif
 			errcnt += 1;
 		}
 		next = oldnext;
@@ -206,10 +234,18 @@ static int crosstest(void)
 	loff_t addr, addr0, addrn;
 	unsigned char *pp1, *pp2, *pp3, *pp4;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "crosstest\n");
+#else
+	;
+#endif
 	pp1 = kmalloc(pgsize * 4, GFP_KERNEL);
 	if (!pp1) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "error: cannot allocate memory\n");
+#else
+		;
+#endif
 		return -ENOMEM;
 	}
 	pp2 = pp1 + pgsize;
@@ -231,8 +267,12 @@ static int crosstest(void)
 	if (mtd_is_bitflip(err))
 		err = 0;
 	if (err || read != pgsize) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "error: read failed at %#llx\n",
 		       (long long)addr);
+#else
+		;
+#endif
 		kfree(pp1);
 		return err;
 	}
@@ -243,8 +283,12 @@ static int crosstest(void)
 	if (mtd_is_bitflip(err))
 		err = 0;
 	if (err || read != pgsize) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "error: read failed at %#llx\n",
 		       (long long)addr);
+#else
+		;
+#endif
 		kfree(pp1);
 		return err;
 	}
@@ -307,7 +351,11 @@ static int erasecrosstest(void)
 	loff_t addr0;
 	char *readbuf = twopages;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "erasecrosstest\n");
+#else
+	;
+#endif
 
 	ebnum = 0;
 	addr0 = 0;
@@ -402,7 +450,11 @@ static int erasetest(void)
 	int err = 0, i, ebnum, ok = 1;
 	loff_t addr0;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "erasetest\n");
+#else
+	;
+#endif
 
 	ebnum = 0;
 	addr0 = 0;
@@ -464,7 +516,11 @@ static int is_block_bad(int ebnum)
 
 	ret = mtd_block_isbad(mtd, addr);
 	if (ret)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "block %d is bad\n", ebnum);
+#else
+		;
+#endif
 	return ret;
 }
 
@@ -474,18 +530,30 @@ static int scan_for_bad_eraseblocks(void)
 
 	bbt = kzalloc(ebcnt, GFP_KERNEL);
 	if (!bbt) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "error: cannot allocate memory\n");
+#else
+		;
+#endif
 		return -ENOMEM;
 	}
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "scanning for bad eraseblocks\n");
+#else
+	;
+#endif
 	for (i = 0; i < ebcnt; ++i) {
 		bbt[i] = is_block_bad(i) ? 1 : 0;
 		if (bbt[i])
 			bad += 1;
 		cond_resched();
 	}
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "scanned %d eraseblocks, %d are bad\n", i, bad);
+#else
+	;
+#endif
 	return 0;
 }
 
@@ -524,27 +592,43 @@ static int __init mtd_pagetest_init(void)
 	pgcnt = mtd->erasesize / mtd->writesize;
 	pgsize = mtd->writesize;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "MTD device size %llu, eraseblock size %u, "
 	       "page size %u, count of eraseblocks %u, pages per "
 	       "eraseblock %u, OOB size %u\n",
 	       (unsigned long long)mtd->size, mtd->erasesize,
 	       pgsize, ebcnt, pgcnt, mtd->oobsize);
+#else
+	;
+#endif
 
 	err = -ENOMEM;
 	bufsize = pgsize * 2;
 	writebuf = kmalloc(mtd->erasesize, GFP_KERNEL);
 	if (!writebuf) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "error: cannot allocate memory\n");
+#else
+		;
+#endif
 		goto out;
 	}
 	twopages = kmalloc(bufsize, GFP_KERNEL);
 	if (!twopages) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "error: cannot allocate memory\n");
+#else
+		;
+#endif
 		goto out;
 	}
 	boundary = kmalloc(bufsize, GFP_KERNEL);
 	if (!boundary) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "error: cannot allocate memory\n");
+#else
+		;
+#endif
 		goto out;
 	}
 
@@ -553,7 +637,11 @@ static int __init mtd_pagetest_init(void)
 		goto out;
 
 	/* Erase all eraseblocks */
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "erasing whole device\n");
+#else
+	;
+#endif
 	for (i = 0; i < ebcnt; ++i) {
 		if (bbt[i])
 			continue;
@@ -562,11 +650,19 @@ static int __init mtd_pagetest_init(void)
 			goto out;
 		cond_resched();
 	}
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "erased %u eraseblocks\n", i);
+#else
+	;
+#endif
 
 	/* Write all eraseblocks */
 	simple_srand(1);
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "writing whole device\n");
+#else
+	;
+#endif
 	for (i = 0; i < ebcnt; ++i) {
 		if (bbt[i])
 			continue;
@@ -574,14 +670,26 @@ static int __init mtd_pagetest_init(void)
 		if (err)
 			goto out;
 		if (i % 256 == 0)
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(PRINT_PREF "written up to eraseblock %u\n", i);
+#else
+			;
+#endif
 		cond_resched();
 	}
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "written %u eraseblocks\n", i);
+#else
+	;
+#endif
 
 	/* Check all eraseblocks */
 	simple_srand(1);
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "verifying all eraseblocks\n");
+#else
+	;
+#endif
 	for (i = 0; i < ebcnt; ++i) {
 		if (bbt[i])
 			continue;
@@ -589,10 +697,18 @@ static int __init mtd_pagetest_init(void)
 		if (err)
 			goto out;
 		if (i % 256 == 0)
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(PRINT_PREF "verified up to eraseblock %u\n", i);
+#else
+			;
+#endif
 		cond_resched();
 	}
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "verified %u eraseblocks\n", i);
+#else
+	;
+#endif
 
 	err = crosstest();
 	if (err)
@@ -606,7 +722,11 @@ static int __init mtd_pagetest_init(void)
 	if (err)
 		goto out;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "finished with %d errors\n", errcnt);
+#else
+	;
+#endif
 out:
 
 	kfree(bbt);
@@ -615,8 +735,16 @@ out:
 	kfree(writebuf);
 	put_mtd_device(mtd);
 	if (err)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "error %d occurred\n", err);
+#else
+		;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "=================================================\n");
+#else
+	;
+#endif
 	return err;
 }
 module_init(mtd_pagetest_init);

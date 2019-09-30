@@ -163,8 +163,8 @@ static int rionet_queue_tx_msg(struct sk_buff *skb, struct net_device *ndev,
 	rnet->tx_slot &= (RIONET_TX_RING_SIZE - 1);
 
 	if (netif_msg_tx_queued(rnet))
-		printk(KERN_INFO "%s: queued skb len %8.8x\n", DRV_NAME,
-		       skb->len);
+//		printk(KERN_INFO "%s: queued skb len %8.8x\n", DRV_NAME,
+;
 
 	return 0;
 }
@@ -190,8 +190,8 @@ static int rionet_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 	if ((rnet->tx_cnt + add_num) > RIONET_TX_RING_SIZE) {
 		netif_stop_queue(ndev);
 		spin_unlock_irqrestore(&rnet->tx_lock, flags);
-		printk(KERN_ERR "%s: BUG! Tx Ring full when queue awake!\n",
-		       ndev->name);
+//		printk(KERN_ERR "%s: BUG! Tx Ring full when queue awake!\n",
+;
 		return NETDEV_TX_BUSY;
 	}
 
@@ -225,8 +225,8 @@ static void rionet_dbell_event(struct rio_mport *mport, void *dev_id, u16 sid, u
 	struct rionet_peer *peer;
 
 	if (netif_msg_intr(rnet))
-		printk(KERN_INFO "%s: doorbell sid %4.4x tid %4.4x info %4.4x",
-		       DRV_NAME, sid, tid, info);
+//		printk(KERN_INFO "%s: doorbell sid %4.4x tid %4.4x info %4.4x",
+;
 	if (info == RIONET_DOORBELL_JOIN) {
 		if (!rionet_active[sid]) {
 			list_for_each_entry(peer, &rionet_peers, node) {
@@ -243,8 +243,8 @@ static void rionet_dbell_event(struct rio_mport *mport, void *dev_id, u16 sid, u
 		nact--;
 	} else {
 		if (netif_msg_intr(rnet))
-			printk(KERN_WARNING "%s: unhandled doorbell\n",
-			       DRV_NAME);
+//			printk(KERN_WARNING "%s: unhandled doorbell\n",
+;
 	}
 }
 
@@ -255,8 +255,8 @@ static void rionet_inb_msg_event(struct rio_mport *mport, void *dev_id, int mbox
 	struct rionet_private *rnet = netdev_priv(ndev);
 
 	if (netif_msg_intr(rnet))
-		printk(KERN_INFO "%s: inbound message event, mbox %d slot %d\n",
-		       DRV_NAME, mbox, slot);
+//		printk(KERN_INFO "%s: inbound message event, mbox %d slot %d\n",
+;
 
 	spin_lock(&rnet->lock);
 	if ((n = rionet_rx_clean(ndev)) != rnet->rx_slot)
@@ -272,9 +272,9 @@ static void rionet_outb_msg_event(struct rio_mport *mport, void *dev_id, int mbo
 	spin_lock(&rnet->lock);
 
 	if (netif_msg_intr(rnet))
-		printk(KERN_INFO
-		       "%s: outbound message event, mbox %d slot %d\n",
-		       DRV_NAME, mbox, slot);
+//		printk(KERN_INFO
+//		       "%s: outbound message event, mbox %d slot %d\n",
+;
 
 	while (rnet->tx_cnt && (rnet->ack_slot != slot)) {
 		/* dma unmap single */
@@ -298,7 +298,7 @@ static int rionet_open(struct net_device *ndev)
 	struct rionet_private *rnet = netdev_priv(ndev);
 
 	if (netif_msg_ifup(rnet))
-		printk(KERN_INFO "%s: open\n", DRV_NAME);
+;
 
 	if ((rc = rio_request_inb_dbell(rnet->mport,
 					(void *)ndev,
@@ -339,8 +339,8 @@ static int rionet_open(struct net_device *ndev)
 							 RIONET_DOORBELL_JOIN,
 							 RIONET_DOORBELL_LEAVE)))
 		{
-			printk(KERN_ERR "%s: error requesting doorbells\n",
-			       DRV_NAME);
+//			printk(KERN_ERR "%s: error requesting doorbells\n",
+;
 			continue;
 		}
 
@@ -359,7 +359,7 @@ static int rionet_close(struct net_device *ndev)
 	int i;
 
 	if (netif_msg_ifup(rnet))
-		printk(KERN_INFO "%s: close\n", DRV_NAME);
+;
 
 	netif_stop_queue(ndev);
 	netif_carrier_off(ndev);
@@ -483,12 +483,12 @@ static int rionet_setup_netdev(struct rio_mport *mport, struct net_device *ndev)
 	if (rc != 0)
 		goto out;
 
-	printk("%s: %s %s Version %s, MAC %pM\n",
-	       ndev->name,
-	       DRV_NAME,
-	       DRV_DESC,
-	       DRV_VERSION,
-	       ndev->dev_addr);
+//	printk("%s: %s %s Version %s, MAC %pM\n",
+//	       ndev->name,
+//	       DRV_NAME,
+//	       DRV_DESC,
+//	       DRV_VERSION,
+;
 
       out:
 	return rc;
@@ -526,9 +526,9 @@ static int rionet_probe(struct rio_dev *rdev, const struct rio_device_id *id)
 		rio_local_read_config_32(rdev->net->hport, RIO_DST_OPS_CAR,
 					 &ldst_ops);
 		if (!is_rionet_capable(lsrc_ops, ldst_ops)) {
-			printk(KERN_ERR
-			       "%s: local device is not network capable\n",
-			       DRV_NAME);
+//			printk(KERN_ERR
+//			       "%s: local device is not network capable\n",
+;
 			rionet_check = 1;
 			rionet_capable = 0;
 			goto out;

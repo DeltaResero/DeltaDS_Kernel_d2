@@ -116,8 +116,8 @@ static int hdlc_device_event(struct notifier_block *this, unsigned long event,
 	on = netif_carrier_ok(dev);
 
 #ifdef DEBUG_LINK
-	printk(KERN_DEBUG "%s: hdlc_device_event NETDEV_CHANGE, carrier %i\n",
-	       dev->name, on);
+//	printk(KERN_DEBUG "%s: hdlc_device_event NETDEV_CHANGE, carrier %i\n",
+;
 #endif
 
 	hdlc = dev_to_hdlc(dev);
@@ -151,8 +151,8 @@ int hdlc_open(struct net_device *dev)
 {
 	hdlc_device *hdlc = dev_to_hdlc(dev);
 #ifdef DEBUG_LINK
-	printk(KERN_DEBUG "%s: hdlc_open() carrier %i open %i\n", dev->name,
-	       hdlc->carrier, hdlc->open);
+//	printk(KERN_DEBUG "%s: hdlc_open() carrier %i open %i\n", dev->name,
+;
 #endif
 
 	if (hdlc->proto == NULL)
@@ -185,8 +185,8 @@ void hdlc_close(struct net_device *dev)
 {
 	hdlc_device *hdlc = dev_to_hdlc(dev);
 #ifdef DEBUG_LINK
-	printk(KERN_DEBUG "%s: hdlc_close() carrier %i open %i\n", dev->name,
-	       hdlc->carrier, hdlc->open);
+//	printk(KERN_DEBUG "%s: hdlc_close() carrier %i open %i\n", dev->name,
+;
 #endif
 
 	spin_lock_irq(&hdlc->state_lock);

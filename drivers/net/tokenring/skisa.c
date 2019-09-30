@@ -159,7 +159,7 @@ static int __init setup_card(struct net_device *dev, struct device *pdev)
 	/* At this point we have found a valid card. */
 
 	if (versionprinted++ == 0)
-		printk(KERN_DEBUG "%s", version);
+;
 
 	err = -EIO;
 	pdev->dma_mask = &dma_mask;
@@ -170,8 +170,8 @@ static int __init setup_card(struct net_device *dev, struct device *pdev)
 		
 	sk_isa_read_eeprom(dev);
 
-	printk(KERN_DEBUG "skisa.c:    Ring Station Address: %pM\n",
-	       dev->dev_addr);
+//	printk(KERN_DEBUG "skisa.c:    Ring Station Address: %pM\n",
+;
 		
 	tp = netdev_priv(dev);
 	tp->setnselout = sk_isa_setnselout_pins;
@@ -199,7 +199,7 @@ static int __init setup_card(struct net_device *dev, struct device *pdev)
 		
                 if(irqlist[j] == 0)
                 {
-                        printk(KERN_INFO "skisa.c: AutoSelect no IRQ available\n");
+;
 			goto out3;
 		}
 	}
@@ -210,15 +210,15 @@ static int __init setup_card(struct net_device *dev, struct device *pdev)
 				break;
 		if (irqlist[j] == 0)
 		{
-			printk(KERN_INFO "skisa.c: Illegal IRQ %d specified\n",
-				dev->irq);
+//			printk(KERN_INFO "skisa.c: Illegal IRQ %d specified\n",
+;
 			goto out3;
 		}
 		if (request_irq(dev->irq, tms380tr_interrupt, 0, 
 			isa_cardname, dev))
 		{
-                        printk(KERN_INFO "skisa.c: Selected IRQ %d not available\n",
-				dev->irq);
+//                        printk(KERN_INFO "skisa.c: Selected IRQ %d not available\n",
+;
 			goto out3;
 		}
 	}
@@ -234,7 +234,7 @@ static int __init setup_card(struct net_device *dev, struct device *pdev)
 
 		if(dmalist[j] == 0)
 		{
-			printk(KERN_INFO "skisa.c: AutoSelect no DMA available\n");
+;
 			goto out2;
 		}
 	}
@@ -245,14 +245,14 @@ static int __init setup_card(struct net_device *dev, struct device *pdev)
 				break;
 		if (dmalist[j] == 0)
 		{
-                        printk(KERN_INFO "skisa.c: Illegal DMA %d specified\n",
-				dev->dma);
+//                        printk(KERN_INFO "skisa.c: Illegal DMA %d specified\n",
+;
 			goto out2;
 		}
 		if (request_dma(dev->dma, isa_cardname))
 		{
-                        printk(KERN_INFO "skisa.c: Selected DMA %d not available\n",
-				dev->dma);
+//                        printk(KERN_INFO "skisa.c: Selected DMA %d not available\n",
+;
 			goto out2;
 		}
 	}
@@ -261,8 +261,8 @@ static int __init setup_card(struct net_device *dev, struct device *pdev)
 	if (err)
 		goto out;
 
-	printk(KERN_DEBUG "%s:    IO: %#4lx  IRQ: %d  DMA: %d\n",
-	       dev->name, dev->base_addr, dev->irq, dev->dma);
+//	printk(KERN_DEBUG "%s:    IO: %#4lx  IRQ: %d  DMA: %d\n",
+;
 
 	return 0;
 out:
@@ -395,10 +395,10 @@ static int __init sk_isa_init(void)
 		}
 	}
 
-	printk(KERN_NOTICE "skisa.c: %d cards found.\n", num);
+;
 	/* Probe for cards. */
 	if (num == 0) {
-		printk(KERN_NOTICE "skisa.c: No cards found.\n");
+;
 		platform_driver_unregister(&sk_isa_driver);
 		return -ENODEV;
 	}

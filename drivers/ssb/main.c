@@ -847,8 +847,12 @@ int __devinit ssb_bus_pcibus_register(struct ssb_bus *bus,
 
 	err = ssb_bus_register(bus, ssb_pci_get_invariants, 0);
 	if (!err) {
+#ifdef CONFIG_DEBUG_PRINTK
 		ssb_printk(KERN_INFO PFX "Sonics Silicon Backplane found on "
 			   "PCI device %s\n", dev_name(&host_pci->dev));
+#else
+		ssb_;
+#endif
 	} else {
 		ssb_printk(KERN_ERR PFX "Failed to register PCI version"
 			   " of SSB with error %d\n", err);
@@ -872,8 +876,12 @@ int __devinit ssb_bus_pcmciabus_register(struct ssb_bus *bus,
 
 	err = ssb_bus_register(bus, ssb_pcmcia_get_invariants, baseaddr);
 	if (!err) {
+#ifdef CONFIG_DEBUG_PRINTK
 		ssb_printk(KERN_INFO PFX "Sonics Silicon Backplane found on "
 			   "PCMCIA device %s\n", pcmcia_dev->devname);
+#else
+		ssb_;
+#endif
 	}
 
 	return err;
@@ -895,8 +903,12 @@ int __devinit ssb_bus_sdiobus_register(struct ssb_bus *bus,
 
 	err = ssb_bus_register(bus, ssb_sdio_get_invariants, ~0);
 	if (!err) {
+#ifdef CONFIG_DEBUG_PRINTK
 		ssb_printk(KERN_INFO PFX "Sonics Silicon Backplane found on "
 			   "SDIO device %s\n", sdio_func_id(func));
+#else
+		ssb_;
+#endif
 	}
 
 	return err;
@@ -915,8 +927,12 @@ int __devinit ssb_bus_ssbbus_register(struct ssb_bus *bus,
 
 	err = ssb_bus_register(bus, get_invariants, baseaddr);
 	if (!err) {
+#ifdef CONFIG_DEBUG_PRINTK
 		ssb_printk(KERN_INFO PFX "Sonics Silicon Backplane found at "
 			   "address 0x%08lX\n", baseaddr);
+#else
+		ssb_;
+#endif
 	}
 
 	return err;
@@ -1118,7 +1134,11 @@ static u32 ssb_tmslow_reject_bitmask(struct ssb_device *dev)
 	case SSB_IDLOW_SSBREV_27:     /* same here */
 		return SSB_TMSLOW_REJECT;	/* this is a guess */
 	default:
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_INFO "ssb: Backplane Revision 0x%.8X\n", rev);
+#else
+		;
+#endif
 		WARN_ON(1);
 	}
 	return (SSB_TMSLOW_REJECT | SSB_TMSLOW_REJECT_23);

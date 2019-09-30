@@ -97,19 +97,19 @@ TODO:
 /* #define PCIDAS64_DEBUG         enable debugging code */
 
 #ifdef PCIDAS64_DEBUG
-#define DEBUG_PRINT(format, args...)  printk(format , ## args)
-#else
-#define DEBUG_PRINT(format, args...)
-#endif
-
-#define TIMER_BASE 25		/*  40MHz master clock */
-#define PRESCALED_TIMER_BASE	10000	/*  100kHz 'prescaled' clock for slow acquisition, maybe I'll support this someday */
-#define DMA_BUFFER_SIZE 0x1000
-
-#define PCI_VENDOR_ID_COMPUTERBOARDS	0x1307
-
-/* maximum value that can be loaded into board's 24-bit counters*/
-static const int max_counter_value = 0xffffff;
+//#define DEBUG_PRINT(format, args...)  printk(format , ## args)
+//#else
+//#define DEBUG_PRINT(format, args...)
+//#endif
+//
+//#define TIMER_BASE 25		/*  40MHz master clock */
+//#define PRESCALED_TIMER_BASE	10000	/*  100kHz 'prescaled' clock for slow acquisition, maybe I'll support this someday */
+//#define DMA_BUFFER_SIZE 0x1000
+//
+//#define PCI_VENDOR_ID_COMPUTERBOARDS	0x1307
+//
+///* maximum value that can be loaded into board's 24-bit counters*/
+;
 
 /* PCI-DAS64xxx base addresses */
 
@@ -2090,7 +2090,7 @@ static int ai_rinsn(struct comedi_device *dev, struct comedi_subdevice *s,
 		DEBUG_PRINT(" looped %i times waiting for data\n", i);
 		if (i == timeout) {
 			comedi_error(dev, " analog input read insn timed out");
-			printk(" status 0x%x\n", bits);
+;
 			return -ETIME;
 		}
 		if (board(dev)->layout == LAYOUT_4020)

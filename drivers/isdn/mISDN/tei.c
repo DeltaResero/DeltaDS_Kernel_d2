@@ -90,7 +90,11 @@ da_debug(struct FsmInst *fi, char *fmt, ...)
 	vaf.fmt = fmt;
 	vaf.va = &va;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_DEBUG "mgr(%d): %pV\n", mgr->ch.st->dev->id, &vaf);
+#else
+	;
+#endif
 
 	va_end(va);
 }
@@ -239,8 +243,12 @@ tei_debug(struct FsmInst *fi, char *fmt, ...)
 	vaf.fmt = fmt;
 	vaf.va = &va;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_DEBUG "sapi(%d) tei(%d): %pV\n",
 	       tm->l2->sapi, tm->l2->tei, &vaf);
+#else
+	;
+#endif
 
 	va_end(va);
 }
@@ -315,7 +323,11 @@ teiup_create(struct manager *mgr, u_int prim, int len, void *arg)
 		memcpy(skb_put(skb, len), arg, len);
 	err = mgr->up->send(mgr->up, skb);
 	if (err) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "%s: err=%d\n", __func__, err);
+#else
+		;
+#endif
 		dev_kfree_skb(skb);
 	}
 }
@@ -455,7 +467,11 @@ put_tei_msg(struct manager *mgr, u_char m_id, unsigned int ri, int tei)
 	bp[7] = ((tei << 1) & 0xff) | 1;
 	skb = _alloc_mISDN_skb(PH_DATA_REQ, new_id(mgr), 8, bp, GFP_ATOMIC);
 	if (!skb) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "%s: no skb for tei msg\n", __func__);
+#else
+		;
+#endif
 		return;
 	}
 	mgr_send_down(mgr, skb);
@@ -804,13 +820,21 @@ create_new_tei(struct manager *mgr, int tei, int sapi)
 		test_and_set_bit(OPTION_L2_PMX, &opt);
 	l2 = create_l2(mgr->up, ISDN_P_LAPD_NT, opt, tei, sapi);
 	if (!l2) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "%s:no memory for layer2\n", __func__);
+#else
+		;
+#endif
 		return NULL;
 	}
 	l2->tm = kzalloc(sizeof(struct teimgr), GFP_KERNEL);
 	if (!l2->tm) {
 		kfree(l2);
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "%s:no memory for teimgr\n", __func__);
+#else
+		;
+#endif
 		return NULL;
 	}
 	l2->tm->mgr = mgr;
@@ -828,7 +852,11 @@ create_new_tei(struct manager *mgr, int tei, int sapi)
 	write_unlock_irqrestore(&mgr->lock, flags);
 	if (id < 0) {
 		l2->ch.ctrl(&l2->ch, CLOSE_CHANNEL, NULL);
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "%s:no free id\n", __func__);
+#else
+		;
+#endif
 		return NULL;
 	} else {
 		l2->ch.nr = id;
@@ -857,7 +885,11 @@ new_tei_req(struct manager *mgr, u_char *dp)
 	else
 		tei = get_free_tei(mgr);
 	if (tei < 0) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "%s:No free tei\n", __func__);
+#else
+		;
+#endif
 		goto denied;
 	}
 	l2 = create_new_tei(mgr, tei, CTRL_SAPI);
@@ -934,7 +966,11 @@ l2_tei(struct layer2 *l2, u_int cmd, u_long arg)
 	if (test_bit(FLG_FIXED_TEI, &l2->flag))
 		return 0;
 	if (*debug & DEBUG_L2_TEI)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "%s: cmd(%x)\n", __func__, cmd);
+#else
+		;
+#endif
 	switch (cmd) {
 	case MDL_ASSIGN_IND:
 		mISDN_FsmEvent(&tm->tei_m, EV_IDREQ, NULL);
@@ -1241,7 +1277,11 @@ mgr_ctrl(struct mISDNchannel *ch, u_int cmd, void *arg)
 
 	mgr = container_of(ch, struct manager, ch);
 	if (*debug & DEBUG_L2_CTRL)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "%s(%x, %p)\n", __func__, cmd, arg);
+#else
+		;
+#endif
 	switch (cmd) {
 	case OPEN_CHANNEL:
 		ret = create_teimgr(mgr, arg);

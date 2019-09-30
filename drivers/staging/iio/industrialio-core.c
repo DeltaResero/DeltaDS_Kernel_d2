@@ -119,9 +119,9 @@ static int __init iio_init(void)
 	/* Register sysfs bus */
 	ret  = bus_register(&iio_bus_type);
 	if (ret < 0) {
-		printk(KERN_ERR
-		       "%s could not register bus type\n",
-			__FILE__);
+//		printk(KERN_ERR
+//		       "%s could not register bus type\n",
+;
 		goto error_nothing;
 	}
 

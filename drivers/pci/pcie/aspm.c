@@ -532,9 +532,13 @@ static int pcie_aspm_sanity_check(struct pci_dev *pdev)
 		 */
 		pci_read_config_dword(child, pos + PCI_EXP_DEVCAP, &reg32);
 		if (!(reg32 & PCI_EXP_DEVCAP_RBER) && !aspm_force) {
+#ifdef CONFIG_DEBUG_PRINTK
 			dev_printk(KERN_INFO, &child->dev, "disabling ASPM"
 				" on pre-1.1 PCIe device.  You can enable it"
 				" with 'pcie_aspm=force'\n");
+#else
+			dev_;
+#endif
 			return -EINVAL;
 		}
 	}

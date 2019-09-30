@@ -122,7 +122,11 @@ int mISDN_dsp_element_register(struct mISDN_dsp_element *elem)
 	}
 
 #ifdef PIPELINE_DEBUG
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_DEBUG "%s: %s registered\n", __func__, elem->name);
+#else
+	;
+#endif
 #endif
 
 	return 0;
@@ -163,7 +167,11 @@ int dsp_pipeline_module_init(void)
 		return PTR_ERR(elements_class);
 
 #ifdef PIPELINE_DEBUG
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_DEBUG "%s: dsp pipeline module initialized\n", __func__);
+#else
+	;
+#endif
 #endif
 
 	dsp_hwec_init();
@@ -199,7 +207,11 @@ int dsp_pipeline_init(struct dsp_pipeline *pipeline)
 	INIT_LIST_HEAD(&pipeline->list);
 
 #ifdef PIPELINE_DEBUG
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_DEBUG "%s: dsp pipeline ready\n", __func__);
+#else
+	;
+#endif
 #endif
 
 	return 0;
@@ -229,7 +241,11 @@ void dsp_pipeline_destroy(struct dsp_pipeline *pipeline)
 	_dsp_pipeline_destroy(pipeline);
 
 #ifdef PIPELINE_DEBUG
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_DEBUG "%s: dsp pipeline destroyed\n", __func__);
+#else
+	;
+#endif
 #endif
 }
 

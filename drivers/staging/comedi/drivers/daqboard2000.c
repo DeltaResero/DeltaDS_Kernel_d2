@@ -714,8 +714,8 @@ static int daqboard2000_8255_cb(int dir, int port, int data,
 		result = readw(((void *)ioaddr) + port * 2);
 	}
 /*
-  printk("daqboard2000_8255_cb %x %d %d %2.2x -> %2.2x\n",
-        arg, dir, port, data, result);
+//  printk("daqboard2000_8255_cb %x %d %d %2.2x -> %2.2x\n",
+;
 */
 	return result;
 }
@@ -799,7 +799,7 @@ static int daqboard2000_attach(struct comedi_device *dev,
 	   u8 interrupt;
 	   Windows code does restore interrupts, but since we don't use them...
 	   pci_read_config_byte(card, PCI_INTERRUPT_LINE, &interrupt);
-	   printk("Interrupt before is: %x\n", interrupt);
+;
 	 */
 
 	aux_data = comedi_aux_data(it->options, 0);
@@ -818,7 +818,7 @@ static int daqboard2000_attach(struct comedi_device *dev,
 	/*
 	   Windows code does restore interrupts, but since we don't use them...
 	   pci_read_config_byte(card, PCI_INTERRUPT_LINE, &interrupt);
-	   printk("Interrupt after is: %x\n", interrupt);
+;
 	 */
 
 	dev->iobase = (unsigned long)devpriv->daq;

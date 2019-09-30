@@ -101,37 +101,37 @@ static void dumpVGAReg(void)
 
 	for (i = 0; i < 0x4f; i++) {
 		reg = xgifb_reg_get(XGISR, i);
-		printk("\no 3c4 %x", i);
-		printk("\ni 3c5 => %x", reg);
+;
+;
 	}
 
 	for (i = 0; i < 0xF0; i++) {
 		reg = xgifb_reg_get(XGICR, i);
-		printk("\no 3d4 %x", i);
-		printk("\ni 3d5 => %x", reg);
+;
+;
 	}
 	/*
 	xgifb_reg_set(XGIPART1,0x2F,1);
 	for (i=1; i < 0x50; i++) {
 		reg = xgifb_reg_get(XGIPART1, i);
-		printk("\no d004 %x", i);
-		printk("\ni d005 => %x", reg);
+;
+;
 	}
 
 	for (i=0; i < 0x50; i++) {
 		 reg = xgifb_reg_get(XGIPART2, i);
-		 printk("\no d010 %x", i);
-		 printk("\ni d011 => %x", reg);
+;
+;
 	}
 	for (i=0; i < 0x50; i++) {
 		reg = xgifb_reg_get(XGIPART3, i);
-		printk("\no d012 %x",i);
-		printk("\ni d013 => %x",reg);
+;
+;
 	}
 	for (i=0; i < 0x50; i++) {
 		reg = xgifb_reg_get(XGIPART4, i);
-		printk("\no d014 %x",i);
-		printk("\ni d015 => %x",reg);
+;
+;
 	}
 	*/
 }
@@ -167,7 +167,7 @@ static int XGIfb_mode_rate_to_dclock(struct vb_device_info *XGI_Pr,
 	/*
 	temp = XGI_SearchModeID(ModeNo , &ModeIdIndex,  XGI_Pr) ;
 	if (!temp) {
-		printk(KERN_ERR "Could not find mode %x\n", ModeNo);
+;
 		return 65000;
 	}
 

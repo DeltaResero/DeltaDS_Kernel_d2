@@ -77,7 +77,7 @@ static int cisco_hard_header(struct sk_buff *skb, struct net_device *dev,
 {
 	struct hdlc_header *data;
 #ifdef DEBUG_HARD_HEADER
-	printk(KERN_DEBUG "%s: cisco_hard_header called\n", dev->name);
+;
 #endif
 
 	skb_push(skb, sizeof(struct hdlc_header));

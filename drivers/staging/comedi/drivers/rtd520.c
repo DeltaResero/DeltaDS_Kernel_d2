@@ -760,7 +760,7 @@ static int rtd_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 	int index;
 #endif
 
-	printk(KERN_INFO "comedi%d: rtd520 attaching.\n", dev->minor);
+;
 
 #if defined(CONFIG_COMEDI_DEBUG) && defined(USE_DMA)
 	/* You can set this a load time: modprobe comedi comedi_debug=1 */
@@ -800,10 +800,10 @@ static int rtd_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 	}
 	if (!pcidev) {
 		if (it->options[0] && it->options[1]) {
-			printk(KERN_INFO "No RTD card at bus=%d slot=%d.\n",
-			       it->options[0], it->options[1]);
+//			printk(KERN_INFO "No RTD card at bus=%d slot=%d.\n",
+;
 		} else {
-			printk(KERN_INFO "No RTD card found.\n");
+;
 		}
 		return -EIO;
 	}
@@ -812,7 +812,7 @@ static int rtd_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 
 	ret = comedi_pci_enable(pcidev, DRV_NAME);
 	if (ret < 0) {
-		printk(KERN_INFO "Failed to enable PCI device and request regions.\n");
+;
 		return ret;
 	}
 	devpriv->got_regions = 1;
@@ -849,8 +849,8 @@ static int rtd_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 		pci_read_config_byte(devpriv->pci_dev,
 				     PCI_LATENCY_TIMER, &pci_latency);
 		if (pci_latency < 32) {
-			printk(KERN_INFO "%s: PCI latency changed from %d to %d\n",
-			       dev->board_name, pci_latency, 32);
+//			printk(KERN_INFO "%s: PCI latency changed from %d to %d\n",
+;
 			pci_write_config_byte(devpriv->pci_dev,
 					      PCI_LATENCY_TIMER, 32);
 		} else {
@@ -1029,7 +1029,7 @@ static int rtd_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 		/* set DMA trigger source */
 		RtdDma0Source(dev, DMAS_ADFIFO_HALF_FULL);
 	} else {
-		printk(KERN_INFO "( no IRQ->no DMA )");
+;
 	}
 #endif /* USE_DMA */
 
@@ -1037,7 +1037,7 @@ static int rtd_attach(struct comedi_device *dev, struct comedi_devconfig *it)
 		RtdPlxInterruptWrite(dev, ICS_PIE | ICS_PLIE);
 	}
 
-	printk("\ncomedi%d: rtd520 driver attached.\n", dev->minor);
+;
 
 	return 1;
 
@@ -1176,7 +1176,7 @@ static int rtd_detach(struct comedi_device *dev)
 		}
 	}
 
-	printk(KERN_INFO "comedi%d: rtd520: removed.\n", dev->minor);
+;
 
 	return 0;
 }
@@ -1278,7 +1278,7 @@ static int rtd520_probe_fifo_depth(struct comedi_device *dev)
 		}
 	}
 	if (i == limit) {
-		printk(KERN_INFO "\ncomedi: %s: failed to probe fifo size.\n", DRV_NAME);
+;
 		return -EIO;
 	}
 	RtdAdcClearFifo(dev);
@@ -1451,8 +1451,8 @@ void abort_dma(struct comedi_device *dev, unsigned int channel)
 		status = readb(dma_cs_addr);
 	}
 	if (status & PLX_DMA_DONE_BIT) {
-		printk("rtd520: Timeout waiting for dma %i done clear\n",
-		       channel);
+//		printk("rtd520: Timeout waiting for dma %i done clear\n",
+;
 		goto abortDmaExit;
 	}
 
@@ -1470,8 +1470,8 @@ void abort_dma(struct comedi_device *dev, unsigned int channel)
 		WAIT_QUIETLY;
 	}
 	if ((status & PLX_DMA_DONE_BIT) == 0) {
-		printk("rtd520: Timeout waiting for dma %i done set\n",
-		       channel);
+//		printk("rtd520: Timeout waiting for dma %i done set\n",
+;
 	}
 
 abortDmaExit:

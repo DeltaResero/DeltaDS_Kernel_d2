@@ -186,8 +186,8 @@ static irqreturn_t intr_handler(int irq, void *d)
 		outw_p(SCANL, dev->iobase + 2);	/* clears the fifo */
 		outb(0x07, dev->iobase + 8);	/* clears all flip-flops */
 #ifdef DEBUG
-		printk("das6402: Got %i samples\n\n",
-		       devpriv->das6402_wordsread - diff);
+//		printk("das6402: Got %i samples\n\n",
+;
 #endif
 		s->async->events |= COMEDI_CB_EOA;
 		comedi_event(dev, s);

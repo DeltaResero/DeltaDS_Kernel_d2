@@ -49,7 +49,7 @@ struct sk_buff *ath_rxbuf_alloc(struct ath_common *common,
 		if (off != 0)
 			skb_reserve(skb, common->cachelsz - off);
 	} else {
-		printk(KERN_ERR "skbuff alloc of size %u failed\n", len);
+;
 		return NULL;
 	}
 

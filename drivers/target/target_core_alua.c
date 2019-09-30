@@ -1721,6 +1721,9 @@ ssize_t core_alua_store_tg_pt_gp_info(
 				config_item_name(
 					&tg_pt_gp->tg_pt_gp_group.cg_item),
 				tg_pt_gp->tg_pt_gp_id);
+#else
+			;
+#endif
 
 			__core_alua_drop_tg_pt_gp_mem(tg_pt_gp_mem, tg_pt_gp);
 			__core_alua_attach_tg_pt_gp_mem(tg_pt_gp_mem,
@@ -1747,6 +1750,9 @@ ssize_t core_alua_store_tg_pt_gp_info(
 		config_item_name(&lun->lun_group.cg_item),
 		config_item_name(&tg_pt_gp_new->tg_pt_gp_group.cg_item),
 		tg_pt_gp_new->tg_pt_gp_id);
+#else
+	;
+#endif
 
 	core_alua_put_tg_pt_gp_from_name(tg_pt_gp_new);
 	return count;

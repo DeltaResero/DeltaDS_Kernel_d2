@@ -106,8 +106,12 @@ l2m_debug(struct FsmInst *fi, char *fmt, ...)
 	vaf.fmt = fmt;
 	vaf.va = &va;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_DEBUG "l2 (sapi %d tei %d): %pV\n",
 	       l2->sapi, l2->tei, &vaf);
+#else
+	;
+#endif
 
 	va_end(va);
 }
@@ -150,7 +154,11 @@ l2up(struct layer2 *l2, u_int prim, struct sk_buff *skb)
 	mISDN_HEAD_ID(skb) = (l2->ch.nr << 16) | l2->ch.addr;
 	err = l2->up->send(l2->up, skb);
 	if (err) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "%s: err=%d\n", __func__, err);
+#else
+		;
+#endif
 		dev_kfree_skb(skb);
 	}
 }
@@ -174,7 +182,11 @@ l2up_create(struct layer2 *l2, u_int prim, int len, void *arg)
 		memcpy(skb_put(skb, len), arg, len);
 	err = l2->up->send(l2->up, skb);
 	if (err) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "%s: err=%d\n", __func__, err);
+#else
+		;
+#endif
 		dev_kfree_skb(skb);
 	}
 }
@@ -185,7 +197,11 @@ l2down_skb(struct layer2 *l2, struct sk_buff *skb) {
 
 	ret = l2->ch.recv(l2->ch.peer, skb);
 	if (ret && (*debug & DEBUG_L2_RECV))
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "l2down_skb: ret(%d)\n", ret);
+#else
+		;
+#endif
 	return ret;
 }
 
@@ -1916,7 +1932,11 @@ ph_data_indication(struct layer2 *l2, struct mISDNhead *hh, struct sk_buff *skb)
 	} else
 		c = 'L';
 	if (c) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "l2 D-channel frame error %c\n", c);
+#else
+		;
+#endif
 		mISDN_FsmEvent(&l2->l2m, EV_L2_FRAME_ERROR, (void *)(long)c);
 	}
 	return ret;
@@ -2005,7 +2025,11 @@ tei_l2(struct layer2 *l2, u_int cmd, u_long arg)
 	int		ret = -EINVAL;
 
 	if (*debug & DEBUG_L2_TEI)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "%s: cmd(%x)\n", __func__, cmd);
+#else
+		;
+#endif
 	switch (cmd) {
 	case (MDL_ASSIGN_REQ):
 		ret = mISDN_FsmEvent(&l2->l2m, EV_L2_MDL_ASSIGN, (void *)arg);
@@ -2018,7 +2042,11 @@ tei_l2(struct layer2 *l2, u_int cmd, u_long arg)
 		break;
 	case (MDL_ERROR_RSP):
 		/* ETS 300-125 5.3.2.1 Test: TC13010 */
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_NOTICE "MDL_ERROR|REQ (tei_l2)\n");
+#else
+		;
+#endif
 		ret = mISDN_FsmEvent(&l2->l2m, EV_L2_MDL_ERROR, NULL);
 		break;
 	}
@@ -2050,7 +2078,11 @@ l2_ctrl(struct mISDNchannel *ch, u_int cmd, void *arg)
 	u_int			info;
 
 	if (*debug & DEBUG_L2_CTRL)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "%s:(%x)\n", __func__, cmd);
+#else
+		;
+#endif
 
 	switch (cmd) {
 	case OPEN_CHANNEL:

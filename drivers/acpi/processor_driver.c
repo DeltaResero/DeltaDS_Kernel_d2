@@ -566,8 +566,12 @@ static int __cpuinit acpi_processor_add(struct acpi_device *device)
 	 */
 	if (per_cpu(processor_device_array, pr->id) != NULL &&
 	    per_cpu(processor_device_array, pr->id) != device) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "BIOS reported wrong ACPI id "
 			"for the processor\n");
+#else
+		;
+#endif
 		result = -ENODEV;
 		goto err_free_cpumask;
 	}

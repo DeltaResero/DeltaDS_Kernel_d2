@@ -743,8 +743,12 @@ static int ide_tape_read_position(ide_drive_t *drive)
 				(buf[0] & 0x40) ? "Yes" : "No");
 
 		if (buf[0] & 0x4) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_INFO "ide-tape: Block location is unknown"
 					 "to the tape\n");
+#else
+			;
+#endif
 			clear_bit(ilog2(IDE_AFLAG_ADDRESS_VALID),
 				  &drive->atapi_flags);
 			return -1;
@@ -830,8 +834,12 @@ static void ide_tape_discard_merge_buffer(ide_drive_t *drive,
 		position = ide_tape_read_position(drive);
 		seek = position > 0 ? position : 0;
 		if (idetape_position_tape(drive, seek, 0, 0)) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_INFO "ide-tape: %s: position_tape failed in"
 					 " %s\n", tape->name, __func__);
+#else
+			;
+#endif
 			return;
 		}
 	}
@@ -1444,8 +1452,12 @@ static void ide_tape_get_bsize_from_bdesc(ide_drive_t *drive)
 	if (ide_queue_pc_tail(drive, tape->disk, &pc, buf, pc.req_xfer)) {
 		printk(KERN_ERR "ide-tape: Can't get block descriptor\n");
 		if (tape->blk_size == 0) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING "ide-tape: Cannot deal with zero "
 					    "block size, assuming 32k\n");
+#else
+			;
+#endif
 			tape->blk_size = 32768;
 		}
 		return;
@@ -1619,8 +1631,12 @@ static void idetape_get_inquiry_results(ide_drive_t *drive)
 	ide_fixstring(product_id, 16, 0);
 	ide_fixstring(fw_rev, 4, 0);
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "ide-tape: %s <-> %s: %.8s %.16s rev %.4s\n",
 			drive->name, tape->name, vendor_id, product_id, fw_rev);
+#else
+	;
+#endif
 }
 
 /*
@@ -1656,13 +1672,21 @@ static void idetape_get_mode_sense_results(ide_drive_t *drive)
 	*(u16 *)&caps[16] = be16_to_cpup((__be16 *)&caps[16]);
 
 	if (!speed) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_INFO "ide-tape: %s: invalid tape speed "
 				"(assuming 650KB/sec)\n", drive->name);
+#else
+		;
+#endif
 		*(u16 *)&caps[14] = 650;
 	}
 	if (!max_speed) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_INFO "ide-tape: %s: invalid max_speed "
 				"(assuming 650KB/sec)\n", drive->name);
+#else
+		;
+#endif
 		*(u16 *)&caps[8] = 650;
 	}
 
@@ -1754,8 +1778,12 @@ static void idetape_setup(ide_drive_t *drive, idetape_tape_t *tape, int minor)
 	drive->dev_flags |= IDE_DFLAG_DSC_OVERLAP;
 
 	if (drive->hwif->host_flags & IDE_HFLAG_NO_DSC) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_INFO "ide-tape: %s: disabling DSC overlap\n",
 				 tape->name);
+#else
+		;
+#endif
 		drive->dev_flags &= ~IDE_DFLAG_DSC_OVERLAP;
 	}
 
@@ -1775,7 +1803,11 @@ static void idetape_setup(ide_drive_t *drive, idetape_tape_t *tape, int minor)
 	tape->user_bs_factor = 1;
 	tape->buffer_size = *ctl * tape->blk_size;
 	while (tape->buffer_size > 0xffff) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_NOTICE "ide-tape: decreasing stage size\n");
+#else
+		;
+#endif
 		*ctl /= 2;
 		tape->buffer_size = *ctl * tape->blk_size;
 	}
@@ -1792,6 +1824,7 @@ static void idetape_setup(ide_drive_t *drive, idetape_tape_t *tape, int minor)
 	 */
 	tape->best_dsc_rw_freq = clamp_t(unsigned long, t, IDETAPE_DSC_RW_MIN,
 					 IDETAPE_DSC_RW_MAX);
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "ide-tape: %s <-> %s: %dKBps, %d*%dkB buffer, "
 		"%lums tDSC%s\n",
 		drive->name, tape->name, *(u16 *)&tape->caps[14],
@@ -1799,6 +1832,9 @@ static void idetape_setup(ide_drive_t *drive, idetape_tape_t *tape, int minor)
 		tape->buffer_size / 1024,
 		tape->best_dsc_rw_freq * 1000 / HZ,
 		(drive->dev_flags & IDE_DFLAG_USING_DMA) ? ", DMA" : "");
+#else
+	;
+#endif
 
 	ide_proc_register_driver(drive, tape->driver);
 }

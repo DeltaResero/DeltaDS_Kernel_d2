@@ -269,7 +269,11 @@ sedlbauer_interrupt(int intno, void *dev_id)
 		/* The card tends to generate interrupts while being removed
 		   causing us to just crash the kernel. bad. */
 		spin_unlock_irqrestore(&cs->lock, flags);
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "Sedlbauer: card not available!\n");
+#else
+		;
+#endif
 		return IRQ_NONE;
 	}
 
@@ -408,7 +412,11 @@ release_io_sedlbauer(struct IsdnCardState *cs)
 static void
 reset_sedlbauer(struct IsdnCardState *cs)
 {
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "Sedlbauer: resetting card\n");
+#else
+	;
+#endif
 
 	if (!((cs->hw.sedl.bus == SEDL_BUS_PCMCIA) &&
 	      (cs->hw.sedl.chip == SEDL_CHIP_ISAC_HSCX))) {
@@ -586,7 +594,11 @@ setup_sedlbauer_isapnp(struct IsdnCard *card, int *bytecnt)
 		pnp_c = NULL;
 	}
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "Sedlbauer PnP: no ISAPnP card found\n");
+#else
+	;
+#endif
 	return -1;
 }
 #else
@@ -797,7 +809,11 @@ ready:
 		cs->writeisacfifo = &WriteISACfifo_IPAC;
 		cs->irq_func = &sedlbauer_interrupt_ipac;
 		val = readreg(cs->hw.sedl.adr, cs->hw.sedl.isac, IPAC_ID);
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_INFO "Sedlbauer: IPAC version %x\n", val);
+#else
+		;
+#endif
 	} else {
 		/* ISAC_HSCX oder ISAC_ISAR */
 		cs->readisac = &ReadISAC;

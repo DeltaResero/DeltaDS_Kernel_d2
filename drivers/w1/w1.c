@@ -1007,7 +1007,11 @@ static int __init w1_init(void)
 {
 	int retval;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "Driver for 1-wire Dallas network protocol.\n");
+#else
+	;
+#endif
 
 	w1_init_netlink();
 

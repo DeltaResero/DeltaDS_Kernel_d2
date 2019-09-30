@@ -177,7 +177,11 @@ ISARVersion(struct IsdnCardState *cs, char *s)
 	if (cs->bcs[0].hw.isar.reg->iis == ISAR_IIS_VNR) {
 		if (len == 1) {
 			ver = tmp[0] & 0xf;
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_INFO "%s ISAR version %d\n", s, ver);
+#else
+			;
+#endif
 		} else
 			ver = -3;
 	} else
@@ -218,7 +222,11 @@ isar_load_firmware(struct IsdnCardState *cs, u_char __user *buf)
 		return -EFAULT;
 	}
 	p += sizeof(int);
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_DEBUG"isar_load_firmware size: %d\n", size);
+#else
+	;
+#endif
 	cnt = 0;
 	/* disable ISAR IRQ */
 	cs->BC_Write_Reg(cs, 0, ISAR_IRQBIT, 0);
@@ -344,7 +352,11 @@ isar_load_firmware(struct IsdnCardState *cs, u_char __user *buf)
 		       ireg->iis, ireg->cmsb, len);
 		ret = 1; goto reterr_unlock;
 	} else
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG"isar start dsp success\n");
+#else
+		;
+#endif
 	/* NORMAL mode entered */
 	/* Enable IRQs of ISAR */
 	cs->BC_Write_Reg(cs, 0, ISAR_IRQBIT, ISAR_IRQSTA);
@@ -462,7 +474,11 @@ send_DLE_ETX(struct BCState *bcs)
 		skb_queue_tail(&bcs->rqueue, skb);
 		schedule_event(bcs, B_RCVBUFREADY);
 	} else {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "HiSax: skb out of memory\n");
+#else
+		;
+#endif
 	}
 }
 
@@ -514,7 +530,11 @@ isar_rcv_frame(struct IsdnCardState *cs, struct BCState *bcs)
 			skb_queue_tail(&bcs->rqueue, skb);
 			schedule_event(bcs, B_RCVBUFREADY);
 		} else {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING "HiSax: skb out of memory\n");
+#else
+			;
+#endif
 			cs->BC_Write_Reg(cs, 1, ISAR_IIA, 0);
 		}
 		break;
@@ -591,7 +611,11 @@ isar_rcv_frame(struct IsdnCardState *cs, struct BCState *bcs)
 					schedule_event(bcs, B_LL_NOCARRIER);
 				}
 			} else {
+#ifdef CONFIG_DEBUG_PRINTK
 				printk(KERN_WARNING "HiSax: skb out of memory\n");
+#else
+				;
+#endif
 			}
 			break;
 		}
@@ -1711,8 +1735,12 @@ open_isarstate(struct IsdnCardState *cs, struct BCState *bcs)
 {
 	if (!test_and_set_bit(BC_FLG_INIT, &bcs->Flag)) {
 		if (!(bcs->hw.isar.rcvbuf = kmalloc(HSCX_BUFMAX, GFP_ATOMIC))) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING
 			       "HiSax: No memory for isar.rcvbuf\n");
+#else
+			;
+#endif
 			return (1);
 		}
 		skb_queue_head_init(&bcs->rqueue);

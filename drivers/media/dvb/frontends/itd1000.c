@@ -62,7 +62,11 @@ static int itd1000_write_regs(struct itd1000_state *state, u8 reg, u8 v[], u8 le
 	/* itd_dbg("wr %02x: %02x\n", reg, v[0]); */
 
 	if (i2c_transfer(state->i2c, &msg, 1) != 1) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "itd1000 I2C write failed\n");
+#else
+		;
+#endif
 		return -EREMOTEIO;
 	}
 	return 0;

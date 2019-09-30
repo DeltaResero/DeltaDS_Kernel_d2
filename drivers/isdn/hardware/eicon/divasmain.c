@@ -184,7 +184,11 @@ void diva_log_info(unsigned char *format, ...)
 	vsnprintf(line, sizeof(line), format, args);
 	va_end(args);
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "%s: %s\n", DRIVERLNAME, line);
+#else
+	;
+#endif
 }
 
 void divas_get_version(char *p)
@@ -822,7 +826,11 @@ static int DIVA_INIT_FUNCTION divas_init(void)
 		       DRIVERLNAME);
 		goto out;
 	}
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "%s: started with major %d\n", DRIVERLNAME, major);
+#else
+	;
+#endif
 
 out:
 	return (ret);
@@ -838,7 +846,11 @@ static void DIVA_EXIT_FUNCTION divas_exit(void)
 	divas_unregister_chrdev();
 	divasfunc_exit();
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "%s: module unloaded.\n", DRIVERLNAME);
+#else
+	;
+#endif
 }
 
 module_init(divas_init);

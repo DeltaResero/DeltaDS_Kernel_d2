@@ -258,8 +258,12 @@ static int isdn_x25iface_disconn_ind(struct concap_proto *cprot)
 		netif_rx(skb);
 		return 0;
 	} else {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "isdn_x25iface_disconn_ind:"
 		       " out of memory\n");
+#else
+		;
+#endif
 		return -1;
 	}
 }
@@ -320,12 +324,20 @@ static int isdn_x25iface_xmit(struct concap_proto *cprot, struct sk_buff *skb)
 		}
 		break;
 	case X25_IFACE_PARAMS:
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "isdn_x25iface_xmit: setting of lapb"
 		       " options not yet supported\n");
+#else
+		;
+#endif
 		break;
 	default:
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "isdn_x25iface_xmit: frame with illegal"
 		       " first byte %x ignored:\n", firstbyte);
+#else
+		;
+#endif
 	}
 	dev_kfree_skb(skb);
 	return 0;

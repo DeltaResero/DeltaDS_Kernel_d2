@@ -46,6 +46,7 @@
 #define DRIVER_DESC	"A driver for the TEA5764 radio chip for EZX Phones."
 
 #define PINFO(format, ...)\
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO KBUILD_MODNAME ": "\
 		DRIVER_VERSION ": " format "\n", ## __VA_ARGS__)
 #define PWARN(format, ...)\
@@ -104,6 +105,9 @@ devices, that would be 76000 and 91000.  */
 
 struct tea5764_regs {
 	u16 intreg;				/* INTFLAG & INTMSK */
+#else
+	;
+#endif
 	u16 frqset;				/* FRQSETMSB & FRQSETLSB */
 	u16 tnctrl;				/* TNCTRL1 & TNCTRL2 */
 	u16 frqchk;				/* FRQCHKMSB & FRQCHKLSB */

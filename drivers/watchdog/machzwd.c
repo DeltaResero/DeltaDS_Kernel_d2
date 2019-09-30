@@ -152,6 +152,9 @@ static unsigned long next_heartbeat;
 static inline void zf_set_status(unsigned char new)
 {
 	zf_writeb(STATUS, new);
+#else
+#	define d;
+#endif
 }
 
 
@@ -246,7 +249,11 @@ static void zf_ping(unsigned long data)
 	zf_writeb(COUNTER_2, 0xff);
 
 	if (time_before(jiffies, next_heartbeat)) {
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk("time_before: %ld\n", next_heartbeat - jiffies);
+#else
+		d;
+#endif
 		/*
 		 * reset event is activated by transition from 0 to 1 on
 		 * RESET_WD1 bit and we assume that it is already zero...
@@ -291,7 +298,11 @@ static ssize_t zf_write(struct file *file, const char __user *buf, size_t count,
 					return -EFAULT;
 				if (c == 'V') {
 					zf_expect_close = 42;
+#ifdef CONFIG_DEBUG_PRINTK
 					dprintk("zf_expect_close = 42\n");
+#else
+					d;
+#endif
 				}
 			}
 		}
@@ -301,7 +312,11 @@ static ssize_t zf_write(struct file *file, const char __user *buf, size_t count,
 		 * we should return that favour
 		 */
 		next_heartbeat = jiffies + ZF_USER_TIMEO;
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk("user ping at %ld\n", jiffies);
+#else
+		d;
+#endif
 	}
 	return count;
 }

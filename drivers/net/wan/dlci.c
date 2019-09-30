@@ -522,7 +522,7 @@ static int __init init_dlci(void)
 	dlci_ioctl_set(dlci_ioctl);
 	register_netdevice_notifier(&dlci_notifier);
 
-	printk("%s.\n", version);
+;
 
 	return 0;
 }

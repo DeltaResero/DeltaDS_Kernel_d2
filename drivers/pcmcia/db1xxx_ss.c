@@ -253,8 +253,12 @@ static int db1x_pcmcia_configure(struct pcmcia_socket *skt,
 	case 0:
 		break;
 	default:
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_INFO "pcmcia%d unsupported Vcc %d\n",
 			sock->nr, state->Vcc);
+#else
+		;
+#endif
 	}
 
 	switch (state->Vpp) {
@@ -266,15 +270,23 @@ static int db1x_pcmcia_configure(struct pcmcia_socket *skt,
 	case 0:
 		break;
 	default:
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_INFO "pcmcia%d unsupported Vpp %d\n",
 			sock->nr, state->Vpp);
+#else
+		;
+#endif
 	}
 
 	/* sanity check: Vpp must be 0, 12, or Vcc */
 	if (((state->Vcc == 33) && (state->Vpp == 50)) ||
 	    ((state->Vcc == 50) && (state->Vpp == 33))) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_INFO "pcmcia%d bad Vcc/Vpp combo (%d %d)\n",
 			sock->nr, state->Vcc, state->Vpp);
+#else
+		;
+#endif
 		v = p = 0;
 		ret = -EINVAL;
 	}
@@ -438,7 +450,11 @@ static int __devinit db1x_pcmcia_socket_probe(struct platform_device *pdev)
 		sock->board_type = BOARD_TYPE_DB1300;
 		break;
 	default:
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_INFO "db1xxx-ss: unknown board %d!\n", bid);
+#else
+		;
+#endif
 		ret = -ENODEV;
 		goto out0;
 	};
@@ -542,11 +558,15 @@ static int __devinit db1x_pcmcia_socket_probe(struct platform_device *pdev)
 		goto out2;
 	}
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "Alchemy Db/Pb1xxx pcmcia%d @ io/attr/mem %09llx"
 		"(%p) %09llx %09llx  card/insert/stschg/eject irqs @ %d "
 		"%d %d %d\n", sock->nr, sock->phys_io, sock->virt_io,
 		sock->phys_attr, sock->phys_mem, sock->card_irq,
 		sock->insert_irq, sock->stschg_irq, sock->eject_irq);
+#else
+	;
+#endif
 
 	return 0;
 

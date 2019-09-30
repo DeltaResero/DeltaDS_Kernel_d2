@@ -216,8 +216,8 @@ static inline void wanxl_rx_intr(card_t *card)
 				skb_put(skb, desc->length);
 
 #ifdef DEBUG_PKT
-				printk(KERN_DEBUG "%s RX(%i):", dev->name,
-				       skb->len);
+//				printk(KERN_DEBUG "%s RX(%i):", dev->name,
+;
 				debug_frame(skb);
 #endif
 				dev->stats.rx_packets++;
@@ -281,7 +281,7 @@ static netdev_tx_t wanxl_xmit(struct sk_buff *skb, struct net_device *dev)
         if (desc->stat != PACKET_EMPTY) {
                 /* should never happen - previous xmit should stop queue */
 #ifdef DEBUG_PKT
-                printk(KERN_DEBUG "%s: transmitter buffer full\n", dev->name);
+;
 #endif
 		netif_stop_queue(dev);
 		spin_unlock(&port->lock);
@@ -289,7 +289,7 @@ static netdev_tx_t wanxl_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 
 #ifdef DEBUG_PKT
-	printk(KERN_DEBUG "%s TX(%i):", dev->name, skb->len);
+;
 	debug_frame(skb);
 #endif
 
@@ -306,7 +306,7 @@ static netdev_tx_t wanxl_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (get_status(port)->tx_descs[port->tx_out].stat != PACKET_EMPTY) {
 		netif_stop_queue(dev);
 #ifdef DEBUG_PKT
-		printk(KERN_DEBUG "%s: transmitter buffer full\n", dev->name);
+;
 #endif
 	}
 
@@ -621,9 +621,9 @@ static int __devinit wanxl_pci_init_one(struct pci_dev *pdev,
 	}
 
 #ifdef DEBUG_PCI
-	printk(KERN_DEBUG "wanXL %s: pci_alloc_consistent() returned memory"
-	       " at 0x%LX\n", pci_name(pdev),
-	       (unsigned long long)card->status_address);
+//	printk(KERN_DEBUG "wanXL %s: pci_alloc_consistent() returned memory"
+//	       " at 0x%LX\n", pci_name(pdev),
+;
 #endif
 
 	/* FIXME when PCI/DMA subsystems are fixed.

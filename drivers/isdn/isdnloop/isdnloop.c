@@ -68,7 +68,11 @@ isdnloop_bchan_send(isdnloop_card *card, int ch)
 			if (rcard) {
 				rcard->interface.rcvcallb_skb(rcard->myid, rch, skb);
 			} else {
+#ifdef CONFIG_DEBUG_PRINTK
 				printk(KERN_WARNING "isdnloop: no rcard, skb dropped\n");
+#else
+				;
+#endif
 				dev_kfree_skb(skb);
 
 			};
@@ -341,18 +345,30 @@ isdnloop_polldchan(unsigned long data)
 			} else {
 				p = card->imsg;
 				if (!strncmp(p, "DRV1.", 5)) {
+#ifdef CONFIG_DEBUG_PRINTK
 					printk(KERN_INFO "isdnloop: (%s) %s\n", CID, p);
+#else
+					;
+#endif
 					if (!strncmp(p + 7, "TC", 2)) {
 						card->ptype = ISDN_PTYPE_1TR6;
 						card->interface.features |= ISDN_FEATURE_P_1TR6;
+#ifdef CONFIG_DEBUG_PRINTK
 						printk(KERN_INFO
 						       "isdnloop: (%s) 1TR6-Protocol loaded and running\n", CID);
+#else
+						;
+#endif
 					}
 					if (!strncmp(p + 7, "EC", 2)) {
 						card->ptype = ISDN_PTYPE_EURO;
 						card->interface.features |= ISDN_FEATURE_P_EURO;
+#ifdef CONFIG_DEBUG_PRINTK
 						printk(KERN_INFO
 						       "isdnloop: (%s) Euro-Protocol loaded and running\n", CID);
+#else
+						;
+#endif
 					}
 					continue;
 
@@ -403,8 +419,12 @@ isdnloop_sendbuf(int channel, struct sk_buff *skb, isdnloop_card *card)
 	struct sk_buff *nskb;
 
 	if (len > 4000) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING
 		       "isdnloop: Send packet too large\n");
+#else
+		;
+#endif
 		return -EINVAL;
 	}
 	if (len) {
@@ -473,7 +493,11 @@ isdnloop_fake(isdnloop_card *card, char *s, int ch)
 	int len = strlen(s) + ((ch >= 0) ? 3 : 0);
 
 	if (!(skb = dev_alloc_skb(len))) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "isdnloop: Out of memory in isdnloop_fake\n");
+#else
+		;
+#endif
 		return 1;
 	}
 	if (ch >= 0)
@@ -746,7 +770,11 @@ isdnloop_vstphone(isdnloop_card *card, char *phone, int caller)
 	static char nphone[30];
 
 	if (!card) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk("BUG!!!\n");
+#else
+		;
+#endif
 		return "";
 	}
 	switch (card->ptype) {
@@ -1476,8 +1504,12 @@ isdnloop_initcard(char *id)
 	cards = card;
 	if (!register_isdn(&card->interface)) {
 		cards = cards->next;
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING
 		       "isdnloop: Unable to register %s\n", id);
+#else
+		;
+#endif
 		kfree(card);
 		return (isdnloop_card *) 0;
 	}
@@ -1493,9 +1525,13 @@ isdnloop_addcard(char *id1)
 	if (!(card = isdnloop_initcard(id1))) {
 		return -EIO;
 	}
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO
 	       "isdnloop: (%s) virtual card added\n",
 	       card->interface.id);
+#else
+	;
+#endif
 	return 0;
 }
 
@@ -1532,7 +1568,11 @@ isdnloop_exit(void)
 		card = card->next;
 		kfree(last);
 	}
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_NOTICE "isdnloop-ISDN-driver unloaded\n");
+#else
+	;
+#endif
 }
 
 module_init(isdnloop_init);

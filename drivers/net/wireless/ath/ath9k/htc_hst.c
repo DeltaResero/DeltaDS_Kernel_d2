@@ -463,7 +463,7 @@ int ath9k_htc_hw_init(struct htc_target *target,
 		      char *product, u32 drv_info)
 {
 	if (ath9k_htc_probe_device(target, dev, devid, product, drv_info)) {
-		printk(KERN_ERR "Failed to initialize the device\n");
+;
 		return -ENODEV;
 	}
 

@@ -568,8 +568,12 @@ static int dvb_pll_configure(struct dvb_frontend *fe, u8 *buf,
 		desc->set(fe, buf);
 
 	if (debug)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk("pll: %s: div=%d | buf=0x%02x,0x%02x,0x%02x,0x%02x\n",
 		       desc->name, div, buf[0], buf[1], buf[2], buf[3]);
+#else
+		;
+#endif
 
 	// calculate the frequency we set it to
 	return (div * desc->entries[i].stepsize) - desc->iffreq;
@@ -777,12 +781,24 @@ struct dvb_frontend *dvb_pll_attach(struct dvb_frontend *fe, int pll_addr,
 	fe->tuner_priv = priv;
 
 	if ((debug) || (id[priv->nr] == pll_desc_id)) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk("dvb-pll[%d]", priv->nr);
+#else
+		;
+#endif
 		if (i2c != NULL)
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(" %d-%04x", i2c_adapter_id(i2c), pll_addr);
+#else
+			;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(": id# %d (%s) attached, %s\n", pll_desc_id, desc->name,
 		       id[priv->nr] == pll_desc_id ?
 				"insmod option" : "autodetected");
+#else
+		;
+#endif
 	}
 
 	return fe;

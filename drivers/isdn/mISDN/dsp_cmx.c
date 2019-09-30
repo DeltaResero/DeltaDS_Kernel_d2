@@ -200,7 +200,11 @@ dsp_cmx_search_conf(u32 id)
 	struct dsp_conf *conf;
 
 	if (!id) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "%s: conference ID is 0.\n", __func__);
+#else
+		;
+#endif
 		return NULL;
 	}
 
@@ -544,6 +548,7 @@ dsp_cmx_hardware(struct dsp_conf *conf, struct dsp *dsp)
 				if (dsp->pcm_slot_tx >= 0 ||
 				    dsp->pcm_slot_rx >= 0) {
 					if (dsp_debug & DEBUG_DSP_CMX)
+#ifdef CONFIG_DEBUG_PRINTK
 						printk(KERN_DEBUG "%s removing "
 						       "%s from PCM slot %d (TX)"
 						       " slot %d (RX) because not"
@@ -732,6 +737,7 @@ dsp_cmx_hardware(struct dsp_conf *conf, struct dsp *dsp)
 			    nextm->dsp->pcm_bank_rx) {
 				/* all members have same slot */
 				if (dsp_debug & DEBUG_DSP_CMX)
+#ifdef CONFIG_DEBUG_PRINTK
 					printk(KERN_DEBUG
 					       "%s dsp %s & %s stay joined on "
 					       "PCM slot %d bank %d (TX) bank %d "
@@ -790,6 +796,7 @@ dsp_cmx_hardware(struct dsp_conf *conf, struct dsp *dsp)
 			nextm->dsp->pcm_bank_rx = 1;
 			nextm->dsp->pcm_bank_tx = 0;
 			if (dsp_debug & DEBUG_DSP_CMX)
+#ifdef CONFIG_DEBUG_PRINTK
 				printk(KERN_DEBUG
 				       "%s adding %s & %s to new PCM slot %d "
 				       "(TX and RX on different chips) because "
@@ -826,6 +833,7 @@ dsp_cmx_hardware(struct dsp_conf *conf, struct dsp *dsp)
 			    nextm->dsp->pcm_bank_rx == 0) {
 				/* all members have same slot */
 				if (dsp_debug & DEBUG_DSP_CMX)
+#ifdef CONFIG_DEBUG_PRINTK
 					printk(KERN_DEBUG
 					       "%s dsp %s & %s stay joined on PCM "
 					       "slot %d (TX) %d (RX) on same chip "
@@ -899,6 +907,7 @@ dsp_cmx_hardware(struct dsp_conf *conf, struct dsp *dsp)
 			nextm->dsp->pcm_bank_rx = 0;
 			nextm->dsp->pcm_bank_tx = 0;
 			if (dsp_debug & DEBUG_DSP_CMX)
+#ifdef CONFIG_DEBUG_PRINTK
 				printk(KERN_DEBUG
 				       "%s adding %s & %s to new PCM slot %d "
 				       "(TX) %d (RX) on same chip or one bank "
@@ -1219,7 +1228,11 @@ dsp_cmx_receive(struct dsp *dsp, struct sk_buff *skb)
 	/* if frame contains time code, write directly */
 	if (dsp->features.unordered) {
 		dsp->rx_W = (hh->id & CMX_BUFF_MASK);
+#ifdef CONFIG_DEBUG_PRINTK
 		/* printk(KERN_DEBUG "%s %08x\n", dsp->name, hh->id); */
+#else
+		/* ;
+#endif
 	}
 	/*
 	 * if we underrun (or maybe overrun),
@@ -1652,7 +1665,11 @@ dsp_cmx_send(void *arg)
 	}
 	if (length > MAX_POLL + 100)
 		length = MAX_POLL + 100;
+#ifdef CONFIG_DEBUG_PRINTK
 	/* printk(KERN_DEBUG "len=%d dsp_count=0x%x\n", length, dsp_count); */
+#else
+	/* ;
+#endif
 
 	/*
 	 * check if jitter needs to be checked (this is every second)

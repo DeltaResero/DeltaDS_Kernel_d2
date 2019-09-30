@@ -1161,7 +1161,7 @@ static struct pernet_operations nfsd_net_ops = {
 static int __init init_nfsd(void)
 {
 	int retval;
-	printk(KERN_INFO "Installing knfsd (copyright (C) 1996 okir@monad.swb.de).\n");
+;
 
 	retval = register_pernet_subsys(&nfsd_net_ops);
 	if (retval < 0)

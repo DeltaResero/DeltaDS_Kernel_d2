@@ -47,6 +47,9 @@ int core_tmr_alloc_req(
 	gfp_t gfp_flags)
 {
 	struct se_tmr_req *tmr;
+#else
+#define DEBUG_LR(x...) ;
+#endif
 
 	tmr = kzalloc(sizeof(struct se_tmr_req), gfp_flags);
 	if (!tmr) {

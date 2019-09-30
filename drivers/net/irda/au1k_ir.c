@@ -703,7 +703,7 @@ static void au1k_tx_timeout(struct net_device *dev)
 	u32 speed;
 	struct au1k_private *aup = netdev_priv(dev);
 
-	printk(KERN_ERR "%s: tx timeout\n", dev->name);
+;
 	speed = aup->speed;
 	aup->speed = 0;
 	au1k_irda_set_speed(dev, speed);
@@ -728,8 +728,8 @@ static int au1k_irda_ioctl(struct net_device *dev, struct ifreq *ifreq, int cmd)
 				ret = au1k_irda_set_speed(dev,
 						rq->ifr_baudrate);
 			else {
-				printk(KERN_ERR "%s ioctl: !netif_running\n",
-						dev->name);
+//				printk(KERN_ERR "%s ioctl: !netif_running\n",
+;
 				ret = 0;
 			}
 		}

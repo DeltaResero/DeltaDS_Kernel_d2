@@ -324,8 +324,8 @@ static void receive_buf(struct net_device *dev, void *buf, unsigned int len)
 			break;
 		default:
 			if (net_ratelimit())
-				printk(KERN_WARNING "%s: bad gso type %u.\n",
-				       dev->name, hdr->hdr.gso_type);
+//				printk(KERN_WARNING "%s: bad gso type %u.\n",
+;
 			goto frame_err;
 		}
 
@@ -335,8 +335,8 @@ static void receive_buf(struct net_device *dev, void *buf, unsigned int len)
 		skb_shinfo(skb)->gso_size = hdr->hdr.gso_size;
 		if (skb_shinfo(skb)->gso_size == 0) {
 			if (net_ratelimit())
-				printk(KERN_WARNING "%s: zero gso size.\n",
-				       dev->name);
+//				printk(KERN_WARNING "%s: zero gso size.\n",
+;
 			goto frame_err;
 		}
 

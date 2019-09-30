@@ -112,14 +112,14 @@ static inline void sca_set_carrier(port_t *port)
 {
 	if (!(sca_in(get_msci(port) + ST3, port->card) & ST3_DCD)) {
 #ifdef DEBUG_LINK
-		printk(KERN_DEBUG "%s: sca_set_carrier on\n",
-		       port->netdev.name);
+//		printk(KERN_DEBUG "%s: sca_set_carrier on\n",
+;
 #endif
 		netif_carrier_on(port->netdev);
 	} else {
 #ifdef DEBUG_LINK
-		printk(KERN_DEBUG "%s: sca_set_carrier off\n",
-		       port->netdev.name);
+//		printk(KERN_DEBUG "%s: sca_set_carrier off\n",
+;
 #endif
 		netif_carrier_off(port->netdev);
 	}
@@ -220,7 +220,7 @@ static inline void sca_rx(card_t *card, port_t *port, pkt_desc __iomem *desc,
 
 	skb_put(skb, len);
 #ifdef DEBUG_PKT
-	printk(KERN_DEBUG "%s RX(%i):", dev->name, skb->len);
+;
 	debug_frame(skb);
 #endif
 	dev->stats.rx_packets++;
@@ -576,7 +576,7 @@ static netdev_tx_t sca_xmit(struct sk_buff *skb, struct net_device *dev)
 	BUG_ON(readb(&desc->stat)); /* previous xmit should stop queue */
 
 #ifdef DEBUG_PKT
-	printk(KERN_DEBUG "%s TX(%i):", dev->name, skb->len);
+;
 	debug_frame(skb);
 #endif
 

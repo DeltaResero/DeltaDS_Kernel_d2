@@ -296,7 +296,11 @@ setup_telespci(struct IsdnCard *card)
 #endif
 
 	strcpy(tmp, telespci_revision);
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "HiSax: Teles/PCI driver Rev. %s\n", HiSax_getrev(tmp));
+#else
+	;
+#endif
 	if (cs->typ != ISDN_CTYPE_TELESPCI)
 		return (0);
 
@@ -327,10 +331,14 @@ setup_telespci(struct IsdnCard *card)
 	writel(0x61000000, cs->hw.teles0.membase + 0x40);
 	/* writel(0x00800000, cs->hw.teles0.membase + 0x200); */
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO
 	       "HiSax: Teles PCI config irq:%d mem:%p\n",
 	       cs->irq,
 	       cs->hw.teles0.membase);
+#else
+	;
+#endif
 
 	setup_isac(cs);
 	cs->readisac = &ReadISAC;

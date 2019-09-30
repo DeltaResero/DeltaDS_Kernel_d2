@@ -656,7 +656,7 @@ EXPORT_SYMBOL_GPL(unregister_sja1000dev);
 
 static __init int sja1000_init(void)
 {
-	printk(KERN_INFO "%s CAN netdevice driver\n", DRV_NAME);
+;
 
 	return 0;
 }
@@ -665,7 +665,7 @@ module_init(sja1000_init);
 
 static __exit void sja1000_exit(void)
 {
-	printk(KERN_INFO "%s: driver removed\n", DRV_NAME);
+;
 }
 
 module_exit(sja1000_exit);

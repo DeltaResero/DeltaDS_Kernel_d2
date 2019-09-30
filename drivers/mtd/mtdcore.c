@@ -409,8 +409,12 @@ int del_mtd_device(struct mtd_info *mtd)
 		not->remove(mtd);
 
 	if (mtd->usecount) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_NOTICE "Removing MTD device #%d (%s) with use count %d\n",
 		       mtd->index, mtd->name, mtd->usecount);
+#else
+		;
+#endif
 		ret = -EBUSY;
 	} else {
 		device_unregister(&mtd->dev);

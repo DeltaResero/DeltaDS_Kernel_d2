@@ -82,13 +82,21 @@ static int erase_eraseblock(int ebnum)
 
 	err = mtd_erase(mtd, &ei);
 	if (err) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "error %d while erasing EB %d\n", err, ebnum);
+#else
+		;
+#endif
 		return err;
 	}
 
 	if (ei.state == MTD_ERASE_FAILED) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "some erase error occurred at EB %d\n",
 		       ebnum);
+#else
+		;
+#endif
 		return -EIO;
 	}
 
@@ -100,7 +108,11 @@ static int erase_whole_device(void)
 	int err;
 	unsigned int i;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "erasing whole device\n");
+#else
+	;
+#endif
 	for (i = 0; i < ebcnt; ++i) {
 		if (bbt[i])
 			continue;
@@ -109,7 +121,11 @@ static int erase_whole_device(void)
 			return err;
 		cond_resched();
 	}
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "erased %u eraseblocks\n", i);
+#else
+	;
+#endif
 	return 0;
 }
 
@@ -122,11 +138,23 @@ static int write_eraseblock(int ebnum)
 	set_random_data(writebuf, subpgsize);
 	err = mtd_write(mtd, addr, subpgsize, &written, writebuf);
 	if (unlikely(err || written != subpgsize)) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "error: write failed at %#llx\n",
 		       (long long)addr);
+#else
+		;
+#endif
 		if (written != subpgsize) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(PRINT_PREF "  write size: %#x\n", subpgsize);
+#else
+			;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(PRINT_PREF "  written: %#zx\n", written);
+#else
+			;
+#endif
 		}
 		return err ? err : -1;
 	}
@@ -136,11 +164,23 @@ static int write_eraseblock(int ebnum)
 	set_random_data(writebuf, subpgsize);
 	err = mtd_write(mtd, addr, subpgsize, &written, writebuf);
 	if (unlikely(err || written != subpgsize)) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "error: write failed at %#llx\n",
 		       (long long)addr);
+#else
+		;
+#endif
 		if (written != subpgsize) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(PRINT_PREF "  write size: %#x\n", subpgsize);
+#else
+			;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(PRINT_PREF "  written: %#zx\n", written);
+#else
+			;
+#endif
 		}
 		return err ? err : -1;
 	}
@@ -160,13 +200,25 @@ static int write_eraseblock2(int ebnum)
 		set_random_data(writebuf, subpgsize * k);
 		err = mtd_write(mtd, addr, subpgsize * k, &written, writebuf);
 		if (unlikely(err || written != subpgsize * k)) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(PRINT_PREF "error: write failed at %#llx\n",
 			       (long long)addr);
+#else
+			;
+#endif
 			if (written != subpgsize) {
+#ifdef CONFIG_DEBUG_PRINTK
 				printk(PRINT_PREF "  write size: %#x\n",
 				       subpgsize * k);
+#else
+				;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 				printk(PRINT_PREF "  written: %#08zx\n",
 				       written);
+#else
+				;
+#endif
 			}
 			return err ? err : -1;
 		}
@@ -182,8 +234,16 @@ static void print_subpage(unsigned char *p)
 
 	for (i = 0; i < subpgsize; ) {
 		for (j = 0; i < subpgsize && j < 32; ++i, ++j)
+#ifdef CONFIG_DEBUG_PRINTK
 			printk("%02x", *p++);
+#else
+			;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 		printk("\n");
+#else
+		;
+#endif
 	}
 }
 
@@ -320,7 +380,11 @@ static int verify_all_eraseblocks_ff(void)
 	int err;
 	unsigned int i;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "verifying all eraseblocks for 0xff\n");
+#else
+	;
+#endif
 	for (i = 0; i < ebcnt; ++i) {
 		if (bbt[i])
 			continue;
@@ -328,10 +392,18 @@ static int verify_all_eraseblocks_ff(void)
 		if (err)
 			return err;
 		if (i % 256 == 0)
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(PRINT_PREF "verified up to eraseblock %u\n", i);
+#else
+			;
+#endif
 		cond_resched();
 	}
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "verified %u eraseblocks\n", i);
+#else
+	;
+#endif
 	return 0;
 }
 
@@ -342,7 +414,11 @@ static int is_block_bad(int ebnum)
 
 	ret = mtd_block_isbad(mtd, addr);
 	if (ret)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "block %d is bad\n", ebnum);
+#else
+		;
+#endif
 	return ret;
 }
 
@@ -352,18 +428,30 @@ static int scan_for_bad_eraseblocks(void)
 
 	bbt = kzalloc(ebcnt, GFP_KERNEL);
 	if (!bbt) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "error: cannot allocate memory\n");
+#else
+		;
+#endif
 		return -ENOMEM;
 	}
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "scanning for bad eraseblocks\n");
+#else
+	;
+#endif
 	for (i = 0; i < ebcnt; ++i) {
 		bbt[i] = is_block_bad(i) ? 1 : 0;
 		if (bbt[i])
 			bad += 1;
 		cond_resched();
 	}
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "scanned %d eraseblocks, %d are bad\n", i, bad);
+#else
+	;
+#endif
 	return 0;
 }
 
@@ -402,22 +490,34 @@ static int __init mtd_subpagetest_init(void)
 	ebcnt = tmp;
 	pgcnt = mtd->erasesize / mtd->writesize;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "MTD device size %llu, eraseblock size %u, "
 	       "page size %u, subpage size %u, count of eraseblocks %u, "
 	       "pages per eraseblock %u, OOB size %u\n",
 	       (unsigned long long)mtd->size, mtd->erasesize,
 	       mtd->writesize, subpgsize, ebcnt, pgcnt, mtd->oobsize);
+#else
+	;
+#endif
 
 	err = -ENOMEM;
 	bufsize = subpgsize * 32;
 	writebuf = kmalloc(bufsize, GFP_KERNEL);
 	if (!writebuf) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "error: cannot allocate memory\n");
+#else
+		;
+#endif
 		goto out;
 	}
 	readbuf = kmalloc(bufsize, GFP_KERNEL);
 	if (!readbuf) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "error: cannot allocate memory\n");
+#else
+		;
+#endif
 		goto out;
 	}
 
@@ -429,7 +529,11 @@ static int __init mtd_subpagetest_init(void)
 	if (err)
 		goto out;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "writing whole device\n");
+#else
+	;
+#endif
 	simple_srand(1);
 	for (i = 0; i < ebcnt; ++i) {
 		if (bbt[i])
@@ -438,13 +542,25 @@ static int __init mtd_subpagetest_init(void)
 		if (unlikely(err))
 			goto out;
 		if (i % 256 == 0)
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(PRINT_PREF "written up to eraseblock %u\n", i);
+#else
+			;
+#endif
 		cond_resched();
 	}
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "written %u eraseblocks\n", i);
+#else
+	;
+#endif
 
 	simple_srand(1);
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "verifying all eraseblocks\n");
+#else
+	;
+#endif
 	for (i = 0; i < ebcnt; ++i) {
 		if (bbt[i])
 			continue;
@@ -452,10 +568,18 @@ static int __init mtd_subpagetest_init(void)
 		if (unlikely(err))
 			goto out;
 		if (i % 256 == 0)
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(PRINT_PREF "verified up to eraseblock %u\n", i);
+#else
+			;
+#endif
 		cond_resched();
 	}
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "verified %u eraseblocks\n", i);
+#else
+	;
+#endif
 
 	err = erase_whole_device();
 	if (err)
@@ -467,7 +591,11 @@ static int __init mtd_subpagetest_init(void)
 
 	/* Write all eraseblocks */
 	simple_srand(3);
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "writing whole device\n");
+#else
+	;
+#endif
 	for (i = 0; i < ebcnt; ++i) {
 		if (bbt[i])
 			continue;
@@ -475,14 +603,26 @@ static int __init mtd_subpagetest_init(void)
 		if (unlikely(err))
 			goto out;
 		if (i % 256 == 0)
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(PRINT_PREF "written up to eraseblock %u\n", i);
+#else
+			;
+#endif
 		cond_resched();
 	}
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "written %u eraseblocks\n", i);
+#else
+	;
+#endif
 
 	/* Check all eraseblocks */
 	simple_srand(3);
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "verifying all eraseblocks\n");
+#else
+	;
+#endif
 	for (i = 0; i < ebcnt; ++i) {
 		if (bbt[i])
 			continue;
@@ -490,10 +630,18 @@ static int __init mtd_subpagetest_init(void)
 		if (unlikely(err))
 			goto out;
 		if (i % 256 == 0)
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(PRINT_PREF "verified up to eraseblock %u\n", i);
+#else
+			;
+#endif
 		cond_resched();
 	}
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "verified %u eraseblocks\n", i);
+#else
+	;
+#endif
 
 	err = erase_whole_device();
 	if (err)
@@ -503,7 +651,11 @@ static int __init mtd_subpagetest_init(void)
 	if (err)
 		goto out;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "finished with %d errors\n", errcnt);
+#else
+	;
+#endif
 
 out:
 	kfree(bbt);
@@ -511,8 +663,16 @@ out:
 	kfree(writebuf);
 	put_mtd_device(mtd);
 	if (err)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "error %d occurred\n", err);
+#else
+		;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "=================================================\n");
+#else
+	;
+#endif
 	return err;
 }
 module_init(mtd_subpagetest_init);

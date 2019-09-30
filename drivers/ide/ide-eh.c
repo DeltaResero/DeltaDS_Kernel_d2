@@ -175,7 +175,11 @@ static ide_startstop_t atapi_reset_pollfunc(ide_drive_t *drive)
 	stat = tp_ops->read_status(hwif);
 
 	if (OK_STAT(stat, 0, ATA_BUSY))
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_INFO "%s: ATAPI reset complete\n", drive->name);
+#else
+		;
+#endif
 	else {
 		if (time_before(jiffies, hwif->poll_timeout)) {
 			ide_set_handler(drive, &atapi_reset_pollfunc, HZ/20);
@@ -206,12 +210,28 @@ static void ide_reset_report_error(ide_hwif_t *hwif, u8 err)
 
 	printk(KERN_ERR "%s: reset: master: ", hwif->name);
 	if (err_master && err_master < 6)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_CONT "%s", err_master_vals[err_master]);
+#else
+		;
+#endif
 	else
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_CONT "error (0x%02x?)", err);
+#else
+		;
+#endif
 	if (err & 0x80)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_CONT "; slave: failed");
+#else
+		;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_CONT "\n");
+#else
+	;
+#endif
 }
 
 /*
@@ -252,7 +272,11 @@ static ide_startstop_t reset_pollfunc(ide_drive_t *drive)
 		tmp = ide_read_error(drive);
 
 		if (tmp == 1) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_INFO "%s: reset: success\n", hwif->name);
+#else
+			;
+#endif
 			drive->failures = 0;
 		} else {
 			ide_reset_report_error(hwif, tmp);

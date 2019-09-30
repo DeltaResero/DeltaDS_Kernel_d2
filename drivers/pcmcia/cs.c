@@ -177,8 +177,12 @@ int pcmcia_register_socket(struct pcmcia_socket *socket)
 
 	wait_for_completion(&socket->thread_done);
 	if (!socket->thread) {
+#ifdef CONFIG_DEBUG_PRINTK
 		dev_printk(KERN_WARNING, &socket->dev,
 			   "PCMCIA: warning: socket thread did not start\n");
+#else
+		dev_;
+#endif
 		return -EIO;
 	}
 
@@ -429,10 +433,14 @@ static int socket_insert(struct pcmcia_socket *skt)
 	if (ret == 0) {
 		skt->state |= SOCKET_PRESENT;
 
+#ifdef CONFIG_DEBUG_PRINTK
 		dev_printk(KERN_NOTICE, &skt->dev,
 			   "pccard: %s card inserted into slot %d\n",
 			   (skt->state & SOCKET_CARDBUS) ? "CardBus" : "PCMCIA",
 			   skt->sock);
+#else
+		dev_;
+#endif
 
 #ifdef CONFIG_CARDBUS
 		if (skt->state & SOCKET_CARDBUS) {
@@ -542,8 +550,12 @@ static int socket_resume(struct pcmcia_socket *skt)
 
 static void socket_remove(struct pcmcia_socket *skt)
 {
+#ifdef CONFIG_DEBUG_PRINTK
 	dev_printk(KERN_NOTICE, &skt->dev,
 		   "pccard: card ejected from slot %d\n", skt->sock);
+#else
+	dev_;
+#endif
 	socket_shutdown(skt);
 }
 
@@ -589,8 +601,12 @@ static int pccardd(void *__skt)
 	/* register with the device core */
 	ret = device_register(&skt->dev);
 	if (ret) {
+#ifdef CONFIG_DEBUG_PRINTK
 		dev_printk(KERN_WARNING, &skt->dev,
 			   "PCMCIA: unable to register socket\n");
+#else
+		dev_;
+#endif
 		skt->thread = NULL;
 		complete(&skt->thread_done);
 		return 0;

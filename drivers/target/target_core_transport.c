@@ -4285,6 +4285,9 @@ static int transport_lun_wait_for_tasks(struct se_cmd *cmd, struct se_lun *lun)
 static void __transport_clear_lun_from_sessions(struct se_lun *lun)
 {
 	struct se_cmd *cmd = NULL;
+#else
+#define DEBUG_CLEAR_L(x...) ;
+#endif
 	unsigned long lun_flags, cmd_flags;
 	/*
 	 * Do exception processing and return CHECK_CONDITION status to the

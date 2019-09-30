@@ -2240,7 +2240,7 @@ static int exfat_fill_super(struct super_block *sb, void *data, int silent)
 	ret = FsMountVol(sb);
 	if (ret) {
 		if (!silent)
-			printk(KERN_ERR "[EXFAT] FsMountVol failed\n");
+;
 
 		goto out_fail;
 	}
@@ -2280,7 +2280,7 @@ static int exfat_fill_super(struct super_block *sb, void *data, int silent)
 	sb->s_root = d_alloc_root(root_inode);
 #endif
 	if (!sb->s_root) {
-		printk(KERN_ERR "[EXFAT] Getting the root inode failed\n");
+;
 		goto out_fail2;
 	}
 

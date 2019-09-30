@@ -299,7 +299,11 @@ int capi_tdata_req(struct pcbit_chan *chan, struct sk_buff *skb)
 
 	if (skb_headroom(skb) < 10)
 	{
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_CRIT "No headspace (%u) on headroom %p for capi header\n", skb_headroom(skb), skb);
+#else
+		;
+#endif
 	}
 	else
 	{
@@ -421,7 +425,11 @@ int capi_decode_conn_ind(struct pcbit_chan *chan,
 		int count = 1;
 
 #ifdef DEBUG
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "CPN: Octect 3 %02x\n", skb->data[1]);
+#else
+		;
+#endif
 #endif
 		if ((skb->data[1] & 0x80) == 0)
 			count = 2;
@@ -437,7 +445,11 @@ int capi_decode_conn_ind(struct pcbit_chan *chan,
 	}
 	else {
 		info->data.setup.CallingPN = NULL;
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "NULL CallingPN\n");
+#else
+		;
+#endif
 	}
 
 	skb_pull(skb, len + 1);
@@ -466,7 +478,11 @@ int capi_decode_conn_ind(struct pcbit_chan *chan,
 	}
 	else {
 		info->data.setup.CalledPN = NULL;
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "NULL CalledPN\n");
+#else
+		;
+#endif
 	}
 
 	skb_pull(skb, len + 1);
@@ -543,10 +559,18 @@ int capi_decode_conn_actv_ind(struct pcbit_chan *chan, struct sk_buff *skb)
 	if (len > 1 && len < 31) {
 		skb_copy_from_linear_data_offset(skb, 2, str, len - 1);
 		str[len] = 0;
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "Connected Party Number: %s\n", str);
+#else
+		;
+#endif
 	}
 	else
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "actv_ind CPN len = %d\n", len);
+#else
+		;
+#endif
 #endif
 
 	skb_pull(skb, len + 1);

@@ -726,7 +726,11 @@ dbusy_timer_handler(struct IsdnCardState *cs)
 				cs->tx_skb = NULL;
 				cs->dc.amd7930.tx_xmtlen = 0;
 			} else {
+#ifdef CONFIG_DEBUG_PRINTK
 				printk(KERN_WARNING "HiSax: Amd7930: D-Channel Busy no skb\n");
+#else
+				;
+#endif
 				debugl1(cs, "Amd7930: D-Channel Busy no skb");
 
 			}

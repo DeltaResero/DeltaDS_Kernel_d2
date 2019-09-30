@@ -619,7 +619,7 @@ static irqreturn_t interrupt_pcl818_ai_mode13_dma(int irq, void *d)
 		release_dma_lock(flags);
 		enable_dma(devpriv->dma);
 	}
-	printk("comedi: A/D mode1/3 IRQ \n");
+;
 
 	devpriv->dma_runs_to_end--;
 	outb(0, dev->iobase + PCL818_CLRINT);	/* clear INT request */
@@ -924,7 +924,7 @@ static void pcl818_ai_mode13dma_int(int mode, struct comedi_device *dev,
 	unsigned int flags;
 	unsigned int bytes;
 
-	printk("mode13dma_int, mode: %d\n", mode);
+;
 	disable_dma(devpriv->dma);	/*  disable dma */
 	bytes = devpriv->hwdmasize[0];
 	if (!devpriv->neverending_ai) {
@@ -1273,7 +1273,7 @@ static int check_channel_list(struct comedi_device *dev,
 	} else {
 		seglen = 1;
 	}
-	printk("check_channel_list: seglen %d\n", seglen);
+;
 	return seglen;
 }
 
@@ -1884,11 +1884,11 @@ no_dma:
 		if (check_single_ended(dev->iobase)) {
 			s->n_chan = this_board->n_aichan_se;
 			s->subdev_flags |= SDF_COMMON | SDF_GROUND;
-			printk(", %dchans S.E. DAC", s->n_chan);
+;
 		} else {
 			s->n_chan = this_board->n_aichan_diff;
 			s->subdev_flags |= SDF_DIFF;
-			printk(", %dchans DIFF DAC", s->n_chan);
+;
 		}
 		s->maxdata = this_board->ai_maxdata;
 		s->len_chanlist = s->n_chan;
@@ -2015,7 +2015,7 @@ no_dma:
 
 	pcl818_reset(dev);
 
-	printk("\n");
+;
 
 	return 0;
 }

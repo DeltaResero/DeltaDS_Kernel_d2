@@ -233,11 +233,11 @@ static int c101_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 #ifdef DEBUG_RINGS
 	if (cmd == SIOCDEVPRIVATE) {
 		sca_dump_rings(dev);
-		printk(KERN_DEBUG "MSCI1: ST: %02x %02x %02x %02x\n",
-		       sca_in(MSCI1_OFFSET + ST0, port),
-		       sca_in(MSCI1_OFFSET + ST1, port),
-		       sca_in(MSCI1_OFFSET + ST2, port),
-		       sca_in(MSCI1_OFFSET + ST3, port));
+//		printk(KERN_DEBUG "MSCI1: ST: %02x %02x %02x %02x\n",
+//		       sca_in(MSCI1_OFFSET + ST0, port),
+//		       sca_in(MSCI1_OFFSET + ST1, port),
+//		       sca_in(MSCI1_OFFSET + ST2, port),
+;
 		return 0;
 	}
 #endif

@@ -1007,7 +1007,11 @@ dchan_l3l4(struct PStack *st, int pr, void *arg)
 
 static void
 dummy_pstack(struct PStack *st, int pr, void *arg) {
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_WARNING"call to dummy_pstack pr=%04x arg %lx\n", pr, (long)arg);
+#else
+	;
+#endif
 }
 
 static int
@@ -1172,7 +1176,11 @@ CallcFreeChan(struct IsdnCardState *csta)
 			kfree(csta->channel[i].b_st);
 			csta->channel[i].b_st = NULL;
 		} else
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING "CallcFreeChan b_st ch%d already freed\n", i);
+#else
+			;
+#endif
 		if (i || test_bit(FLG_TWO_DCHAN, &csta->HW_Flags)) {
 			release_d_st(csta->channel + i);
 		} else

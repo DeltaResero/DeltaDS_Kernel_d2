@@ -460,13 +460,13 @@ static int state_check(u32 state, struct dscc4_dev_priv *dpriv,
 
 	if (debug > 1) {
 	if (SOURCE_ID(state) != dpriv->dev_id) {
-		printk(KERN_DEBUG "%s (%s): Source Id=%d, state=%08x\n",
-		       dev->name, msg, SOURCE_ID(state), state );
+//		printk(KERN_DEBUG "%s (%s): Source Id=%d, state=%08x\n",
+;
 			ret = -1;
 	}
 	if (state & 0x0df80c00) {
-		printk(KERN_DEBUG "%s (%s): state=%08x (UFO alert)\n",
-		       dev->name, msg, state);
+//		printk(KERN_DEBUG "%s (%s): state=%08x (UFO alert)\n",
+;
 			ret = -1;
 	}
 	}
@@ -477,8 +477,8 @@ static void dscc4_tx_print(struct net_device *dev,
 			   struct dscc4_dev_priv *dpriv,
 			   char *msg)
 {
-	printk(KERN_DEBUG "%s: tx_current=%02d tx_dirty=%02d (%s)\n",
-	       dev->name, dpriv->tx_current, dpriv->tx_dirty, msg);
+//	printk(KERN_DEBUG "%s: tx_current=%02d tx_dirty=%02d (%s)\n",
+;
 }
 
 static void dscc4_release_ring(struct dscc4_dev_priv *dpriv)
@@ -652,7 +652,7 @@ static inline void dscc4_rx_skb(struct dscc4_dev_priv *dpriv,
 
 	skb = dpriv->rx_skbuff[dpriv->rx_current++%RX_RING_SIZE];
 	if (!skb) {
-		printk(KERN_DEBUG "%s: skb=0 (%s)\n", dev->name, __func__);
+;
 		goto refill;
 	}
 	pkt_len = TO_SIZE(le32_to_cpu(rx_fd->state2));
@@ -715,7 +715,7 @@ static int __devinit dscc4_init_one(struct pci_dev *pdev,
 	void __iomem *ioaddr;
 	int i, rc;
 
-	printk(KERN_DEBUG "%s", version);
+;
 
 	rc = pci_enable_device(pdev);
 	if (rc < 0)
@@ -1379,15 +1379,15 @@ static int dscc4_clock_setting(struct dscc4_dev_priv *dpriv,
 	if (dscc4_set_clock(dev, &bps, &state) < 0)
 		goto done;
 	if (bps) { /* DCE */
-		printk(KERN_DEBUG "%s: generated RxClk (DCE)\n", dev->name);
+;
 		if (settings->clock_rate != bps) {
-			printk(KERN_DEBUG "%s: clock adjusted (%08d -> %08d)\n",
-				dev->name, settings->clock_rate, bps);
+//			printk(KERN_DEBUG "%s: clock adjusted (%08d -> %08d)\n",
+;
 			settings->clock_rate = bps;
 		}
 	} else { /* DTE */
 		state |= PowerUp | Vis;
-		printk(KERN_DEBUG "%s: external RxClk (DTE)\n", dev->name);
+;
 	}
 	scc_writel(state, dpriv, dev, CCR0);
 	ret = 0;
@@ -1424,10 +1424,10 @@ static int dscc4_loopback_setting(struct dscc4_dev_priv *dpriv,
 
 	state = scc_readl(dpriv, CCR1);
 	if (settings->loopback) {
-		printk(KERN_DEBUG "%s: loopback\n", dev->name);
+;
 		state |= 0x00000100;
 	} else {
-		printk(KERN_DEBUG "%s: normal\n", dev->name);
+;
 		state &= ~0x00000100;
 	}
 	scc_writel(state, dpriv, dev, CCR1);
@@ -1543,10 +1543,10 @@ try:
 	state = le32_to_cpu(dpriv->iqtx[cur]);
 	if (!state) {
 		if (debug > 4)
-			printk(KERN_DEBUG "%s: Tx ISR = 0x%08x\n", dev->name,
-			       state);
+//			printk(KERN_DEBUG "%s: Tx ISR = 0x%08x\n", dev->name,
+;
 		if ((debug > 1) && (loop > 1))
-			printk(KERN_DEBUG "%s: Tx irq loop=%d\n", dev->name, loop);
+;
 		if (loop && netif_queue_stopped(dev))
 			if ((dpriv->tx_current - dpriv->tx_dirty)%TX_RING_SIZE)
 				netif_wake_queue(dev);
@@ -1722,11 +1722,11 @@ try:
 		struct RxFD *rx_fd;
 
 		if (debug > 4)
-			printk(KERN_DEBUG "%s: Rx ISR = 0x%08x\n", dev->name,
-			       state);
+//			printk(KERN_DEBUG "%s: Rx ISR = 0x%08x\n", dev->name,
+;
 		state &= 0x00ffffff;
 		if (state & Err) { /* Hold or reset */
-			printk(KERN_DEBUG "%s: Rx ERR\n", dev->name);
+;
 			cur = dpriv->rx_current%RX_RING_SIZE;
 			rx_fd = dpriv->rx_fd + cur;
 			/*
@@ -1782,8 +1782,8 @@ try:
 
 		for (evt = evts; evt->irq_name; evt++) {
 			if (state & evt->mask) {
-					printk(KERN_DEBUG "%s: %s\n",
-						dev->name, evt->irq_name);
+//					printk(KERN_DEBUG "%s: %s\n",
+;
 				if (!(state &= ~evt->mask))
 					goto try;
 			}
@@ -1839,8 +1839,8 @@ try:
 
 			if (debug > 0) {
 				if (dpriv->flags & RdoSet)
-					printk(KERN_DEBUG
-					       "%s: no RDO in Rx data\n", DRV_NAME);
+//					printk(KERN_DEBUG
+;
 			}
 #ifdef DSCC4_RDO_EXPERIMENTAL_RECOVERY
 			/*

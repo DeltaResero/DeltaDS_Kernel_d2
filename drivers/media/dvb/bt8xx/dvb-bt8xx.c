@@ -44,9 +44,13 @@ MODULE_PARM_DESC(debug, "Turn on/off debugging (default:off).");
 
 DVB_DEFINE_MOD_OPT_ADAPTER_NR(adapter_nr);
 
+#ifdef CONFIG_DEBUG_PRINTK
 #define dprintk( args... ) \
 	do { \
 		if (debug) printk(KERN_DEBUG args); \
+#else
+#define d;
+#endif
 	} while (0)
 
 #define IF_FREQUENCYx6 217    /* 6 * 36.16666666667MHz */
@@ -55,7 +59,11 @@ static void dvb_bt8xx_task(unsigned long data)
 {
 	struct dvb_bt8xx_card *card = (struct dvb_bt8xx_card *)data;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	//printk("%d ", card->bt->finished_block);
+#else
+	//;
+#endif
 
 	while (card->bt->last_block != card->bt->finished_block) {
 		(card->bt->TS_Size ? dvb_dmx_swfilter_204 : dvb_dmx_swfilter)
@@ -74,7 +82,11 @@ static int dvb_bt8xx_start_feed(struct dvb_demux_feed *dvbdmxfeed)
 	struct dvb_bt8xx_card *card = dvbdmx->priv;
 	int rc;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk("dvb_bt8xx: start_feed\n");
+#else
+	d;
+#endif
 
 	if (!dvbdmx->dmx.frontend)
 		return -EINVAL;
@@ -94,7 +106,11 @@ static int dvb_bt8xx_stop_feed(struct dvb_demux_feed *dvbdmxfeed)
 	struct dvb_demux *dvbdmx = dvbdmxfeed->demux;
 	struct dvb_bt8xx_card *card = dvbdmx->priv;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk("dvb_bt8xx: stop_feed\n");
+#else
+	d;
+#endif
 
 	if (!dvbdmx->dmx.frontend)
 		return -EINVAL;
@@ -442,7 +458,11 @@ static void or51211_reset(struct dvb_frontend * fe)
 	/* reset & PRM1,2&4 are outputs */
 	int ret = bttv_gpio_enable(bt->bttv_nr, 0x001F, 0x001F);
 	if (ret != 0)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "or51211: Init Error - Can't Reset DVR (%i)\n", ret);
+#else
+		;
+#endif
 	bttv_write_gpio(bt->bttv_nr, 0x001F, 0x0000);   /* Reset */
 	msleep(20);
 	/* Now set for normal operation */
@@ -559,7 +579,11 @@ static void digitv_alps_tded4_reset(struct dvb_bt8xx_card *bt)
 
 	int ret = bttv_gpio_enable(bt->bttv_nr, 0x08, 0x08);
 	if (ret != 0)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "digitv_alps_tded4: Init Error - Can't Reset DVR (%i)\n", ret);
+#else
+		;
+#endif
 
 	/* Pulse the reset line */
 	bttv_write_gpio(bt->bttv_nr, 0x08, 0x08); /* High */
@@ -926,7 +950,11 @@ static void dvb_bt8xx_remove(struct bttv_sub_device *sub)
 {
 	struct dvb_bt8xx_card *card = dev_get_drvdata(&sub->dev);
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk("dvb_bt8xx: unloading card%d\n", card->bttv_nr);
+#else
+	d;
+#endif
 
 	bt878_stop(card->bt);
 	tasklet_kill(&card->bt->tasklet);

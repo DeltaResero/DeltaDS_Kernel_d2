@@ -98,7 +98,11 @@ struct mISDNclock
 	struct mISDNclock	*iclock;
 
 	if (*debug & (DEBUG_CORE | DEBUG_CLOCK))
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "%s: %s %d\n", __func__, name, pri);
+#else
+		;
+#endif
 	iclock = kzalloc(sizeof(struct mISDNclock), GFP_ATOMIC);
 	if (!iclock) {
 		printk(KERN_ERR "%s: No memory for clock entry.\n", __func__);

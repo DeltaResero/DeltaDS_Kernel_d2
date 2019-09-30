@@ -1399,7 +1399,11 @@ setup_hfcsx(struct IsdnCard *card)
 	char tmp[64];
 
 	strcpy(tmp, hfcsx_revision);
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "HiSax: HFC-SX driver Rev. %s\n", HiSax_getrev(tmp));
+#else
+	;
+#endif
 #ifdef __ISAPNP__
 	if (!card->para[1] && isapnp_present()) {
 		struct pnp_dev *pnp_d;

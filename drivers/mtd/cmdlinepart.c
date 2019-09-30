@@ -50,7 +50,11 @@
 
 /* debug macro */
 #if 0
+#ifdef CONFIG_DEBUG_PRINTK
 #define dbg(x) do { printk("DEBUG-CMDLINE-PART: "); printk x; } while(0)
+#else
+#define dbg(x) do { ;
+#endif
 #else
 #define dbg(x)
 #endif
@@ -340,9 +344,13 @@ static int parse_cmdline_partitions(struct mtd_info *master,
 				  part->parts[i].size = master->size - offset;
 				if (offset + part->parts[i].size > master->size)
 				{
+#ifdef CONFIG_DEBUG_PRINTK
 					printk(KERN_WARNING ERRP
 					       "%s: partitioning exceeds flash size, truncating\n",
 					       part->mtd_id);
+#else
+					;
+#endif
 					part->parts[i].size = master->size - offset;
 					part->num_parts = i;
 				}

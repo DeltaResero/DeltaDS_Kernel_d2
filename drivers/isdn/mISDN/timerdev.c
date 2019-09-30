@@ -53,7 +53,11 @@ mISDN_open(struct inode *ino, struct file *filep)
 	struct mISDNtimerdev	*dev;
 
 	if (*debug & DEBUG_TIMER)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "%s(%p,%p)\n", __func__, ino, filep);
+#else
+		;
+#endif
 	dev = kmalloc(sizeof(struct mISDNtimerdev) , GFP_KERNEL);
 	if (!dev)
 		return -ENOMEM;
@@ -75,7 +79,11 @@ mISDN_close(struct inode *ino, struct file *filep)
 	struct mISDNtimer	*timer, *next;
 
 	if (*debug & DEBUG_TIMER)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "%s(%p,%p)\n", __func__, ino, filep);
+#else
+		;
+#endif
 	list_for_each_entry_safe(timer, next, &dev->pending, list) {
 		del_timer(&timer->tl);
 		kfree(timer);
@@ -249,7 +257,11 @@ mISDN_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 			break;
 		}
 		if (*debug & DEBUG_TIMER)
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_DEBUG "%s del id %d\n", __func__, id);
+#else
+			;
+#endif
 		id = misdn_del_timer(dev, id);
 		if (put_user(id, (int __user *)arg))
 			ret = -EFAULT;
@@ -284,7 +296,11 @@ mISDN_inittimer(u_int *deb)
 	debug = deb;
 	err = misc_register(&mISDNtimer);
 	if (err)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "mISDN: Could not register timer device\n");
+#else
+		;
+#endif
 	return err;
 }
 

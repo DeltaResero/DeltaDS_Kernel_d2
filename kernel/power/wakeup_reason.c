@@ -118,20 +118,32 @@ int __init wakeup_reason_init(void)
 	spin_lock_init(&resume_reason_lock);
 	retval = register_pm_notifier(&wakeup_reason_pm_notifier_block);
 	if (retval)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "[%s] failed to register PM notifier %d\n",
 				__func__, retval);
+#else
+		;
+#endif
 
 	wakeup_reason = kobject_create_and_add("wakeup_reasons", kernel_kobj);
 	if (!wakeup_reason) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "[%s] failed to create a sysfs kobject\n",
 				__func__);
+#else
+		;
+#endif
 		return 1;
 	}
 	retval = sysfs_create_group(wakeup_reason, &attr_group);
 	if (retval) {
 		kobject_put(wakeup_reason);
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "[%s] failed to create a sysfs group %d\n",
 				__func__, retval);
+#else
+		;
+#endif
 	}
 	return 0;
 }

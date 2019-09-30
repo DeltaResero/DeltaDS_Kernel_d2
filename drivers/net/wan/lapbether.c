@@ -116,7 +116,7 @@ static int lapbeth_rcv(struct sk_buff *skb, struct net_device *dev, struct packe
 	skb_trim(skb, len);	/* Set the length of the data */
 
 	if ((err = lapb_data_received(lapbeth->axdev, skb)) != LAPB_OK) {
-		printk(KERN_DEBUG "lapbether: lapb_data_received err - %d\n", err);
+;
 		goto drop_unlock;
 	}
 out:
@@ -421,7 +421,7 @@ static int __init lapbeth_init_driver(void)
 
 	register_netdevice_notifier(&lapbeth_dev_notifier);
 
-	printk(banner);
+;
 
 	return 0;
 }

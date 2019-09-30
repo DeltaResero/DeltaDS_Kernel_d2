@@ -233,7 +233,11 @@ setup_netjet_u(struct IsdnCard *card)
 #endif
 
 	strcpy(tmp, NETjet_U_revision);
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "HiSax: Traverse Tech. NETspider-U driver Rev. %s\n", HiSax_getrev(tmp));
+#else
+	;
+#endif
 	if (cs->typ != ISDN_CTYPE_NETJET_U)
 		return (0);
 	test_and_clear_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags);

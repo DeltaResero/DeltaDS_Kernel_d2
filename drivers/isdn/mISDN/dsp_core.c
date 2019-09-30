@@ -317,7 +317,11 @@ dsp_control_req(struct dsp *dsp, struct mISDNhead *hh, struct sk_buff *skb)
 		break;
 	case DTMF_TONE_STOP: /* turn off DTMF */
 		if (dsp_debug & DEBUG_DSP_CORE)
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_DEBUG "%s: stop dtmf\n", __func__);
+#else
+			;
+#endif
 		dsp->dtmf.enable = 0;
 		dsp->dtmf.hardware = 0;
 		dsp->dtmf.software = 0;
@@ -341,7 +345,11 @@ dsp_control_req(struct dsp *dsp, struct mISDNhead *hh, struct sk_buff *skb)
 	case DSP_CONF_SPLIT: /* remove from conference */
 	conf_split:
 		if (dsp_debug & DEBUG_DSP_CORE)
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_DEBUG "%s: release conference\n", __func__);
+#else
+			;
+#endif
 		ret = dsp_cmx_conf(dsp, 0);
 		/* dsp_cmx_hardware will also be called here */
 		if (dsp_debug & DEBUG_DSP_CMX)
@@ -374,7 +382,11 @@ dsp_control_req(struct dsp *dsp, struct mISDNhead *hh, struct sk_buff *skb)
 			break;
 		}
 		if (dsp_debug & DEBUG_DSP_CORE)
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_DEBUG "%s: turn tone off\n", __func__);
+#else
+			;
+#endif
 		dsp_tone(dsp, 0);
 		dsp_cmx_hardware(dsp->conf, dsp);
 		dsp_rx_off(dsp);
@@ -420,7 +432,11 @@ dsp_control_req(struct dsp *dsp, struct mISDNhead *hh, struct sk_buff *skb)
 	case DSP_ECHO_ON: /* enable echo */
 		dsp->echo.software = 1; /* soft echo */
 		if (dsp_debug & DEBUG_DSP_CORE)
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_DEBUG "%s: enable cmx-echo\n", __func__);
+#else
+			;
+#endif
 		dsp_cmx_hardware(dsp->conf, dsp);
 		dsp_rx_off(dsp);
 		if (dsp_debug & DEBUG_DSP_CMX)
@@ -430,7 +446,11 @@ dsp_control_req(struct dsp *dsp, struct mISDNhead *hh, struct sk_buff *skb)
 		dsp->echo.software = 0;
 		dsp->echo.hardware = 0;
 		if (dsp_debug & DEBUG_DSP_CORE)
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_DEBUG "%s: disable cmx-echo\n", __func__);
+#else
+			;
+#endif
 		dsp_cmx_hardware(dsp->conf, dsp);
 		dsp_rx_off(dsp);
 		if (dsp_debug & DEBUG_DSP_CMX)
@@ -481,7 +501,11 @@ dsp_control_req(struct dsp *dsp, struct mISDNhead *hh, struct sk_buff *skb)
 	case DSP_TXDATA_ON: /* enable txdata */
 		dsp->tx_data = 1;
 		if (dsp_debug & DEBUG_DSP_CORE)
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_DEBUG "%s: enable tx-data\n", __func__);
+#else
+			;
+#endif
 		dsp_cmx_hardware(dsp->conf, dsp);
 		dsp_rx_off(dsp);
 		if (dsp_debug & DEBUG_DSP_CMX)
@@ -490,7 +514,11 @@ dsp_control_req(struct dsp *dsp, struct mISDNhead *hh, struct sk_buff *skb)
 	case DSP_TXDATA_OFF: /* disable txdata */
 		dsp->tx_data = 0;
 		if (dsp_debug & DEBUG_DSP_CORE)
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_DEBUG "%s: disable tx-data\n", __func__);
+#else
+			;
+#endif
 		dsp_cmx_hardware(dsp->conf, dsp);
 		dsp_rx_off(dsp);
 		if (dsp_debug & DEBUG_DSP_CMX)
@@ -606,7 +634,11 @@ dsp_control_req(struct dsp *dsp, struct mISDNhead *hh, struct sk_buff *skb)
 			break;
 		}
 		if (dsp_debug & DEBUG_DSP_CORE)
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_DEBUG "%s: turn blowfish off\n", __func__);
+#else
+			;
+#endif
 		dsp_bf_cleanup(dsp);
 		dsp_cmx_hardware(dsp->conf, dsp);
 		dsp_dtmf_hardware(dsp);
@@ -955,7 +987,11 @@ dsp_ctrl(struct mISDNchannel *ch, u_int cmd, void *arg)
 	int		err = 0;
 
 	if (debug & DEBUG_DSP_CTRL)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "%s:(%x)\n", __func__, cmd);
+#else
+		;
+#endif
 
 	switch (cmd) {
 	case OPEN_CHANNEL:
@@ -1058,7 +1094,11 @@ dspcreate(struct channel_req *crq)
 		return -ENOMEM;
 	}
 	if (dsp_debug & DEBUG_DSP_CTRL)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "%s: creating new dsp instance\n", __func__);
+#else
+		;
+#endif
 
 	/* default enabled */
 	INIT_WORK(&ndsp->workq, (void *)dsp_send_bh);

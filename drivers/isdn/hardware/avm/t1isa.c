@@ -230,10 +230,14 @@ static irqreturn_t t1isa_interrupt(int interrupt, void *devptr)
 			cinfo->versionlen = t1_get_slice(card->port, cinfo->versionbuf);
 			spin_unlock_irqrestore(&card->lock, flags);
 			b1_parse_version(cinfo);
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_INFO "%s: %s-card (%s) now active\n",
 			       card->name,
 			       cinfo->version[VER_CARDTYPE],
 			       cinfo->version[VER_DRIVER]);
+#else
+			;
+#endif
 			capi_ctr_ready(ctrl);
 			break;
 
@@ -262,7 +266,11 @@ static irqreturn_t t1isa_interrupt(int interrupt, void *devptr)
 				card->msgbuf[MsgLen - 1] = 0;
 				MsgLen--;
 			}
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_INFO "%s: DEBUG: %s\n", card->name, card->msgbuf);
+#else
+			;
+#endif
 			break;
 
 
@@ -377,7 +385,11 @@ static int t1isa_probe(struct pci_dev *pdev, int cardnr)
 
 	card = b1_alloc_card(1);
 	if (!card) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "t1isa: no memory.\n");
+#else
+		;
+#endif
 		retval = -ENOMEM;
 		goto err;
 	}
@@ -435,12 +447,20 @@ static int t1isa_probe(struct pci_dev *pdev, int cardnr)
 
 	retval = attach_capi_ctr(&cinfo->capi_ctrl);
 	if (retval) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_INFO "t1isa: attach controller failed.\n");
+#else
+		;
+#endif
 		goto err_free_irq;
 	}
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "t1isa: AVM T1 ISA at i/o %#x, irq %d, card %d\n",
 	       card->port, card->irq, card->cardnr);
+#else
+	;
+#endif
 
 	pci_set_drvdata(pdev, cinfo);
 	return 0;
@@ -572,7 +592,11 @@ static int __init t1isa_init(void)
 
 	strlcpy(capi_driver_t1isa.revision, rev, 32);
 	register_capi_driver(&capi_driver_t1isa);
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "t1isa: revision %s\n", rev);
+#else
+	;
+#endif
 
 	return 0;
 }

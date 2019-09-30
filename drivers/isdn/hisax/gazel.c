@@ -541,7 +541,11 @@ setup_gazelpci(struct IsdnCardState *cs)
 	u_char pci_irq = 0, found;
 	u_int nbseek, seekcard;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_WARNING "Gazel: PCI card automatic recognition\n");
+#else
+	;
+#endif
 
 	found = 0;
 	seekcard = PCI_DEVICE_ID_PLX_R685;
@@ -572,11 +576,19 @@ setup_gazelpci(struct IsdnCardState *cs)
 		}
 	}
 	if (!found) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "Gazel: No PCI card found\n");
+#else
+		;
+#endif
 		return (1);
 	}
 	if (!pci_irq) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "Gazel: No IRQ for PCI card found\n");
+#else
+		;
+#endif
 		return 1;
 	}
 	cs->hw.gazel.pciaddr[0] = pci_ioaddr0;
@@ -630,7 +642,11 @@ setup_gazel(struct IsdnCard *card)
 	u_char val;
 
 	strcpy(tmp, gazel_revision);
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "Gazel: Driver Revision %s\n", HiSax_getrev(tmp));
+#else
+	;
+#endif
 
 	if (cs->typ != ISDN_CTYPE_GAZEL)
 		return (0);
@@ -644,7 +660,11 @@ setup_gazel(struct IsdnCard *card)
 		if (setup_gazelpci(cs))
 			return (0);
 #else
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "Gazel: Card PCI requested and NO_PCI_BIOS, unable to config\n");
+#else
+		;
+#endif
 		return (0);
 #endif				/* CONFIG_PCI */
 	}
@@ -653,7 +673,11 @@ setup_gazel(struct IsdnCard *card)
 		return (0);
 	}
 	if (reset_gazel(cs)) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "Gazel: wrong IRQ\n");
+#else
+		;
+#endif
 		release_io_gazel(cs);
 		return (0);
 	}

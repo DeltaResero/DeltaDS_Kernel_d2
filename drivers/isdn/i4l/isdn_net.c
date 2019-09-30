@@ -332,7 +332,11 @@ isdn_net_autohup(void)
 			l->cps = (l->transcount * HZ) / (jiffies - last_jiffies);
 		l->transcount = 0;
 		if (dev->net_verbose > 3)
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_DEBUG "%s: %d bogocps\n", p->dev->name, l->cps);
+#else
+			;
+#endif
 		if ((l->flags & ISDN_NET_CONNECTED) && (!l->dialstate)) {
 			anymore = 1;
 			l->huptimer++;
@@ -353,13 +357,21 @@ isdn_net_autohup(void)
 				} else if (l->outgoing) {
 					if (l->hupflags & ISDN_CHARGEHUP) {
 						if (l->hupflags & ISDN_WAITCHARGE) {
+#ifdef CONFIG_DEBUG_PRINTK
 							printk(KERN_DEBUG "isdn_net: Hupflags of %s are %X\n",
 							       p->dev->name, l->hupflags);
+#else
+							;
+#endif
 							isdn_net_hangup(p->dev);
 						} else if (time_after(jiffies, l->chargetime + l->chargeint)) {
+#ifdef CONFIG_DEBUG_PRINTK
 							printk(KERN_DEBUG
 							       "isdn_net: %s: chtime = %lu, chint = %d\n",
 							       p->dev->name, l->chargetime, l->chargeint);
+#else
+							;
+#endif
 							isdn_net_hangup(p->dev);
 						}
 					} else
@@ -569,7 +581,11 @@ isdn_net_dial(void)
 
 #ifdef ISDN_DEBUG_NET_DIAL
 		if (lp->dialstate)
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_DEBUG "%s: dialstate=%d\n", p->dev->name, lp->dialstate);
+#else
+			;
+#endif
 #endif
 		switch (lp->dialstate) {
 		case 0:
@@ -862,7 +878,11 @@ isdn_net_hangup(struct net_device *d)
 		cmd.command = ISDN_CMD_HANGUP;
 		cmd.arg = lp->isdn_channel;
 		isdn_command(&cmd);
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_INFO "%s: Chargesum is %d\n", d->name, lp->charge);
+#else
+		;
+#endif
 		isdn_all_eaz(lp->isdn_device, lp->isdn_channel);
 	}
 	isdn_net_unbind_channel(lp);
@@ -889,7 +909,11 @@ isdn_net_log_skb(struct sk_buff *skb, isdn_net_local *lp)
 		/* fall back to old isdn_net_log_packet method() */
 		char *buf = skb->data;
 
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "isdn_net: protocol %04x is buggy, dev %s\n", skb->protocol, lp->netdev->dev->name);
+#else
+		;
+#endif
 		p = buf;
 		proto = ETH_P_IP;
 		switch (lp->p_encap) {
@@ -1010,18 +1034,30 @@ void isdn_net_writebuf_skb(isdn_net_local *lp, struct sk_buff *skb)
 	/* before obtaining the lock the caller should have checked that
 	   the lp isn't busy */
 	if (isdn_net_lp_busy(lp)) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk("isdn BUG at %s:%d!\n", __FILE__, __LINE__);
+#else
+		;
+#endif
 		goto error;
 	}
 
 	if (!(lp->flags & ISDN_NET_CONNECTED)) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk("isdn BUG at %s:%d!\n", __FILE__, __LINE__);
+#else
+		;
+#endif
 		goto error;
 	}
 	ret = isdn_writebuf_skb_stub(lp->isdn_device, lp->isdn_channel, 1, skb);
 	if (ret != len) {
 		/* we should never get here */
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "%s: HL driver queue full\n", lp->netdev->dev->name);
+#else
+		;
+#endif
 		goto error;
 	}
 
@@ -1056,7 +1092,11 @@ isdn_net_xmit(struct net_device *ndev, struct sk_buff *skb)
 	int retv = NETDEV_TX_OK;
 
 	if (((isdn_net_local *) netdev_priv(ndev))->master) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk("isdn BUG at %s:%d!\n", __FILE__, __LINE__);
+#else
+		;
+#endif
 		dev_kfree_skb(skb);
 		return NETDEV_TX_OK;
 	}
@@ -1070,7 +1110,11 @@ isdn_net_xmit(struct net_device *ndev, struct sk_buff *skb)
 	nd = ((isdn_net_local *) netdev_priv(ndev))->netdev;
 	lp = isdn_net_get_locked_lp(nd);
 	if (!lp) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "%s: all channels busy - requeuing!\n", ndev->name);
+#else
+		;
+#endif
 		return NETDEV_TX_BUSY;
 	}
 	/* we have our lp locked from now on */
@@ -1122,7 +1166,11 @@ isdn_net_adjust_hdr(struct sk_buff *skb, struct net_device *dev)
 	if (lp->p_encap == ISDN_NET_ENCAP_ETHER) {
 		const int pullsize = skb_network_offset(skb) - ETH_HLEN;
 		if (pullsize > 0) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_DEBUG "isdn_net: Pull junk %d\n", pullsize);
+#else
+			;
+#endif
 			skb_pull(skb, pullsize);
 		}
 	}
@@ -1518,7 +1566,11 @@ isdn_net_ciscohdlck_slarp_send_keepalive(unsigned long data)
 	int myseq_diff = 0;
 
 	if (!(lp->flags & ISDN_NET_CONNECTED) || lp->dialstate) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk("isdn BUG at %s:%d!\n", __FILE__, __LINE__);
+#else
+		;
+#endif
 		return;
 	}
 	lp->cisco_myseq++;
@@ -1747,13 +1799,21 @@ isdn_net_ciscohdlck_receive(isdn_net_local *lp, struct sk_buff *skb)
 	skb_pull(skb, 4);
 
 	if (addr != CISCO_ADDR_UNICAST && addr != CISCO_ADDR_BROADCAST) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "%s: Unknown Cisco addr 0x%02x\n",
 		       lp->netdev->dev->name, addr);
+#else
+		;
+#endif
 		goto out_free;
 	}
 	if (ctrl != CISCO_CTRL) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "%s: Unknown Cisco ctrl 0x%02x\n",
 		       lp->netdev->dev->name, ctrl);
+#else
+		;
+#endif
 		goto out_free;
 	}
 
@@ -1967,9 +2027,13 @@ isdn_net_rebuild_header(struct sk_buff *skb)
 		 */
 
 		if (eth->h_proto != htons(ETH_P_IP)) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING
 			       "isdn_net: %s don't know how to resolve type %d addresses?\n",
 			       dev->name, (int) eth->h_proto);
+#else
+			;
+#endif
 			memcpy(eth->h_source, dev->dev_addr, dev->addr_len);
 			return 0;
 		}
@@ -2039,7 +2103,11 @@ isdn_net_swapbind(int drvidx)
 	isdn_net_dev *p;
 
 #ifdef ISDN_DEBUG_NET_ICALL
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_DEBUG "n_fi: swapping ch of %d\n", drvidx);
+#else
+	;
+#endif
 #endif
 	p = dev->netdev;
 	while (p) {
@@ -2063,7 +2131,11 @@ isdn_net_swap_usage(int i1, int i2)
 	int u2 = dev->usage[i2] & ISDN_USAGE_EXCLUSIVE;
 
 #ifdef ISDN_DEBUG_NET_ICALL
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_DEBUG "n_fi: usage of %d and %d\n", i1, i2);
+#else
+	;
+#endif
 #endif
 	dev->usage[i1] &= ~ISDN_USAGE_EXCLUSIVE;
 	dev->usage[i1] |= u2;
@@ -2173,8 +2245,12 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 		if (matchret > wret)
 			wret = matchret;
 #ifdef ISDN_DEBUG_NET_ICALL
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "n_fi: if='%s', l.msn=%s, l.flags=%d, l.dstate=%d\n",
 		       p->dev->name, lp->msn, lp->flags, lp->dialstate);
+#else
+		;
+#endif
 #endif
 		if ((!matchret) &&                                        /* EAZ is matching   */
 		    (((!(lp->flags & ISDN_NET_CONNECTED)) &&              /* but not connected */
@@ -2184,8 +2260,12 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 			     )))
 		{
 #ifdef ISDN_DEBUG_NET_ICALL
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_DEBUG "n_fi: match1, pdev=%d pch=%d\n",
 			       lp->pre_device, lp->pre_channel);
+#else
+			;
+#endif
 #endif
 			if (dev->usage[idx] & ISDN_USAGE_EXCLUSIVE) {
 				if ((lp->pre_channel != ch) ||
@@ -2202,14 +2282,22 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 					if (ch == 0) {
 						sidx = isdn_dc2minor(di, 1);
 #ifdef ISDN_DEBUG_NET_ICALL
+#ifdef CONFIG_DEBUG_PRINTK
 						printk(KERN_DEBUG "n_fi: ch is 0\n");
+#else
+						;
+#endif
 #endif
 						if (USG_NONE(dev->usage[sidx])) {
 							/* Second Channel is free, now see if it is bound
 							 * exclusive too. */
 							if (dev->usage[sidx] & ISDN_USAGE_EXCLUSIVE) {
 #ifdef ISDN_DEBUG_NET_ICALL
+#ifdef CONFIG_DEBUG_PRINTK
 								printk(KERN_DEBUG "n_fi: 2nd channel is down and bound\n");
+#else
+								;
+#endif
 #endif
 								/* Yes, swap bindings only, if the original
 								 * binding is bound to channel 1 of this driver */
@@ -2224,7 +2312,11 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 								}
 							} else {
 #ifdef ISDN_DEBUG_NET_ICALL
+#ifdef CONFIG_DEBUG_PRINTK
 								printk(KERN_DEBUG "n_fi: 2nd channel is down and unbound\n");
+#else
+								;
+#endif
 #endif
 								/* No, swap always and swap excl-usage also */
 								isdn_net_swap_usage(idx, sidx);
@@ -2233,13 +2325,21 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 							}
 							/* Now check for exclusive binding again */
 #ifdef ISDN_DEBUG_NET_ICALL
+#ifdef CONFIG_DEBUG_PRINTK
 							printk(KERN_DEBUG "n_fi: final check\n");
+#else
+							;
+#endif
 #endif
 							if ((dev->usage[idx] & ISDN_USAGE_EXCLUSIVE) &&
 							    ((lp->pre_channel != ch) ||
 							     (lp->pre_device != di))) {
 #ifdef ISDN_DEBUG_NET_ICALL
+#ifdef CONFIG_DEBUG_PRINTK
 								printk(KERN_DEBUG "n_fi: final check failed\n");
+#else
+								;
+#endif
 #endif
 								p = (isdn_net_dev *) p->next;
 								continue;
@@ -2248,13 +2348,21 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 					} else {
 						/* We are already on the second channel, so nothing to do */
 #ifdef ISDN_DEBUG_NET_ICALL
+#ifdef CONFIG_DEBUG_PRINTK
 						printk(KERN_DEBUG "n_fi: already on 2nd channel\n");
+#else
+						;
+#endif
 #endif
 					}
 				}
 			}
 #ifdef ISDN_DEBUG_NET_ICALL
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_DEBUG "n_fi: match2\n");
+#else
+			;
+#endif
 #endif
 			n = lp->phone[0];
 			if (lp->flags & ISDN_NET_SECURE) {
@@ -2266,7 +2374,11 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 			}
 			if (n || (!(lp->flags & ISDN_NET_SECURE))) {
 #ifdef ISDN_DEBUG_NET_ICALL
+#ifdef CONFIG_DEBUG_PRINTK
 				printk(KERN_DEBUG "n_fi: match3\n");
+#else
+				;
+#endif
 #endif
 				/* matching interface found */
 
@@ -2276,8 +2388,12 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 				 * so reject actively.
 				 * */
 				if (ISDN_NET_DIALMODE(*lp) == ISDN_NET_DM_OFF) {
+#ifdef CONFIG_DEBUG_PRINTK
 					printk(KERN_INFO "incoming call, interface %s `stopped' -> rejected\n",
 					       p->dev->name);
+#else
+					;
+#endif
 					return 3;
 				}
 				/*
@@ -2285,8 +2401,12 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 				 * If not, reject the call actively.
 				 */
 				if (!isdn_net_device_started(p)) {
+#ifdef CONFIG_DEBUG_PRINTK
 					printk(KERN_INFO "%s: incoming call, interface down -> rejected\n",
 					       p->dev->name);
+#else
+					;
+#endif
 					return 3;
 				}
 				/* Interface is up, now see if it's a slave. If so, see if
@@ -2294,10 +2414,22 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 				 */
 				if (lp->master) {
 					isdn_net_local *mlp = ISDN_MASTER_PRIV(lp);
+#ifdef CONFIG_DEBUG_PRINTK
 					printk(KERN_DEBUG "ICALLslv: %s\n", p->dev->name);
+#else
+					;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 					printk(KERN_DEBUG "master=%s\n", lp->master->name);
+#else
+					;
+#endif
 					if (mlp->flags & ISDN_NET_CONNECTED) {
+#ifdef CONFIG_DEBUG_PRINTK
 						printk(KERN_DEBUG "master online\n");
+#else
+						;
+#endif
 						/* Master is online, find parent-slave (master if first slave) */
 						while (mlp->slave) {
 							if (ISDN_SLAVE_PRIV(mlp) == lp)
@@ -2305,9 +2437,17 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 							mlp = ISDN_SLAVE_PRIV(mlp);
 						}
 					} else
+#ifdef CONFIG_DEBUG_PRINTK
 						printk(KERN_DEBUG "master offline\n");
+#else
+						;
+#endif
 					/* Found parent, if it's offline iterate next device */
+#ifdef CONFIG_DEBUG_PRINTK
 					printk(KERN_DEBUG "mlpf: %d\n", mlp->flags & ISDN_NET_CONNECTED);
+#else
+					;
+#endif
 					if (!(mlp->flags & ISDN_NET_CONNECTED)) {
 						p = (isdn_net_dev *) p->next;
 						continue;
@@ -2321,12 +2461,20 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 					 * so reject actively.
 					 * */
 					if (ISDN_NET_DIALMODE(*lp) == ISDN_NET_DM_OFF) {
+#ifdef CONFIG_DEBUG_PRINTK
 						printk(KERN_INFO "incoming call for callback, interface %s `off' -> rejected\n",
 						       p->dev->name);
+#else
+						;
+#endif
 						return 3;
 					}
+#ifdef CONFIG_DEBUG_PRINTK
 					printk(KERN_DEBUG "%s: call from %s -> %s, start callback\n",
 					       p->dev->name, nr, eaz);
+#else
+					;
+#endif
 					if (lp->phone[1]) {
 						/* Grab a free ISDN-Channel */
 						spin_lock_irqsave(&dev->lock, flags);
@@ -2579,18 +2727,30 @@ isdn_net_new(char *name, struct net_device *master)
 
 	/* Avoid creating an existing interface */
 	if (isdn_net_findif(name)) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "isdn_net: interface %s already exists\n", name);
+#else
+		;
+#endif
 		return NULL;
 	}
 	if (name == NULL)
 		return NULL;
 	if (!(netdev = kzalloc(sizeof(isdn_net_dev), GFP_KERNEL))) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "isdn_net: Could not allocate net-device\n");
+#else
+		;
+#endif
 		return NULL;
 	}
 	netdev->dev = alloc_netdev(sizeof(isdn_net_local), name, _isdn_setup);
 	if (!netdev->dev) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "isdn_net: Could not allocate network device\n");
+#else
+		;
+#endif
 		kfree(netdev);
 		return NULL;
 	}
@@ -2615,7 +2775,11 @@ isdn_net_new(char *name, struct net_device *master)
 		 */
 		netdev->dev->watchdog_timeo = ISDN_NET_TX_TIMEOUT;
 		if (register_netdev(netdev->dev) != 0) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING "isdn_net: Could not register net-device\n");
+#else
+			;
+#endif
 			free_netdev(netdev->dev);
 			kfree(netdev);
 			return NULL;
@@ -2689,7 +2853,11 @@ isdn_net_setcfg(isdn_net_ioctl_cfg *cfg)
 				if ((dev->drv[i]->interface->features & features) == features)
 					break;
 		if (i == ISDN_MAX_DRIVERS) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING "isdn_net: No driver with selected features\n");
+#else
+			;
+#endif
 			return -ENODEV;
 		}
 		if (lp->p_encap != cfg->p_encap) {
@@ -2697,8 +2865,12 @@ isdn_net_setcfg(isdn_net_ioctl_cfg *cfg)
 			struct concap_proto *cprot = p->cprot;
 #endif
 			if (isdn_net_device_started(p)) {
+#ifdef CONFIG_DEBUG_PRINTK
 				printk(KERN_WARNING "%s: cannot change encap when if is up\n",
 				       p->dev->name);
+#else
+				;
+#endif
 				return -EBUSY;
 			}
 #ifdef CONFIG_ISDN_X25
@@ -2722,8 +2894,12 @@ isdn_net_setcfg(isdn_net_ioctl_cfg *cfg)
 		switch (cfg->p_encap) {
 		case ISDN_NET_ENCAP_SYNCPPP:
 #ifndef CONFIG_ISDN_PPP
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING "%s: SyncPPP support not configured\n",
 			       p->dev->name);
+#else
+			;
+#endif
 			return -EINVAL;
 #else
 			p->dev->type = ARPHRD_PPP;	/* change ARP type */
@@ -2732,8 +2908,12 @@ isdn_net_setcfg(isdn_net_ioctl_cfg *cfg)
 			break;
 		case ISDN_NET_ENCAP_X25IFACE:
 #ifndef CONFIG_ISDN_X25
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING "%s: isdn-x25 support not configured\n",
 			       p->dev->name);
+#else
+			;
+#endif
 			return -EINVAL;
 #else
 			p->dev->type = ARPHRD_X25;	/* change ARP type */
@@ -2746,9 +2926,13 @@ isdn_net_setcfg(isdn_net_ioctl_cfg *cfg)
 			if (cfg->p_encap >= 0 &&
 			    cfg->p_encap <= ISDN_NET_ENCAP_MAX_ENCAP)
 				break;
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING
 			       "%s: encapsulation protocol %d not supported\n",
 			       p->dev->name, cfg->p_encap);
+#else
+			;
+#endif
 			return -EINVAL;
 		}
 		if (strlen(cfg->drvid)) {

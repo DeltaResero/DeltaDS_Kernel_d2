@@ -107,13 +107,21 @@ static inline int erase_eraseblock(int ebnum)
 
 	err = mtd_erase(mtd, &ei);
 	if (err) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "error %d while erasing EB %d\n", err, ebnum);
+#else
+		;
+#endif
 		return err;
 	}
 
 	if (ei.state == MTD_ERASE_FAILED) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "some erase error occurred at EB %d\n",
 		       ebnum);
+#else
+		;
+#endif
 		return -EIO;
 	}
 
@@ -191,13 +199,21 @@ static inline int write_pattern(int ebnum, void *buf)
 	}
 	err = mtd_write(mtd, addr, len, &written, buf);
 	if (err) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "error %d while writing EB %d, written %zd"
 		      " bytes\n", err, ebnum, written);
+#else
+		;
+#endif
 		return err;
 	}
 	if (written != len) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "written only %zd bytes of %zd, but no error"
 		       " reported\n", written, len);
+#else
+		;
+#endif
 		return -EIO;
 	}
 
@@ -295,13 +311,21 @@ static int __init tort_init(void)
 			err = mtd_block_isbad(mtd, (loff_t)i * mtd->erasesize);
 
 			if (err < 0) {
+#ifdef CONFIG_DEBUG_PRINTK
 				printk(PRINT_PREF "block_isbad() returned %d "
 				       "for EB %d\n", err, i);
+#else
+				;
+#endif
 				goto out;
 			}
 
 			if (err) {
+#ifdef CONFIG_DEBUG_PRINTK
 				printk("EB %d is bad. Skip it.\n", i);
+#else
+				;
+#endif
 				bad_ebs[i - eb] = 1;
 			}
 		}
@@ -329,8 +353,12 @@ static int __init tort_init(void)
 					continue;
 				err = check_eraseblock(i, patt_FF);
 				if (err) {
+#ifdef CONFIG_DEBUG_PRINTK
 					printk(PRINT_PREF "verify failed"
 					       " for 0xFF... pattern\n");
+#else
+					;
+#endif
 					goto out;
 				}
 				cond_resched();
@@ -362,10 +390,14 @@ static int __init tort_init(void)
 					patt = patt_A5A;
 				err = check_eraseblock(i, patt);
 				if (err) {
+#ifdef CONFIG_DEBUG_PRINTK
 					printk(PRINT_PREF "verify failed for %s"
 					       " pattern\n",
 					       ((eb + erase_cycles) & 1) ?
 					       "0x55AA55..." : "0xAA55AA...");
+#else
+					;
+#endif
 					goto out;
 				}
 				cond_resched();
@@ -380,9 +412,13 @@ static int __init tort_init(void)
 			stop_timing();
 			ms = (finish.tv_sec - start.tv_sec) * 1000 +
 			     (finish.tv_usec - start.tv_usec) / 1000;
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(PRINT_PREF "%08u erase cycles done, took %lu "
 			       "milliseconds (%lu seconds)\n",
 			       erase_cycles, ms, ms / 1000);
+#else
+			;
+#endif
 			start_timing();
 		}
 
@@ -391,8 +427,12 @@ static int __init tort_init(void)
 	}
 out:
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "finished after %u erase cycles\n",
 	       erase_cycles);
+#else
+	;
+#endif
 	kfree(check_buf);
 out_patt_FF:
 	kfree(patt_FF);
@@ -403,8 +443,16 @@ out_patt_5A5:
 out_mtd:
 	put_mtd_device(mtd);
 	if (err)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "error %d occurred during torturing\n", err);
+#else
+		;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "=================================================\n");
+#else
+	;
+#endif
 	return err;
 }
 module_init(tort_init);
@@ -441,10 +489,18 @@ static void report_corrupt(unsigned char *read, unsigned char *written)
 			       &bits) >= 0)
 			pages++;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "verify fails on %d pages, %d bytes/%d bits\n",
 	       pages, bytes, bits);
+#else
+	;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(PRINT_PREF "The following is a list of all differences between"
 	       " what was read from flash and what was expected\n");
+#else
+	;
+#endif
 
 	for (i = 0; i < check_len; i += pgsize) {
 		cond_resched();
@@ -454,13 +510,21 @@ static void report_corrupt(unsigned char *read, unsigned char *written)
 		if (first < 0)
 			continue;
 
+#ifdef CONFIG_DEBUG_PRINTK
 		printk("-------------------------------------------------------"
 		       "----------------------------------\n");
+#else
+		;
+#endif
 
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(PRINT_PREF "Page %zd has %d bytes/%d bits failing verify,"
 		       " starting at offset 0x%x\n",
 		       (mtd->erasesize - check_len + i) / pgsize,
 		       bytes, bits, first);
+#else
+		;
+#endif
 
 		offset = first & ~0x7;
 		len = ((first + bytes) | 0x7) + 1 - offset;
@@ -475,26 +539,54 @@ static void print_bufs(unsigned char *read, unsigned char *written, int start,
 	int i = 0, j1, j2;
 	char *diff;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk("Offset       Read                          Written\n");
+#else
+	;
+#endif
 	while (i < len) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk("0x%08x: ", start + i);
+#else
+		;
+#endif
 		diff = "   ";
 		for (j1 = 0; j1 < 8 && i + j1 < len; j1++) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(" %02x", read[start + i + j1]);
+#else
+			;
+#endif
 			if (read[start + i + j1] != written[start + i + j1])
 				diff = "***";
 		}
 
 		while (j1 < 8) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(" ");
+#else
+			;
+#endif
 			j1 += 1;
 		}
 
+#ifdef CONFIG_DEBUG_PRINTK
 		printk("  %s ", diff);
+#else
+		;
+#endif
 
 		for (j2 = 0; j2 < 8 && i + j2 < len; j2++)
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(" %02x", written[start + i + j2]);
+#else
+			;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 		printk("\n");
+#else
+		;
+#endif
 		i += 8;
 	}
 }

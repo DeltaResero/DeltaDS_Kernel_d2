@@ -530,9 +530,13 @@ static void pm121_create_sys_fans(int loop_id)
 
 	/* No params found, put fans to max */
 	if (param == NULL) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "pm121: %s fan config not found "
 		       " for this machine model\n",
 		       loop_names[loop_id]);
+#else
+		;
+#endif
 		goto fail;
 	}
 
@@ -542,7 +546,11 @@ static void pm121_create_sys_fans(int loop_id)
 	pm121_sys_state[loop_id] = kmalloc(sizeof(struct pm121_sys_state),
 					   GFP_KERNEL);
 	if (pm121_sys_state[loop_id] == NULL) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "pm121: Memory allocation error\n");
+#else
+		;
+#endif
 		goto fail;
 	}
 	pm121_sys_state[loop_id]->ticks = 1;
@@ -568,9 +576,13 @@ static void pm121_create_sys_fans(int loop_id)
  fail:
 	/* note that this is not optimal since another loop may still
 	   control the same control */
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_WARNING "pm121: failed to set up %s loop "
 	       "setting \"%s\" to max speed.\n",
 	       loop_names[loop_id], control->name);
+#else
+	;
+#endif
 
 	if (control)
 		wf_control_set_max(control);
@@ -599,8 +611,12 @@ static void pm121_sys_fans_tick(int loop_id)
 
 	rc = sensor->ops->get_value(sensor, &temp);
 	if (rc) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "windfarm: %s sensor error %d\n",
 		       sensor->name, rc);
+#else
+		;
+#endif
 		pm121_failure_state |= FAILURE_SENSOR;
 		return;
 	}
@@ -627,8 +643,12 @@ static void pm121_sys_fans_tick(int loop_id)
 	if (control && pm121_failure_state == 0) {
 		rc = control->ops->set_value(control, st->setpoint);
 		if (rc) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING "windfarm: %s fan error %d\n",
 			       control->name, rc);
+#else
+			;
+#endif
 			pm121_failure_state |= FAILURE_FAN;
 		}
 	}
@@ -650,7 +670,11 @@ static void pm121_create_cpu_fans(void)
 	/* First, locate the PID params in SMU SBD */
 	hdr = smu_get_sdb_partition(SMU_SDB_CPUPIDDATA_ID, NULL);
 	if (hdr == 0) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "pm121: CPU PID fan config not found.\n");
+#else
+		;
+#endif
 		goto fail;
 	}
 	piddata = (struct smu_sdbp_cpupiddata *)&hdr[1];
@@ -676,8 +700,12 @@ static void pm121_create_cpu_fans(void)
 	pid_param.interval = PM121_CPU_INTERVAL;
 	pid_param.history_len = piddata->history_len;
 	if (pid_param.history_len > WF_CPU_PID_MAX_HISTORY) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "pm121: History size overflow on "
 		       "CPU control loop (%d)\n", piddata->history_len);
+#else
+		;
+#endif
 		pid_param.history_len = WF_CPU_PID_MAX_HISTORY;
 	}
 	pid_param.gd = piddata->gd;
@@ -705,7 +733,11 @@ static void pm121_create_cpu_fans(void)
 	return;
 
  fail:
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_WARNING "pm121: CPU fan config not found, max fan speed\n");
+#else
+	;
+#endif
 
 	if (controls[CPUFREQ])
 		wf_control_set_max(controls[CPUFREQ]);
@@ -731,16 +763,24 @@ static void pm121_cpu_fans_tick(struct pm121_cpu_state *st)
 
 	rc = sensor_cpu_temp->ops->get_value(sensor_cpu_temp, &temp);
 	if (rc) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "pm121: CPU temp sensor error %d\n",
 		       rc);
+#else
+		;
+#endif
 		pm121_failure_state |= FAILURE_SENSOR;
 		return;
 	}
 
 	rc = sensor_cpu_power->ops->get_value(sensor_cpu_power, &power);
 	if (rc) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "pm121: CPU power sensor error %d\n",
 		       rc);
+#else
+		;
+#endif
 		pm121_failure_state |= FAILURE_SENSOR;
 		return;
 	}
@@ -770,8 +810,12 @@ static void pm121_cpu_fans_tick(struct pm121_cpu_state *st)
 	if (fan_cpu && pm121_failure_state == 0) {
 		rc = fan_cpu->ops->set_value(fan_cpu, st->setpoint);
 		if (rc) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING "pm121: %s fan error %d\n",
 			       fan_cpu->name, rc);
+#else
+			;
+#endif
 			pm121_failure_state |= FAILURE_FAN;
 		}
 	}
@@ -973,8 +1017,12 @@ static int pm121_init_pm(void)
 
 	pm121_connection = &pm121_connections[pm121_mach_model - 2];
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "pm121: Initializing for iMac G5 iSight model ID %d\n",
 	       pm121_mach_model);
+#else
+	;
+#endif
 
 	return 0;
 }

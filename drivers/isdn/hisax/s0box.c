@@ -171,7 +171,11 @@ Start_ISAC:
 		goto Start_ISAC;
 	}
 	if (count >= MAXCOUNT)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "S0Box: more than %d loops in s0box_interrupt\n", count);
+#else
+		;
+#endif
 	writereg(cs->hw.teles3.cfg_reg, cs->hw.teles3.hscx[0], HSCX_MASK, 0xFF);
 	writereg(cs->hw.teles3.cfg_reg, cs->hw.teles3.hscx[1], HSCX_MASK, 0xFF);
 	writereg(cs->hw.teles3.cfg_reg, cs->hw.teles3.isac, ISAC_MASK, 0xFF);
@@ -217,7 +221,11 @@ setup_s0box(struct IsdnCard *card)
 	char tmp[64];
 
 	strcpy(tmp, s0box_revision);
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "HiSax: S0Box IO driver Rev. %s\n", HiSax_getrev(tmp));
+#else
+	;
+#endif
 	if (cs->typ != ISDN_CTYPE_S0BOX)
 		return (0);
 
@@ -252,8 +260,12 @@ setup_s0box(struct IsdnCard *card)
 	cs->irq_func = &s0box_interrupt;
 	ISACVersion(cs, "S0Box:");
 	if (HscxVersion(cs, "S0Box:")) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING
 		       "S0Box: wrong HSCX versions check IO address\n");
+#else
+		;
+#endif
 		release_io_s0box(cs);
 		return (0);
 	}

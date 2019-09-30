@@ -403,10 +403,14 @@ static int dvb_frontend_swzigzag_autotune(struct dvb_frontend *fe, int check_wra
 		return 1;
 	}
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk("%s: drift:%i inversion:%i auto_step:%i "
 		"auto_sub_step:%i started_auto_step:%i\n",
 		__func__, fepriv->lnb_drift, fepriv->inversion,
 		fepriv->auto_step, fepriv->auto_sub_step, fepriv->started_auto_step);
+#else
+	d;
+#endif
 
 	/* set the frontend itself */
 	c->frequency += fepriv->lnb_drift;
@@ -605,7 +609,11 @@ static int dvb_frontend_thread(void *data)
 
 	bool re_tune = false;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk("%s\n", __func__);
+#else
+	d;
+#endif
 
 	fepriv->check_wrapped = 0;
 	fepriv->quality = 0;
@@ -665,19 +673,35 @@ restart:
 					fe->ops.tune(fe, re_tune, fepriv->tune_mode_flags, &fepriv->delay, &s);
 
 				if (s != fepriv->status && !(fepriv->tune_mode_flags & FE_TUNE_MODE_ONESHOT)) {
+#ifdef CONFIG_DEBUG_PRINTK
 					dprintk("%s: state changed, adding current state\n", __func__);
+#else
+					d;
+#endif
 					dvb_frontend_add_event(fe, s);
 					fepriv->status = s;
 				}
 				break;
 			case DVBFE_ALGO_SW:
+#ifdef CONFIG_DEBUG_PRINTK
 				dprintk("%s: Frontend ALGO = DVBFE_ALGO_SW\n", __func__);
+#else
+				d;
+#endif
 				dvb_frontend_swzigzag(fe);
 				break;
 			case DVBFE_ALGO_CUSTOM:
+#ifdef CONFIG_DEBUG_PRINTK
 				dprintk("%s: Frontend ALGO = DVBFE_ALGO_CUSTOM, state=%d\n", __func__, fepriv->state);
+#else
+				d;
+#endif
 				if (fepriv->state & FESTATE_RETUNE) {
+#ifdef CONFIG_DEBUG_PRINTK
 					dprintk("%s: Retune requested, FESTAT_RETUNE\n", __func__);
+#else
+					d;
+#endif
 					fepriv->state = FESTATE_TUNED;
 				}
 				/* Case where we are going to search for a carrier
@@ -713,7 +737,11 @@ restart:
 				}
 				break;
 			default:
+#ifdef CONFIG_DEBUG_PRINTK
 				dprintk("%s: UNDEFINED ALGO !\n", __func__);
+#else
+				d;
+#endif
 				break;
 			}
 		} else {
@@ -765,8 +793,12 @@ static void dvb_frontend_stop(struct dvb_frontend *fe)
 
 	/* paranoia check in case a signal arrived */
 	if (fepriv->thread)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk("dvb_frontend_stop: warning: thread %p won't exit\n",
 				fepriv->thread);
+#else
+		;
+#endif
 }
 
 s32 timeval_usec_diff(struct timeval lasttime, struct timeval curtime)
@@ -841,7 +873,11 @@ static int dvb_frontend_start(struct dvb_frontend *fe)
 		"kdvb-ad-%i-fe-%i", fe->dvb->num,fe->id);
 	if (IS_ERR(fe_thread)) {
 		ret = PTR_ERR(fe_thread);
+#ifdef CONFIG_DEBUG_PRINTK
 		printk("dvb_frontend_start: failed to start kthread (%d)\n", ret);
+#else
+		;
+#endif
 		up(&fepriv->sem);
 		return ret;
 	}
@@ -862,8 +898,12 @@ static void dvb_frontend_get_frequency_limits(struct dvb_frontend *fe,
 		*freq_max = min(fe->ops.info.frequency_max, fe->ops.tuner_ops.info.frequency_max);
 
 	if (*freq_min == 0 || *freq_max == 0)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "DVB: adapter %i frontend %u frequency limits undefined - fix the driver\n",
 		       fe->dvb->num,fe->id);
+#else
+		;
+#endif
 }
 
 static int dvb_frontend_check_parameters(struct dvb_frontend *fe)
@@ -1037,30 +1077,50 @@ static void dtv_property_dump(struct dtv_property *tvp)
 	int i;
 
 	if (tvp->cmd <= 0 || tvp->cmd > DTV_MAX_COMMAND) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "%s: tvp.cmd = 0x%08x undefined\n",
 			__func__, tvp->cmd);
+#else
+		;
+#endif
 		return;
 	}
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk("%s() tvp.cmd    = 0x%08x (%s)\n"
 		,__func__
 		,tvp->cmd
 		,dtv_cmds[ tvp->cmd ].name);
+#else
+	d;
+#endif
 
 	if(dtv_cmds[ tvp->cmd ].buffer) {
 
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk("%s() tvp.u.buffer.len = 0x%02x\n"
 			,__func__
 			,tvp->u.buffer.len);
+#else
+		d;
+#endif
 
 		for(i = 0; i < tvp->u.buffer.len; i++)
+#ifdef CONFIG_DEBUG_PRINTK
 			dprintk("%s() tvp.u.buffer.data[0x%02x] = 0x%02x\n"
 				,__func__
 				,i
 				,tvp->u.buffer.data[i]);
+#else
+			d;
+#endif
 
 	} else
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk("%s() tvp.u.data = 0x%08x\n", __func__, tvp->u.data);
+#else
+		d;
+#endif
 }
 
 /* Synchronise the legacy tuning parameters into the cache, so that demodulator
@@ -1724,7 +1784,11 @@ static int dvb_frontend_ioctl(struct file *file,
 	struct dvb_frontend_private *fepriv = fe->frontend_priv;
 	int err = -EOPNOTSUPP;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk("%s (%d)\n", __func__, _IOC_NR(cmd));
+#else
+	d;
+#endif
 
 	if (fepriv->exit != DVB_FE_NO_EXIT)
 		return -ENODEV;
@@ -1761,13 +1825,25 @@ static int dvb_frontend_ioctl_properties(struct file *file,
 	struct dtv_property *tvp = NULL;
 	int i;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk("%s\n", __func__);
+#else
+	d;
+#endif
 
 	if(cmd == FE_SET_PROPERTY) {
 		tvps = (struct dtv_properties __user *)parg;
 
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk("%s() properties.num = %d\n", __func__, tvps->num);
+#else
+		d;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk("%s() properties.props = %p\n", __func__, tvps->props);
+#else
+		d;
+#endif
 
 		/* Put an arbitrary limit on the number of messages that can
 		 * be sent at once */
@@ -2141,7 +2217,11 @@ static int dvb_frontend_ioctl_legacy(struct file *file,
 			int i;
 			u8 last = 1;
 			if (dvb_frontend_debug)
+#ifdef CONFIG_DEBUG_PRINTK
 				printk("%s switch command: 0x%04lx\n", __func__, swcmd);
+#else
+				;
+#endif
 			do_gettimeofday(&nexttime);
 			if (dvb_frontend_debug)
 				memcpy(&tv[0], &nexttime, sizeof(struct timeval));
@@ -2164,10 +2244,18 @@ static int dvb_frontend_ioctl_legacy(struct file *file,
 					dvb_frontend_sleep_until(&nexttime, 8000);
 			}
 			if (dvb_frontend_debug) {
+#ifdef CONFIG_DEBUG_PRINTK
 				printk("%s(%d): switch delay (should be 32k followed by all 8k\n",
 					__func__, fe->dvb->num);
+#else
+				;
+#endif
 				for (i = 1; i < 10; i++)
+#ifdef CONFIG_DEBUG_PRINTK
 					printk("%d: %d\n", i, timeval_usec_diff(tv[i-1] , tv[i]));
+#else
+					;
+#endif
 			}
 			err = 0;
 			fepriv->state = FESTATE_DISEQC;

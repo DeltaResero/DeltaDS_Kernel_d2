@@ -191,8 +191,12 @@ static inline int __init doccheck(void __iomem *potential, unsigned long physadr
 	default:
 
 #ifdef CONFIG_MTD_DOCPROBE_55AA
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "Possible DiskOnChip with unknown ChipID %2.2X found at 0x%lx\n",
 		       ChipID, physadr);
+#else
+		;
+#endif
 #endif
 #ifndef DOC_PASSIVE_PROBE
 		/* Put back the contents of the DOCControl register, in case it's not
@@ -203,7 +207,11 @@ static inline int __init doccheck(void __iomem *potential, unsigned long physadr
 		return 0;
 	}
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_WARNING "DiskOnChip failed TOGGLE test, dropping.\n");
+#else
+	;
+#endif
 
 #ifndef DOC_PASSIVE_PROBE
 	/* Put back the contents of the DOCControl register: it's not a DiskOnChip */
@@ -236,14 +244,22 @@ static void __init DoC_Probe(unsigned long physadr)
 	if ((ChipID = doccheck(docptr, physadr))) {
 		if (ChipID == DOC_ChipID_Doc2kTSOP) {
 			/* Remove this at your own peril. The hardware driver works but nothing prevents you from erasing bad blocks */
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_NOTICE "Refusing to drive DiskOnChip 2000 TSOP until Bad Block Table is correctly supported by INFTL\n");
+#else
+			;
+#endif
 			iounmap(docptr);
 			return;
 		}
 		docfound = 1;
 		mtd = kzalloc(sizeof(struct DiskOnChip) + sizeof(struct mtd_info), GFP_KERNEL);
 		if (!mtd) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING "Cannot allocate memory for data structures. Dropping.\n");
+#else
+			;
+#endif
 			iounmap(docptr);
 			return;
 		}
@@ -287,7 +303,11 @@ static void __init DoC_Probe(unsigned long physadr)
 			symbol_put_addr(initroutine);
 			return;
 		}
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_NOTICE "Cannot find driver for DiskOnChip %s at 0x%lX\n", name, physadr);
+#else
+		;
+#endif
 		kfree(mtd);
 	}
 	iounmap(docptr);
@@ -305,7 +325,11 @@ static int __init init_doc(void)
 	int i;
 
 	if (doc_config_location) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_INFO "Using configured DiskOnChip probe address 0x%lx\n", doc_config_location);
+#else
+		;
+#endif
 		DoC_Probe(doc_config_location);
 	} else {
 		for (i=0; (doc_locations[i] != 0xffffffff); i++) {
@@ -315,7 +339,11 @@ static int __init init_doc(void)
 	/* No banner message any more. Print a message if no DiskOnChip
 	   found, so the user knows we at least tried. */
 	if (!docfound)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_INFO "No recognised DiskOnChip devices found\n");
+#else
+		;
+#endif
 	return -EAGAIN;
 }
 

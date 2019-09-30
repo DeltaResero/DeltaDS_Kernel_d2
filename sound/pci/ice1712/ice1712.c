@@ -468,7 +468,11 @@ static irqreturn_t snd_ice1712_interrupt(int irq, void *dev_id)
 			u16 pbkstatus;
 			struct snd_pcm_substream *substream;
 			pbkstatus = inw(ICEDS(ice, INTSTAT));
+#ifdef CONFIG_DEBUG_PRINTK
 			/* printk(KERN_DEBUG "pbkstatus = 0x%x\n", pbkstatus); */
+#else
+			/* ;
+#endif
 			for (idx = 0; idx < 6; idx++) {
 				if ((pbkstatus & (3 << (idx * 2))) == 0)
 					continue;
@@ -907,7 +911,11 @@ static int __devinit snd_ice1712_pcm(struct snd_ice1712 *ice, int device, struct
 	if (rpcm)
 		*rpcm = pcm;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_WARNING "Consumer PCM code does not work well at the moment --jk\n");
+#else
+	;
+#endif
 
 	return 0;
 }
@@ -1540,7 +1548,11 @@ static int __devinit snd_ice1712_ac97_mixer(struct snd_ice1712 *ice)
 		ac97.private_free = snd_ice1712_mixer_free_ac97;
 		err = snd_ac97_mixer(pbus, &ac97, &ice->ac97);
 		if (err < 0)
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING "ice1712: cannot initialize ac97 for consumer, skipped\n");
+#else
+			;
+#endif
 		else {
 			err = snd_ctl_add(ice->card, snd_ctl_new1(&snd_ice1712_mixer_digmix_route_ac97, ice));
 			if (err < 0)
@@ -1558,7 +1570,11 @@ static int __devinit snd_ice1712_ac97_mixer(struct snd_ice1712 *ice)
 		ac97.private_free = snd_ice1712_mixer_free_ac97;
 		err = snd_ac97_mixer(pbus, &ac97, &ice->ac97);
 		if (err < 0)
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING "ice1712: cannot initialize pro ac97, skipped\n");
+#else
+			;
+#endif
 		else
 			return 0;
 	}
@@ -2346,7 +2362,11 @@ static int __devinit snd_ice1712_read_eeprom(struct snd_ice1712 *ice,
 	for (tbl = card_tables; *tbl; tbl++) {
 		for (c = *tbl; c->subvendor; c++) {
 			if (modelname && c->model && !strcmp(modelname, c->model)) {
+#ifdef CONFIG_DEBUG_PRINTK
 				printk(KERN_INFO "ice1712: Using board model %s\n", c->name);
+#else
+				;
+#endif
 				ice->eeprom.subvendor = c->subvendor;
 			} else if (c->subvendor != ice->eeprom.subvendor)
 				continue;
@@ -2360,8 +2380,12 @@ static int __devinit snd_ice1712_read_eeprom(struct snd_ice1712 *ice,
 			goto read_skipped;
 		}
 	}
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_WARNING "ice1712: No matching model found for ID 0x%x\n",
 	       ice->eeprom.subvendor);
+#else
+	;
+#endif
 
  found:
 	ice->eeprom.size = snd_ice1712_read_i2c(ice, dev, 0x04);

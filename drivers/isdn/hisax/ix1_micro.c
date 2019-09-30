@@ -231,7 +231,11 @@ setup_ix1micro(struct IsdnCard *card)
 	char tmp[64];
 
 	strcpy(tmp, ix1_revision);
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "HiSax: ITK IX1 driver Rev. %s\n", HiSax_getrev(tmp));
+#else
+	;
+#endif
 	if (cs->typ != ISDN_CTYPE_IX1MICROR2)
 		return (0);
 

@@ -640,8 +640,12 @@ static int gsmi_shutdown_reason(int reason)
 	if (rc < 0)
 		printk(KERN_ERR "gsmi: Log Shutdown Reason failed\n");
 	else
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_EMERG "gsmi: Log Shutdown Reason 0x%02x\n",
 		       reason);
+#else
+		;
+#endif
 
 	return rc;
 }
@@ -746,7 +750,11 @@ static __init int gsmi_system_valid(void)
 	 * whitewash our board names out of the public driver.
 	 */
 	if (!strncmp(acpi_gbl_FADT.header.oem_table_id, "FACP", 4)) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_INFO "gsmi: Board is too old\n");
+#else
+		;
+#endif
 		return -ENODEV;
 	}
 

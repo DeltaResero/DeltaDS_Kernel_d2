@@ -195,7 +195,11 @@ again:
 		sk >>= 8;
 		sk2 >>= 8;
 		if (sk > 32767 || sk < -32767 || sk2 > 32767 || sk2 < -32767)
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING "DTMF-Detection overflow\n");
+#else
+			;
+#endif
 		/* compute |X(k)|**2 */
 		result[k] =
 			(sk * sk) -
@@ -223,6 +227,7 @@ coefficients:
 	}
 
 	if (dsp_debug & DEBUG_DSP_DTMFCOEFF)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "a %3d %3d %3d %3d %3d %3d %3d %3d"
 		       " tr:%3d r %3d %3d %3d %3d %3d %3d %3d %3d\n",
 		       result[0] / 10000, result[1] / 10000, result[2] / 10000,
@@ -273,7 +278,11 @@ coefficients:
 
 storedigit:
 	if (what && (dsp_debug & DEBUG_DSP_DTMF))
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "DTMF what: %c\n", what);
+#else
+		;
+#endif
 
 	if (dsp->dtmf.lastwhat != what)
 		dsp->dtmf.count = 0;

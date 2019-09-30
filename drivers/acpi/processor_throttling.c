@@ -260,8 +260,12 @@ static int acpi_processor_throttling_notifier(unsigned long event, void *data)
 		if (pr->throttling_platform_limit > target_state)
 			target_state = pr->throttling_platform_limit;
 		if (target_state >= p_throttling->state_count) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING
 				"Exceed the limit of T-state \n");
+#else
+			;
+#endif
 			target_state = p_throttling->state_count - 1;
 		}
 		p_tstate->target_state = target_state;
@@ -280,8 +284,12 @@ static int acpi_processor_throttling_notifier(unsigned long event, void *data)
 				cpu, target_state));
 		break;
 	default:
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING
 			"Unsupported Throttling notifier event\n");
+#else
+		;
+#endif
 		break;
 	}
 
@@ -943,7 +951,11 @@ static int acpi_processor_get_fadt_info(struct acpi_processor *pr)
 	}
 	/* TBD: Support duty_cycle values that span bit 4. */
 	else if ((pr->throttling.duty_offset + pr->throttling.duty_width) > 4) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING PREFIX "duty_cycle spans bit 4\n");
+#else
+		;
+#endif
 		return -EINVAL;
 	}
 

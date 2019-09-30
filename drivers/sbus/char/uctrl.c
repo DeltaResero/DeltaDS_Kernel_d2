@@ -27,6 +27,7 @@
 
 #define DEBUG 1
 #ifdef DEBUG
+#ifdef CONFIG_DEBUG_PRINTK
 #define dprintk(x) printk x
 #else
 #define dprintk(x)
@@ -34,6 +35,9 @@
 
 struct uctrl_regs {
 	u32 uctrl_intr;
+#else
+#define d;
+#endif
 	u32 uctrl_data;
 	u32 uctrl_stat;
 	u32 uctrl_xxx[5];
@@ -243,7 +247,11 @@ static struct miscdevice uctrl_dev = {
       if (UCTRL_STAT_TXNF_STA & sbus_readl(&driver->regs->uctrl_stat)) \
       break; \
   } \
+#ifdef CONFIG_DEBUG_PRINTK
   dprintk(("write data 0x%02x\n", value)); \
+#else
+  d;
+#endif
   sbus_writel(value, &driver->regs->uctrl_data); \
 }
 
@@ -258,7 +266,11 @@ static struct miscdevice uctrl_dev = {
     udelay(1); \
   } \
   value = sbus_readl(&driver->regs->uctrl_data); \
+#ifdef CONFIG_DEBUG_PRINTK
   dprintk(("read data 0x%02x\n", value)); \
+#else
+  d;
+#endif
   sbus_writel(UCTRL_STAT_RXNE_STA, &driver->regs->uctrl_stat); \
 }
 
@@ -271,7 +283,11 @@ static void uctrl_do_txn(struct uctrl_driver *driver, struct uctrl_txn *txn)
 	intr = sbus_readl(&driver->regs->uctrl_intr);
 	sbus_writel(stat, &driver->regs->uctrl_stat);
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(("interrupt stat 0x%x int 0x%x\n", stat, intr));
+#else
+	d;
+#endif
 
 	incnt = txn->inbits;
 	outcnt = txn->outbits;
@@ -288,13 +304,21 @@ static void uctrl_do_txn(struct uctrl_driver *driver, struct uctrl_txn *txn)
 
 	/* Get the ack */
 	READUCTLDATA(byte);
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(("ack was %x\n", (byte >> 8)));
+#else
+	d;
+#endif
 
 	bytecnt = 0;
 	while (outcnt > 0) {
 		READUCTLDATA(byte);
 		txn->outbuf[bytecnt] = (byte >> 8);
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk(("set byte to %02x\n", byte));
+#else
+		d;
+#endif
 		outcnt--;
 		bytecnt++;
 	}
@@ -313,10 +337,18 @@ static void uctrl_get_event_status(struct uctrl_driver *driver)
 
 	uctrl_do_txn(driver, &txn);
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(("bytes %x %x\n", (outbits[0] & 0xff), (outbits[1] & 0xff)));
+#else
+	d;
+#endif
 	driver->status.event_status = 
 		((outbits[0] & 0xff) << 8) | (outbits[1] & 0xff);
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(("ev is %x\n", driver->status.event_status));
+#else
+	d;
+#endif
 }
 
 static void uctrl_get_external_status(struct uctrl_driver *driver)
@@ -333,17 +365,33 @@ static void uctrl_get_external_status(struct uctrl_driver *driver)
 
 	uctrl_do_txn(driver, &txn);
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(("bytes %x %x\n", (outbits[0] & 0xff), (outbits[1] & 0xff)));
+#else
+	d;
+#endif
 	driver->status.external_status = 
 		((outbits[0] * 256) + (outbits[1]));
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(("ex is %x\n", driver->status.external_status));
+#else
+	d;
+#endif
 	v = driver->status.external_status;
 	for (i = 0; v != 0; i++, v >>= 1) {
 		if (v & 1) {
+#ifdef CONFIG_DEBUG_PRINTK
 			dprintk(("%s%s", " ", uctrl_extstatus[i]));
+#else
+			d;
+#endif
 		}
 	}
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(("\n"));
+#else
+	d;
+#endif
 	
 }
 
@@ -380,8 +428,12 @@ static int __devinit uctrl_probe(struct platform_device *op)
 	}
 
 	sbus_writel(UCTRL_INTR_RXNE_REQ|UCTRL_INTR_RXNE_MSK, &p->regs->uctrl_intr);
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "%s: uctrl regs[0x%p] (irq %d)\n",
 	       op->dev.of_node->full_name, p->regs, p->irq);
+#else
+	;
+#endif
 	uctrl_get_event_status(p);
 	uctrl_get_external_status(p);
 

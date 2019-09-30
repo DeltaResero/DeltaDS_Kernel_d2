@@ -177,7 +177,11 @@ static int queuecommand_lck(struct scsi_cmnd *srb,
 
 	/* fail the command if we are disconnecting */
 	if (rtsx_chk_stat(chip, RTSX_STAT_DISCONNECT)) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_INFO "Fail command during disconnect\n");
+#else
+		;
+#endif
 		srb->result = DID_NO_CONNECT << 16;
 		done(srb);
 		return 0;
@@ -204,14 +208,22 @@ static int command_abort(struct scsi_cmnd *srb)
 	struct rtsx_dev *dev = host_to_rtsx(host);
 	struct rtsx_chip *chip = dev->chip;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "%s called\n", __func__);
+#else
+	;
+#endif
 
 	scsi_lock(host);
 
 	/* Is this command still active? */
 	if (chip->srb != srb) {
 		scsi_unlock(host);
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_INFO "-- nothing to abort\n");
+#else
+		;
+#endif
 		return FAILED;
 	}
 
@@ -231,7 +243,11 @@ static int device_reset(struct scsi_cmnd *srb)
 {
 	int result = 0;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "%s called\n", __func__);
+#else
+	;
+#endif
 
 	return result < 0 ? FAILED : SUCCESS;
 }
@@ -241,7 +257,11 @@ static int bus_reset(struct scsi_cmnd *srb)
 {
 	int result = 0;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "%s called\n", __func__);
+#else
+	;
+#endif
 
 	return result < 0 ? FAILED : SUCCESS;
 }
@@ -303,8 +323,12 @@ static int rtsx_acquire_irq(struct rtsx_dev *dev)
 {
 	struct rtsx_chip *chip = dev->chip;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "%s: chip->msi_en = %d, pci->irq = %d\n",
 			__func__, chip->msi_en, dev->pci->irq);
+#else
+	;
+#endif
 
 	if (request_irq(dev->pci->irq, rtsx_interrupt,
 			chip->msi_en ? 0 : IRQF_SHARED,
@@ -347,7 +371,11 @@ static int rtsx_suspend(struct pci_dev *pci, pm_message_t state)
 	struct rtsx_dev *dev = (struct rtsx_dev *)pci_get_drvdata(pci);
 	struct rtsx_chip *chip;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "Ready to suspend\n");
+#else
+	;
+#endif
 
 	if (!dev) {
 		printk(KERN_ERR "Invalid memory\n");
@@ -386,7 +414,11 @@ static int rtsx_resume(struct pci_dev *pci)
 	struct rtsx_dev *dev = (struct rtsx_dev *)pci_get_drvdata(pci);
 	struct rtsx_chip *chip;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "Ready to resume\n");
+#else
+	;
+#endif
 
 	if (!dev) {
 		printk(KERN_ERR "Invalid memory\n");
@@ -435,7 +467,11 @@ static void rtsx_shutdown(struct pci_dev *pci)
 	struct rtsx_dev *dev = (struct rtsx_dev *)pci_get_drvdata(pci);
 	struct rtsx_chip *chip;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "Ready to shutdown\n");
+#else
+	;
+#endif
 
 	if (!dev) {
 		printk(KERN_ERR "Invalid memory\n");
@@ -475,7 +511,11 @@ static int rtsx_control_thread(void *__dev)
 
 		/* if the device has disconnected, we are free to exit */
 		if (rtsx_chk_stat(chip, RTSX_STAT_DISCONNECT)) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_INFO "-- rtsx-control exiting\n");
+#else
+			;
+#endif
 			mutex_unlock(&dev->dev_mutex);
 			break;
 		}
@@ -594,7 +634,11 @@ static int rtsx_polling_thread(void *__dev)
 
 		/* if the device has disconnected, we are free to exit */
 		if (rtsx_chk_stat(chip, RTSX_STAT_DISCONNECT)) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_INFO "-- rtsx-polling exiting\n");
+#else
+			;
+#endif
 			mutex_unlock(&dev->dev_mutex);
 			break;
 		}
@@ -683,7 +727,11 @@ Exit:
 /* Release all our dynamic resources */
 static void rtsx_release_resources(struct rtsx_dev *dev)
 {
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "-- %s\n", __func__);
+#else
+	;
+#endif
 
 	/* Tell the control thread to exit.  The SCSI host must
 	 * already have been removed so it won't try to queue
@@ -774,8 +822,12 @@ static int rtsx_scan_thread(void *__dev)
 
 	/* Wait for the timeout to expire or for a disconnect */
 	if (delay_use > 0) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_INFO "%s: waiting for device "
 				"to settle before scanning\n", CR_DRIVER_NAME);
+#else
+		;
+#endif
 		wait_event_interruptible_timeout(dev->delay_wait,
 				rtsx_chk_stat(chip, RTSX_STAT_DISCONNECT),
 				delay_use * HZ);
@@ -784,7 +836,11 @@ static int rtsx_scan_thread(void *__dev)
 	/* If the device is still connected, perform the scanning */
 	if (!rtsx_chk_stat(chip, RTSX_STAT_DISCONNECT)) {
 		scsi_scan_host(rtsx_to_host(dev));
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_INFO "%s: device scan complete\n", CR_DRIVER_NAME);
+#else
+		;
+#endif
 
 		/* Should we unbind if no devices were detected? */
 	}
@@ -983,7 +1039,11 @@ static int __devinit rtsx_probe(struct pci_dev *pci,
 
 	rtsx_init_options(dev->chip);
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "pci->irq = %d\n", pci->irq);
+#else
+	;
+#endif
 
 	if (dev->chip->msi_en) {
 		if (pci_enable_msi(pci) < 0)
@@ -1059,7 +1119,11 @@ static void __devexit rtsx_remove(struct pci_dev *pci)
 {
 	struct rtsx_dev *dev = (struct rtsx_dev *)pci_get_drvdata(pci);
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "rtsx_remove() called\n");
+#else
+	;
+#endif
 
 	quiesce_and_remove_host(dev);
 	release_everything(dev);
@@ -1092,18 +1156,30 @@ static struct pci_driver driver = {
 
 static int __init rtsx_init(void)
 {
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "Initializing Realtek PCIE storage driver...\n");
+#else
+	;
+#endif
 
 	return pci_register_driver(&driver);
 }
 
 static void __exit rtsx_exit(void)
 {
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "rtsx_exit() called\n");
+#else
+	;
+#endif
 
 	pci_unregister_driver(&driver);
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "%s module exit\n", CR_DRIVER_NAME);
+#else
+	;
+#endif
 }
 
 module_init(rtsx_init)

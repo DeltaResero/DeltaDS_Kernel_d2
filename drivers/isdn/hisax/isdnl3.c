@@ -185,7 +185,11 @@ L3AddTimer(struct L3Timer *t,
 	   int millisec, int event)
 {
 	if (timer_pending(&t->tl)) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "L3AddTimer: timer already active!\n");
+#else
+		;
+#endif
 		return -1;
 	}
 	init_timer(&t->tl);
@@ -207,7 +211,11 @@ l3_alloc_skb(int len)
 	struct sk_buff *skb;
 
 	if (!(skb = alloc_skb(len + MAX_HEADER_LEN, GFP_ATOMIC))) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "HiSax: No skb for D-channel\n");
+#else
+		;
+#endif
 		return (NULL);
 	}
 	skb_reserve(skb, MAX_HEADER_LEN);

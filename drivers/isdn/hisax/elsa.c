@@ -329,7 +329,11 @@ Start_ISAC:
 		goto Start_ISAC;
 	}
 	if (!icnt)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING"ELSA IRQ LOOP\n");
+#else
+		;
+#endif
 	writereg(cs->hw.elsa.ale, cs->hw.elsa.hscx, HSCX_MASK, 0xFF);
 	writereg(cs->hw.elsa.ale, cs->hw.elsa.hscx, HSCX_MASK + 0x40, 0xFF);
 	writereg(cs->hw.elsa.ale, cs->hw.elsa.isac, ISAC_MASK, 0xFF);
@@ -415,7 +419,11 @@ Start_IPAC:
 		goto Start_IPAC;
 	}
 	if (!icnt)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "ELSA IRQ LOOP\n");
+#else
+		;
+#endif
 	writereg(cs->hw.elsa.ale, cs->hw.elsa.isac, IPAC_MASK, 0xFF);
 	writereg(cs->hw.elsa.ale, cs->hw.elsa.isac, IPAC_MASK, 0xC0);
 	spin_unlock_irqrestore(&cs->lock, flags);
@@ -781,8 +789,12 @@ probe_elsa_adr(unsigned int adr, int typ)
 		if (request_region(adr, 8, "elsa card")) {
 			release_region(adr, 8);
 		} else {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING
 			       "Elsa: Probing Port 0x%x: already in use\n", adr);
+#else
+			;
+#endif
 			return (0);
 		}
 	}
@@ -798,21 +810,45 @@ probe_elsa_adr(unsigned int adr, int typ)
 		pfp_1 += 0x40 & in1;
 		pfp_2 += 0x40 & in2;
 	}
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "Elsa: Probing IO 0x%x", adr);
+#else
+	;
+#endif
 	if (65 == ++p16_1 * ++p16_2) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(" PCC-16/PCF found\n");
+#else
+		;
+#endif
 		return (ELSA_PCC16);
 	} else if (1025 == ++pfp_1 * ++pfp_2) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(" PCF-Pro found\n");
+#else
+		;
+#endif
 		return (ELSA_PCFPRO);
 	} else if (33 == ++p8_1 * ++p8_2) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(" PCC8 found\n");
+#else
+		;
+#endif
 		return (ELSA_PCC8);
 	} else if (17 == ++pc_1 * ++pc_2) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(" PC found\n");
+#else
+		;
+#endif
 		return (ELSA_PC);
 	} else {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(" failed\n");
+#else
+		;
+#endif
 		return (0);
 	}
 }
@@ -838,21 +874,33 @@ setup_elsa_isa(struct IsdnCard *card)
 	u_char val;
 
 	cs->hw.elsa.base = card->para[0];
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "Elsa: Microlink IO probing\n");
+#else
+	;
+#endif
 	if (cs->hw.elsa.base) {
 		if (!(cs->subtyp = probe_elsa_adr(cs->hw.elsa.base,
 						  cs->typ))) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING
 			       "Elsa: no Elsa Microlink at %#lx\n",
 			       cs->hw.elsa.base);
+#else
+			;
+#endif
 			return (0);
 		}
 	} else
 		cs->hw.elsa.base = probe_elsa(cs);
 
 	if (!cs->hw.elsa.base) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING
 		       "No Elsa Microlink found\n");
+#else
+		;
+#endif
 		return (0);
 	}
 
@@ -985,11 +1033,15 @@ setup_elsa_isapnp(struct IsdnCard *card)
 	cs->hw.elsa.trig = cs->hw.elsa.base + ELSA_TRIG_IRQ;
 	cs->hw.elsa.timer = cs->hw.elsa.base + ELSA_START_TIMER;
 	cs->hw.elsa.ctrl = cs->hw.elsa.base + ELSA_CONTROL;
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO
 	       "Elsa: %s defined at %#lx IRQ %d\n",
 	       Elsa_Types[cs->subtyp],
 	       cs->hw.elsa.base,
 	       cs->irq);
+#else
+	;
+#endif
 
 	return (1);
 }
@@ -1019,11 +1071,15 @@ setup_elsa_pcmcia(struct IsdnCard *card)
 	cs->hw.elsa.trig = 0;
 	cs->hw.elsa.ctrl = 0;
 	cs->irq_flags |= IRQF_SHARED;
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO
 	       "Elsa: %s defined at %#lx IRQ %d\n",
 	       Elsa_Types[cs->subtyp],
 	       cs->hw.elsa.base,
 	       cs->irq);
+#else
+	;
+#endif
 }
 
 #ifdef CONFIG_PCI
@@ -1077,12 +1133,16 @@ setup_elsa_pci(struct IsdnCard *card)
 	cs->hw.elsa.timer = 0;
 	cs->hw.elsa.trig  = 0;
 	cs->irq_flags |= IRQF_SHARED;
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO
 	       "Elsa: %s defined at %#lx/0x%x IRQ %d\n",
 	       Elsa_Types[cs->subtyp],
 	       cs->hw.elsa.base,
 	       cs->hw.elsa.cfg,
 	       cs->irq);
+#else
+	;
+#endif
 
 	return (1);
 }
@@ -1185,7 +1245,11 @@ setup_elsa_common(struct IsdnCard *card)
 		cs->writeisacfifo = &WriteISACfifo_IPAC;
 		cs->irq_func = &elsa_interrupt_ipac;
 		val = readreg(cs->hw.elsa.ale, cs->hw.elsa.isac, IPAC_ID);
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_INFO "Elsa: IPAC version %x\n", val);
+#else
+		;
+#endif
 	} else {
 		cs->readisac = &ReadISAC;
 		cs->writeisac = &WriteISAC;
@@ -1220,7 +1284,11 @@ setup_elsa(struct IsdnCard *card)
 	char tmp[64];
 
 	strcpy(tmp, Elsa_revision);
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "HiSax: Elsa driver Rev. %s\n", HiSax_getrev(tmp));
+#else
+	;
+#endif
 	cs->hw.elsa.ctrl_reg = 0;
 	cs->hw.elsa.status = 0;
 	cs->hw.elsa.MFlag = 0;

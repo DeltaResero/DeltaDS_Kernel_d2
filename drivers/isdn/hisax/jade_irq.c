@@ -160,7 +160,11 @@ jade_interrupt(struct IsdnCardState *cs, u_char val, u_char jade)
 		if (bcs->mode == L1_MODE_TRANS) {
 			/* receive audio data */
 			if (!(skb = dev_alloc_skb(fifo_size)))
+#ifdef CONFIG_DEBUG_PRINTK
 				printk(KERN_WARNING "HiSax: receive out of memory\n");
+#else
+				;
+#endif
 			else {
 				memcpy(skb_put(skb, fifo_size), bcs->hw.hscx.rcvbuf, fifo_size);
 				skb_queue_tail(&bcs->rqueue, skb);

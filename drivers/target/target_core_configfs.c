@@ -1917,6 +1917,9 @@ static ssize_t target_core_store_alua_lu_gp(
 				config_item_name(&su_dev->se_dev_group.cg_item),
 				config_item_name(&lu_gp->lu_gp_group.cg_item),
 				lu_gp->lu_gp_id);
+#else
+			;
+#endif
 
 			__core_alua_drop_lu_gp_mem(lu_gp_mem, lu_gp);
 			spin_unlock(&lu_gp_mem->lu_gp_mem_lock);
@@ -1942,6 +1945,9 @@ static ssize_t target_core_store_alua_lu_gp(
 		config_item_name(&su_dev->se_dev_group.cg_item),
 		config_item_name(&lu_gp_new->lu_gp_group.cg_item),
 		lu_gp_new->lu_gp_id);
+#else
+	;
+#endif
 
 	core_alua_put_lu_gp_from_name(lu_gp_new);
 	return count;

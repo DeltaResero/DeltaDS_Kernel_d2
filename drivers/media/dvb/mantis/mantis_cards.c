@@ -81,7 +81,11 @@ static irqreturn_t mantis_irq_handler(int irq, void *dev_id)
 
 	mantis = (struct mantis_pci *) dev_id;
 	if (unlikely(mantis == NULL)) {
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk(MANTIS_ERROR, 1, "Mantis == NULL");
+#else
+		d;
+#endif
 		return IRQ_NONE;
 	}
 	ca = mantis->mantis_ca;
@@ -154,9 +158,17 @@ static irqreturn_t mantis_irq_handler(int irq, void *dev_id)
 		  MANTIS_INT_RISCI);
 
 	if (stat)
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk(MANTIS_DEBUG, 0, "<Unknown> Stat=<%02x> Mask=<%02x>", stat, mask);
+#else
+		d;
+#endif
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(MANTIS_DEBUG, 0, "\n");
+#else
+	d;
+#endif
 	return IRQ_HANDLED;
 }
 
@@ -182,42 +194,70 @@ static int __devinit mantis_pci_probe(struct pci_dev *pdev, const struct pci_dev
 
 	err = mantis_pci_init(mantis);
 	if (err) {
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk(MANTIS_ERROR, 1, "ERROR: Mantis PCI initialization failed <%d>", err);
+#else
+		d;
+#endif
 		goto fail1;
 	}
 
 	err = mantis_stream_control(mantis, STREAM_TO_HIF);
 	if (err < 0) {
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk(MANTIS_ERROR, 1, "ERROR: Mantis stream control failed <%d>", err);
+#else
+		d;
+#endif
 		goto fail1;
 	}
 
 	err = mantis_i2c_init(mantis);
 	if (err < 0) {
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk(MANTIS_ERROR, 1, "ERROR: Mantis I2C initialization failed <%d>", err);
+#else
+		d;
+#endif
 		goto fail2;
 	}
 
 	err = mantis_get_mac(mantis);
 	if (err < 0) {
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk(MANTIS_ERROR, 1, "ERROR: Mantis MAC address read failed <%d>", err);
+#else
+		d;
+#endif
 		goto fail2;
 	}
 
 	err = mantis_dma_init(mantis);
 	if (err < 0) {
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk(MANTIS_ERROR, 1, "ERROR: Mantis DMA initialization failed <%d>", err);
+#else
+		d;
+#endif
 		goto fail3;
 	}
 
 	err = mantis_dvb_init(mantis);
 	if (err < 0) {
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk(MANTIS_ERROR, 1, "ERROR: Mantis DVB initialization failed <%d>", err);
+#else
+		d;
+#endif
 		goto fail4;
 	}
 	err = mantis_uart_init(mantis);
 	if (err < 0) {
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk(MANTIS_ERROR, 1, "ERROR: Mantis UART initialization failed <%d>", err);
+#else
+		d;
+#endif
 		goto fail6;
 	}
 
@@ -226,24 +266,44 @@ static int __devinit mantis_pci_probe(struct pci_dev *pdev, const struct pci_dev
 	return err;
 
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(MANTIS_ERROR, 1, "ERROR: Mantis UART exit! <%d>", err);
+#else
+	d;
+#endif
 	mantis_uart_exit(mantis);
 
 fail6:
 fail4:
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(MANTIS_ERROR, 1, "ERROR: Mantis DMA exit! <%d>", err);
+#else
+	d;
+#endif
 	mantis_dma_exit(mantis);
 
 fail3:
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(MANTIS_ERROR, 1, "ERROR: Mantis I2C exit! <%d>", err);
+#else
+	d;
+#endif
 	mantis_i2c_exit(mantis);
 
 fail2:
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(MANTIS_ERROR, 1, "ERROR: Mantis PCI exit! <%d>", err);
+#else
+	d;
+#endif
 	mantis_pci_exit(mantis);
 
 fail1:
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(MANTIS_ERROR, 1, "ERROR: Mantis free! <%d>", err);
+#else
+	d;
+#endif
 	kfree(mantis);
 
 fail0:

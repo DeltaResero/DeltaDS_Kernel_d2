@@ -53,10 +53,14 @@ struct stv0288_state {
 
 static int debug;
 static int debug_legacy_dish_switch;
+#ifdef CONFIG_DEBUG_PRINTK
 #define dprintk(args...) \
 	do { \
 		if (debug) \
 			printk(KERN_DEBUG "stv0288: " args); \
+#else
+#define d;
+#endif
 	} while (0)
 
 
@@ -74,8 +78,12 @@ static int stv0288_writeregI(struct stv0288_state *state, u8 reg, u8 data)
 	ret = i2c_transfer(state->i2c, &msg, 1);
 
 	if (ret != 1)
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk("%s: writereg error (reg == 0x%02x, val == 0x%02x, "
 			"ret == %i)\n", __func__, reg, data, ret);
+#else
+		d;
+#endif
 
 	return (ret != 1) ? -EREMOTEIO : 0;
 }
@@ -112,8 +120,12 @@ static u8 stv0288_readreg(struct stv0288_state *state, u8 reg)
 	ret = i2c_transfer(state->i2c, msg, 2);
 
 	if (ret != 2)
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk("%s: readreg error (reg == 0x%02x, ret == %i)\n",
 				__func__, reg, ret);
+#else
+		d;
+#endif
 
 	return b1[0];
 }
@@ -147,7 +159,11 @@ static int stv0288_set_symbolrate(struct dvb_frontend *fe, u32 srate)
 		stv0288_writeregI(state, 0x28, b[0]);
 		stv0288_writeregI(state, 0x29, b[1]);
 		stv0288_writeregI(state, 0x2a, b[2]);
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk("stv0288: stv0288_set_symbolrate\n");
+#else
+		d;
+#endif
 
 	return 0;
 }
@@ -159,7 +175,11 @@ static int stv0288_send_diseqc_msg(struct dvb_frontend *fe,
 
 	int i;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk("%s\n", __func__);
+#else
+	d;
+#endif
 
 	stv0288_writeregI(state, 0x09, 0);
 	msleep(30);
@@ -178,7 +198,11 @@ static int stv0288_send_diseqc_burst(struct dvb_frontend *fe,
 {
 	struct stv0288_state *state = fe->demodulator_priv;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk("%s\n", __func__);
+#else
+	d;
+#endif
 
 	if (stv0288_writeregI(state, 0x05, 0x03))/* burst mode, single shot */
 		return -EREMOTEIO;
@@ -325,9 +349,13 @@ static u8 stv0288_inittab[] = {
 
 static int stv0288_set_voltage(struct dvb_frontend *fe, fe_sec_voltage_t volt)
 {
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk("%s: %s\n", __func__,
 		volt == SEC_VOLTAGE_13 ? "SEC_VOLTAGE_13" :
 		volt == SEC_VOLTAGE_18 ? "SEC_VOLTAGE_18" : "??");
+#else
+	d;
+#endif
 
 	return 0;
 }
@@ -339,7 +367,11 @@ static int stv0288_init(struct dvb_frontend *fe)
 	u8 reg;
 	u8 val;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk("stv0288: init chip\n");
+#else
+	d;
+#endif
 	stv0288_writeregI(state, 0x41, 0x04);
 	msleep(50);
 
@@ -369,7 +401,11 @@ static int stv0288_read_status(struct dvb_frontend *fe, fe_status_t *status)
 	if (sync == 255)
 		sync = 0;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk("%s : FE_READ_STATUS : VSTATUS: 0x%02x\n", __func__, sync);
+#else
+	d;
+#endif
 
 	*status = 0;
 	if (sync & 0x80)
@@ -378,7 +414,11 @@ static int stv0288_read_status(struct dvb_frontend *fe, fe_status_t *status)
 		*status |= FE_HAS_VITERBI;
 	if (sync & 0x08) {
 		*status |= FE_HAS_LOCK;
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk("stv0288 has locked\n");
+#else
+		d;
+#endif
 	}
 
 	return 0;
@@ -392,7 +432,11 @@ static int stv0288_read_ber(struct dvb_frontend *fe, u32 *ber)
 		return 0;
 	*ber = (stv0288_readreg(state, 0x26) << 8) |
 					stv0288_readreg(state, 0x27);
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk("stv0288_read_ber %d\n", *ber);
+#else
+	d;
+#endif
 
 	return 0;
 }
@@ -407,7 +451,11 @@ static int stv0288_read_signal_strength(struct dvb_frontend *fe, u16 *strength)
 
 	signal = signal * 5 / 4;
 	*strength = (signal > 0xffff) ? 0xffff : (signal < 0) ? 0 : signal;
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk("stv0288_read_signal_strength %d\n", *strength);
+#else
+	d;
+#endif
 
 	return 0;
 }
@@ -428,7 +476,11 @@ static int stv0288_read_snr(struct dvb_frontend *fe, u16 *snr)
 			   | stv0288_readreg(state, 0x2e));
 	xsnr = 3 * (xsnr - 0xa100);
 	*snr = (xsnr > 0xffff) ? 0xffff : (xsnr < 0) ? 0 : xsnr;
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk("stv0288_read_snr %d\n", *snr);
+#else
+	d;
+#endif
 
 	return 0;
 }
@@ -461,12 +513,20 @@ static int stv0288_set_frontend(struct dvb_frontend *fe)
 	unsigned char tda[3];
 	u8 reg, time_out = 0;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk("%s : FE_SET_FRONTEND\n", __func__);
+#else
+	d;
+#endif
 
 	if (c->delivery_system != SYS_DVBS) {
+#ifdef CONFIG_DEBUG_PRINTK
 			dprintk("%s: unsupported delivery "
 				"system selected (%d)\n",
 				__func__, c->delivery_system);
+#else
+			d;
+#endif
 			return -EOPNOTSUPP;
 	}
 
@@ -594,7 +654,11 @@ struct dvb_frontend *stv0288_attach(const struct stv0288_config *config,
 	stv0288_writeregI(state, 0x41, 0x04);
 	msleep(200);
 	id = stv0288_readreg(state, 0x00);
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk("stv0288 id %x\n", id);
+#else
+	d;
+#endif
 
 	/* register 0x00 contains 0x11 for STV0288  */
 	if (id != 0x11)

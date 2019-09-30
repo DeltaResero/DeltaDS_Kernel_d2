@@ -71,7 +71,11 @@ static void acpi_sleep_tts_switch(u32 acpi_state)
 		 * OS can't evaluate the _TTS object correctly. Some warning
 		 * message will be printed. But it won't break anything.
 		 */
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_NOTICE "Failure in evaluating _TTS object\n");
+#else
+		;
+#endif
 	}
 }
 
@@ -102,8 +106,12 @@ static int acpi_sleep_prepare(u32 acpi_state)
 	}
 	ACPI_FLUSH_CPU_CACHE();
 #endif
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO PREFIX "Preparing to enter system sleep state S%d\n",
 		acpi_state);
+#else
+	;
+#endif
 	acpi_enable_wakeup_devices(acpi_state);
 	acpi_enter_sleep_state_prep(acpi_state);
 	return 0;
@@ -384,8 +392,12 @@ static void acpi_pm_finish(void)
 	if (acpi_state == ACPI_STATE_S0)
 		return;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO PREFIX "Waking up from system sleep state S%d\n",
 		acpi_state);
+#else
+	;
+#endif
 	acpi_disable_wakeup_devices(acpi_state);
 	acpi_leave_sleep_state(acpi_state);
 
@@ -604,8 +616,12 @@ static void acpi_hibernation_leave(void)
 	acpi_leave_sleep_state_prep(ACPI_STATE_S4, wake_sleep_flags);
 	/* Check the hardware signature */
 	if (facs && s4_hardware_signature != facs->hardware_signature) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_EMERG "ACPI: Hardware changed while hibernated, "
 			"cannot resume!\n");
+#else
+		;
+#endif
 		panic("ACPI S4 hardware signature mismatch");
 	}
 	/* Restore the NVS memory area */
@@ -723,7 +739,11 @@ int acpi_pm_device_sleep_state(struct device *dev, int *d_min_p)
 	unsigned long long d_min, d_max;
 
 	if (!handle || ACPI_FAILURE(acpi_bus_get_device(handle, &adev))) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "ACPI handle has no context!\n");
+#else
+		;
+#endif
 		return -ENODEV;
 	}
 
@@ -767,8 +787,12 @@ int acpi_pm_device_sleep_state(struct device *dev, int *d_min_p)
 				d_max = d_min;
 		} else if (d_max < d_min) {
 			/* Warn the user of the broken DSDT */
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING "ACPI: Wrong value from %s\n",
 				acpi_method);
+#else
+			;
+#endif
 			/* Sanitize it */
 			d_min = d_max;
 		}
@@ -857,7 +881,11 @@ static void acpi_power_off_prepare(void)
 static void acpi_power_off(void)
 {
 	/* acpi_sleep_prepare(ACPI_STATE_S5) should have already been called */
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_DEBUG "%s called\n", __func__);
+#else
+	;
+#endif
 	local_irq_disable();
 	acpi_enter_sleep_state(ACPI_STATE_S5, wake_sleep_flags);
 }
@@ -902,14 +930,22 @@ int __init acpi_sleep_init(void)
 	acpi_sleep_dmi_check();
 
 	sleep_states[ACPI_STATE_S0] = 1;
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO PREFIX "(supports S0");
+#else
+	;
+#endif
 
 #ifdef CONFIG_SUSPEND
 	for (i = ACPI_STATE_S1; i < ACPI_STATE_S4; i++) {
 		status = acpi_get_sleep_type_data(i, &type_a, &type_b);
 		if (ACPI_SUCCESS(status)) {
 			sleep_states[i] = 1;
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(" S%d", i);
+#else
+			;
+#endif
 		}
 	}
 
@@ -923,7 +959,11 @@ int __init acpi_sleep_init(void)
 		hibernation_set_ops(old_suspend_ordering ?
 			&acpi_hibernation_ops_old : &acpi_hibernation_ops);
 		sleep_states[ACPI_STATE_S4] = 1;
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(" S4");
+#else
+		;
+#endif
 		if (!nosigcheck) {
 			acpi_get_table(ACPI_SIG_FACS, 1,
 				(struct acpi_table_header **)&facs);
@@ -936,11 +976,19 @@ int __init acpi_sleep_init(void)
 	status = acpi_get_sleep_type_data(ACPI_STATE_S5, &type_a, &type_b);
 	if (ACPI_SUCCESS(status)) {
 		sleep_states[ACPI_STATE_S5] = 1;
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(" S5");
+#else
+		;
+#endif
 		pm_power_off_prepare = acpi_power_off_prepare;
 		pm_power_off = acpi_power_off;
 	}
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(")\n");
+#else
+	;
+#endif
 	/*
 	 * Register the tts_notifier to reboot notifier list so that the _TTS
 	 * object can also be evaluated when the system enters S5.

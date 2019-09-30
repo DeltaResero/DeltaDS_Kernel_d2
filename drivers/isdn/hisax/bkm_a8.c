@@ -179,8 +179,12 @@ Start_IPAC:
 		goto Start_IPAC;
 	}
 	if (!icnt)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "HiSax: Scitel Quadro (%s) IRQ LOOP\n",
 		       sct_quadro_subtypes[cs->subtyp]);
+#else
+		;
+#endif
 	writereg(cs->hw.ax.base, cs->hw.ax.data_adr, IPAC_MASK, 0xFF);
 	writereg(cs->hw.ax.base, cs->hw.ax.data_adr, IPAC_MASK, 0xC0);
 	spin_unlock_irqrestore(&cs->lock, flags);
@@ -283,7 +287,11 @@ setup_sct_quadro(struct IsdnCard *card)
 	u_int pci_ioaddr1, pci_ioaddr2, pci_ioaddr3, pci_ioaddr4, pci_ioaddr5;
 
 	strcpy(tmp, sct_quadro_revision);
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "HiSax: T-Berkom driver Rev. %s\n", HiSax_getrev(tmp));
+#else
+	;
+#endif
 	if (cs->typ == ISDN_CTYPE_SCT_QUADRO) {
 		cs->subtyp = SCT_1;	/* Preset */
 	} else
@@ -293,8 +301,12 @@ setup_sct_quadro(struct IsdnCard *card)
 	if (card->para[0] >= SCT_1 && card->para[0] <= SCT_4)
 		cs->subtyp = card->para[0];
 	else {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "HiSax: Scitel Quadro: Invalid "
 		       "subcontroller in configuration, default to 1\n");
+#else
+		;
+#endif
 		return (0);
 	}
 	if ((cs->subtyp != SCT_1) && ((sub_sys_id != PCI_DEVICE_ID_BERKOM_SCITEL_QUADRO) ||
@@ -341,8 +353,12 @@ setup_sct_quadro(struct IsdnCard *card)
 #endif /* End HACK */
 	}
 	if (!pci_irq) {		/* IRQ range check ?? */
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "HiSax: Scitel Quadro (%s): No IRQ\n",
 		       sct_quadro_subtypes[cs->subtyp]);
+#else
+		;
+#endif
 		return (0);
 	}
 	pci_read_config_dword(dev_a8, PCI_BASE_ADDRESS_1, &pci_ioaddr1);
@@ -351,9 +367,13 @@ setup_sct_quadro(struct IsdnCard *card)
 	pci_read_config_dword(dev_a8, PCI_BASE_ADDRESS_4, &pci_ioaddr4);
 	pci_read_config_dword(dev_a8, PCI_BASE_ADDRESS_5, &pci_ioaddr5);
 	if (!pci_ioaddr1 || !pci_ioaddr2 || !pci_ioaddr3 || !pci_ioaddr4 || !pci_ioaddr5) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "HiSax: Scitel Quadro (%s): "
 		       "No IO base address(es)\n",
 		       sct_quadro_subtypes[cs->subtyp]);
+#else
+		;
+#endif
 		return (0);
 	}
 	pci_ioaddr1 &= PCI_BASE_ADDRESS_IO_MASK;
@@ -407,6 +427,7 @@ setup_sct_quadro(struct IsdnCard *card)
 	/* For isac and hscx data path */
 	cs->hw.ax.data_adr = cs->hw.ax.base + 4;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "HiSax: Scitel Quadro (%s) configured at "
 	       "0x%.4lX, 0x%.4lX, 0x%.4lX and IRQ %d\n",
 	       sct_quadro_subtypes[cs->subtyp],
@@ -414,6 +435,9 @@ setup_sct_quadro(struct IsdnCard *card)
 	       cs->hw.ax.base,
 	       cs->hw.ax.data_adr,
 	       cs->irq);
+#else
+	;
+#endif
 
 	test_and_set_bit(HW_IPAC, &cs->HW_Flags);
 

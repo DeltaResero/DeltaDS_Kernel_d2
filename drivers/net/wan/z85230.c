@@ -1053,7 +1053,7 @@ int z8530_sync_txdma_open(struct net_device *dev, struct z8530_channel *c)
 {
 	unsigned long cflags, dflags;
 
-	printk("Opening sync interface for TX-DMA\n");
+;
 	c->sync = 1;
 	c->mtu = dev->mtu+64;
 	c->count = 0;
@@ -1780,7 +1780,7 @@ static const char banner[] __initconst =
 
 static int __init z85230_init_driver(void)
 {
-	printk(banner);
+;
 	return 0;
 }
 module_init(z85230_init_driver);

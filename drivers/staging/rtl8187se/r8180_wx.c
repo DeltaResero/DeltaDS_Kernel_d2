@@ -338,7 +338,7 @@ static int r8180_wx_set_scan(struct net_device *dev, struct iw_request_info *a,
 			/* FIXME: Need to consider last scan time */
 			if ((priv->link_detect.bBusyTraffic) && (true))	{
 				ret = 0;
-				printk("Now traffic is busy, please try later!\n");
+;
 			}	else
 				/* prevent scan in BusyTraffic,end */
 				ret = ieee80211_wx_set_scan(priv->ieee80211, a, wrqu, b);
@@ -714,7 +714,7 @@ static int r8180_wx_set_power(struct net_device *dev,
 		return 0;
 
 	down(&priv->wx_sem);
-	printk("=>>>>>>>>>>=============================>set power:%d, %d!\n", wrqu->power.disabled, wrqu->power.flags);
+;
 	if (wrqu->power.disabled == 0) {
 		wrqu->power.flags |= IW_POWER_ALL_R;
 		wrqu->power.flags |= IW_POWER_TIMEOUT;
@@ -815,16 +815,16 @@ static int r8180_wx_set_iwmode(struct net_device *dev,
 	if (*param == 1) {
 		modulation |= IEEE80211_CCK_MODULATION;
 		mode = IEEE_B;
-	printk(KERN_INFO "B mode!\n");
+;
 	} else if (*param == 2) {
 		modulation |= IEEE80211_OFDM_MODULATION;
 		mode = IEEE_G;
-	printk(KERN_INFO "G mode!\n");
+;
 	} else if (*param == 3) {
 		modulation |= IEEE80211_CCK_MODULATION;
 		modulation |= IEEE80211_OFDM_MODULATION;
 		mode = IEEE_B|IEEE_G;
-	printk(KERN_INFO "B/G mode!\n");
+;
 	}
 
 	if (ieee->proto_started) {
@@ -1020,7 +1020,7 @@ static int r8180_wx_set_channelplan(struct net_device *dev,
 	struct r8180_priv *priv = ieee80211_priv(dev);
 	int *val = (int *)extra;
 	int i;
-	printk("-----in fun %s\n", __func__);
+;
 
 	if (priv->ieee80211->bHwRadioOff)
 		return 0;
@@ -1068,7 +1068,7 @@ static int r8180_wx_set_forcerate(struct net_device *dev,
 
 	down(&priv->wx_sem);
 
-	printk("==============>%s(): forcerate is %d\n", __func__, forcerate);
+;
 	if ((forcerate == 2) || (forcerate == 4) || (forcerate == 11) || (forcerate == 22) || (forcerate == 12) ||
 		(forcerate == 18) || (forcerate == 24) || (forcerate == 36) || (forcerate == 48) || (forcerate == 72) ||
 		(forcerate == 96) || (forcerate == 108))
@@ -1077,9 +1077,9 @@ static int r8180_wx_set_forcerate(struct net_device *dev,
 		priv->ieee80211->rate = forcerate * 5;
 	}	else if (forcerate == 0)	{
 		priv->ForcedDataRate = 0;
-		printk("OK! return rate adaptive\n");
+;
 	}	else
-			printk("ERR: wrong rate\n");
+;
 	up(&priv->wx_sem);
 	return 0;
 }

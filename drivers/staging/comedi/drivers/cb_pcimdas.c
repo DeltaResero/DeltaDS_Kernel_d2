@@ -421,7 +421,7 @@ static int cb_pcimdas_ai_rinsn(struct comedi_device *dev,
 				break;
 		}
 		if (i == TIMEOUT) {
-			printk("timeout\n");
+;
 			return -ETIMEDOUT;
 		}
 		/* read data */

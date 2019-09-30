@@ -442,8 +442,12 @@ int second_overflow(unsigned long secs)
 			leap = -1;
 			time_state = TIME_OOP;
 			time_tai++;
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_NOTICE
 				"Clock: inserting leap second 23:59:60 UTC\n");
+#else
+			;
+#endif
 		}
 		break;
 	case TIME_DEL:
@@ -455,8 +459,12 @@ int second_overflow(unsigned long secs)
 			ntp_next_leap_sec = KTIME_MAX;
 			time_tai--;
 			time_state = TIME_WAIT;
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_NOTICE
 				"Clock: deleting leap second 23:59:59 UTC\n");
+#else
+			;
+#endif
 		}
 		break;
 	case TIME_OOP:

@@ -153,7 +153,11 @@ jade_l2l1(struct PStack *st, int pr, void *arg)
 	case (PH_PULL | INDICATION):
 		spin_lock_irqsave(&bcs->cs->lock, flags);
 		if (bcs->tx_skb) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING "jade_l2l1: this shouldn't happen\n");
+#else
+			;
+#endif
 		} else {
 			test_and_set_bit(BC_FLG_BUSY, &bcs->Flag);
 			bcs->tx_skb = skb;

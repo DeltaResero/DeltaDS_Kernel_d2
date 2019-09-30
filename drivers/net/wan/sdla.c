@@ -297,7 +297,7 @@ static int sdla_cpuspeed(struct net_device *dev, struct ifreq *ifr)
 
 	if (data == Z80_SCC_BAD)
 	{
-		printk("%s: SCC bad\n", dev->name);
+;
 		return -EIO;
 	}
 
@@ -1633,7 +1633,7 @@ static int __init init_sdla(void)
 {
 	int err;
 
-	printk("%s.\n", version);
+;
 
 	sdla = alloc_netdev(sizeof(struct frad_local), "sdla0", setup_sdla);
 	if (!sdla) 

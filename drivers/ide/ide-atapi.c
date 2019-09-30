@@ -17,6 +17,7 @@
 
 #ifdef DEBUG
 #define debug_log(fmt, args...) \
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "ide: " fmt, ## args)
 #else
 #define debug_log(fmt, args...) do {} while (0)
@@ -27,6 +28,9 @@
 static inline int dev_is_idecd(ide_drive_t *drive)
 {
 	return drive->media == ide_cdrom || drive->media == ide_optical;
+#else
+	;
+#endif
 }
 
 /*
@@ -202,8 +206,12 @@ void ide_prep_sense(ide_drive_t *drive, struct request *rq)
 			      GFP_NOIO);
 	if (unlikely(err)) {
 		if (printk_ratelimit())
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING PFX "%s: failed to map sense "
 					    "buffer\n", drive->name);
+#else
+			;
+#endif
 		return;
 	}
 
@@ -224,8 +232,12 @@ int ide_queue_sense_rq(ide_drive_t *drive, void *special)
 {
 	/* deferred failure from ide_prep_sense() */
 	if (!drive->sense_rq_armed) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING PFX "%s: error queuing a sense request\n",
 		       drive->name);
+#else
+		;
+#endif
 		return -ENOMEM;
 	}
 
@@ -296,8 +308,12 @@ int ide_cd_expiry(ide_drive_t *drive)
 		break;
 	default:
 		if (!(rq->cmd_flags & REQ_QUIET))
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_INFO PFX "cmd 0x%x timed out\n",
 					 rq->cmd[0]);
+#else
+			;
+#endif
 		wait = 0;
 		break;
 	}

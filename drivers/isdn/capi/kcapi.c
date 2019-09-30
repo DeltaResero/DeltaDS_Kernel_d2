@@ -164,8 +164,12 @@ register_appl(struct capi_ctr *ctr, u16 applid, capi_register_params *rparam)
 	if (ctr)
 		ctr->register_appl(ctr, applid, rparam);
 	else
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "%s: cannot get controller resources\n",
 		       __func__);
+#else
+		;
+#endif
 }
 
 
@@ -203,7 +207,11 @@ static void notify_up(u32 contr)
 
 		wake_up_interruptible_all(&ctr->state_wait_queue);
 	} else
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "%s: invalid contr %d\n", __func__, contr);
+#else
+		;
+#endif
 
 unlock_out:
 	mutex_unlock(&capi_controller_lock);
@@ -240,13 +248,21 @@ static void notify_down(u32 contr)
 	mutex_lock(&capi_controller_lock);
 
 	if (showcapimsgs & 1)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "kcapi: notify down contr %d\n", contr);
+#else
+		;
+#endif
 
 	ctr = get_capi_ctr_by_nr(contr);
 	if (ctr)
 		ctr_down(ctr, CAPI_CTR_DETECTED);
 	else
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "%s: invalid contr %d\n", __func__, contr);
+#else
+		;
+#endif
 
 	mutex_unlock(&capi_controller_lock);
 }
@@ -429,8 +445,12 @@ EXPORT_SYMBOL(capi_ctr_handle_message);
 
 void capi_ctr_ready(struct capi_ctr *ctr)
 {
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_NOTICE "kcapi: controller [%03d] \"%s\" ready.\n",
 	       ctr->cnr, ctr->name);
+#else
+	;
+#endif
 
 	notify_push(CAPICTR_UP, ctr->cnr);
 }
@@ -447,7 +467,11 @@ EXPORT_SYMBOL(capi_ctr_ready);
 
 void capi_ctr_down(struct capi_ctr *ctr)
 {
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_NOTICE "kcapi: controller [%03d] down.\n", ctr->cnr);
+#else
+	;
+#endif
 
 	notify_push(CAPICTR_DOWN, ctr->cnr);
 }
@@ -467,8 +491,12 @@ EXPORT_SYMBOL(capi_ctr_down);
 void capi_ctr_suspend_output(struct capi_ctr *ctr)
 {
 	if (!ctr->blocked) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "kcapi: controller [%03d] suspend\n",
 		       ctr->cnr);
+#else
+		;
+#endif
 		ctr->blocked = 1;
 	}
 }
@@ -488,8 +516,12 @@ EXPORT_SYMBOL(capi_ctr_suspend_output);
 void capi_ctr_resume_output(struct capi_ctr *ctr)
 {
 	if (ctr->blocked) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "kcapi: controller [%03d] resumed\n",
 		       ctr->cnr);
+#else
+		;
+#endif
 		ctr->blocked = 0;
 	}
 }
@@ -574,8 +606,12 @@ int detach_capi_ctr(struct capi_ctr *ctr)
 	if (ctr->procent)
 		remove_proc_entry(ctr->procfn, NULL);
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_NOTICE "kcapi: controller [%03d]: %s unregistered\n",
 	       ctr->cnr, ctr->name);
+#else
+	;
+#endif
 
 unlock_out:
 	mutex_unlock(&capi_controller_lock);
@@ -704,7 +740,11 @@ u16 capi20_register(struct capi20_appl *ap)
 	mutex_unlock(&capi_controller_lock);
 
 	if (showcapimsgs & 1) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "kcapi: appl %d up\n", applid);
+#else
+		;
+#endif
 	}
 
 	return CAPI_NOERROR;
@@ -748,7 +788,11 @@ u16 capi20_release(struct capi20_appl *ap)
 	skb_queue_purge(&ap->recv_queue);
 
 	if (showcapimsgs & 1) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "kcapi: appl %d down\n", ap->applid);
+#else
+		;
+#endif
 	}
 
 	return CAPI_NOERROR;
@@ -1098,18 +1142,30 @@ static int old_capi_manufacturer(unsigned int cmd, void __user *data)
 		}
 
 		if (ctr->load_firmware == NULL) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_DEBUG "kcapi: load: no load function\n");
+#else
+			;
+#endif
 			retval = -ESRCH;
 			goto load_unlock_out;
 		}
 
 		if (ldef.t4file.len <= 0) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_DEBUG "kcapi: load: invalid parameter: length of t4file is %d ?\n", ldef.t4file.len);
+#else
+			;
+#endif
 			retval = -EINVAL;
 			goto load_unlock_out;
 		}
 		if (ldef.t4file.data == NULL) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_DEBUG "kcapi: load: invalid parameter: dataptr is 0\n");
+#else
+			;
+#endif
 			retval = -EINVAL;
 			goto load_unlock_out;
 		}
@@ -1122,7 +1178,11 @@ static int old_capi_manufacturer(unsigned int cmd, void __user *data)
 		ldata.configuration.len = ldef.t4config.len;
 
 		if (ctr->state != CAPI_CTR_DETECTED) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_INFO "kcapi: load: contr=%d not in detect state\n", ldef.contr);
+#else
+			;
+#endif
 			retval = -EBUSY;
 			goto load_unlock_out;
 		}
@@ -1158,7 +1218,11 @@ static int old_capi_manufacturer(unsigned int cmd, void __user *data)
 			goto reset_unlock_out;
 
 		if (ctr->reset_ctr == NULL) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_DEBUG "kcapi: reset: no reset function\n");
+#else
+			;
+#endif
 			retval = -ESRCH;
 			goto reset_unlock_out;
 		}
@@ -1210,8 +1274,12 @@ int capi20_manufacturer(unsigned int cmd, void __user *data)
 		ctr = get_capi_ctr_by_nr(fdef.contr);
 		if (ctr) {
 			ctr->traceflag = fdef.flag;
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_INFO "kcapi: contr [%03d] set trace=%d\n",
 			       ctr->cnr, ctr->traceflag);
+#else
+			;
+#endif
 			retval = 0;
 		} else
 			retval = -ESRCH;

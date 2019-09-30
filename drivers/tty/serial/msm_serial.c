@@ -965,7 +965,11 @@ static int __init msm_console_setup(struct console *co, char *options)
 
 	msm_reset(port);
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "msm_serial: console setup on port #%d\n", port->line);
+#else
+	;
+#endif
 
 	return uart_set_options(port, co, baud, parity, bits, flow);
 }
@@ -1009,7 +1013,11 @@ static int __init msm_serial_probe(struct platform_device *pdev)
 	if (unlikely(pdev->id < 0 || pdev->id >= UART_NR))
 		return -ENXIO;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "msm_serial: detected port #%d\n", pdev->id);
+#else
+	;
+#endif
 
 	port = get_port_from_line(pdev->id);
 	port->dev = &pdev->dev;
@@ -1200,7 +1208,11 @@ static int __init msm_serial_init(void)
 
 	platform_driver_probe(&msm_platform_uim_driver, msm_uim_probe);
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "msm_serial: driver initialized\n");
+#else
+	;
+#endif
 
 	return ret;
 }

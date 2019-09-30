@@ -230,7 +230,11 @@ Start_IPAC:
 		goto Start_IPAC;
 	}
 	if (!icnt)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "ASUS IRQ LOOP\n");
+#else
+		;
+#endif
 	writereg(cs->hw.asus.adr, cs->hw.asus.isac, IPAC_MASK, 0xFF);
 	writereg(cs->hw.asus.adr, cs->hw.asus.isac, IPAC_MASK, 0xC0);
 	spin_unlock_irqrestore(&cs->lock, flags);
@@ -324,7 +328,11 @@ setup_asuscom(struct IsdnCard *card)
 	char tmp[64];
 
 	strcpy(tmp, Asuscom_revision);
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "HiSax: Asuscom ISDNLink driver Rev. %s\n", HiSax_getrev(tmp));
+#else
+	;
+#endif
 	if (cs->typ != ISDN_CTYPE_ASUSCOM)
 		return (0);
 #ifdef __ISAPNP__
@@ -399,7 +407,11 @@ setup_asuscom(struct IsdnCard *card)
 		cs->readisacfifo = &ReadISACfifo_IPAC;
 		cs->writeisacfifo = &WriteISACfifo_IPAC;
 		cs->irq_func = &asuscom_interrupt_ipac;
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_INFO "Asus: IPAC version %x\n", val);
+#else
+		;
+#endif
 	} else {
 		cs->subtyp = ASUS_ISACHSCX;
 		cs->hw.asus.adr = cs->hw.asus.cfg_reg + ASUS_ADR;

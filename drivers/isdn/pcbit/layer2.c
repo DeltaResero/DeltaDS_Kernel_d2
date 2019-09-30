@@ -336,8 +336,12 @@ pcbit_receive(struct pcbit_dev *dev)
 	tt = pcbit_readw(dev);
 
 	if ((tt & 0x7fffU) > 511) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_INFO "pcbit: invalid frame length -> TT=%04x\n",
 		       tt);
+#else
+		;
+#endif
 		pcbit_l2_error(dev);
 		return;
 	}
@@ -345,7 +349,11 @@ pcbit_receive(struct pcbit_dev *dev)
 		type1 = 0;
 
 		if (dev->read_frame) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_DEBUG "pcbit_receive: Type 0 frame and read_frame != NULL\n");
+#else
+			;
+#endif
 			/* discard previous queued frame */
 			kfree_skb(dev->read_frame->skb);
 			kfree(dev->read_frame);
@@ -354,7 +362,11 @@ pcbit_receive(struct pcbit_dev *dev)
 		frame = kzalloc(sizeof(struct frame_buf), GFP_ATOMIC);
 
 		if (frame == NULL) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING "kmalloc failed\n");
+#else
+			;
+#endif
 			return;
 		}
 
@@ -363,7 +375,11 @@ pcbit_receive(struct pcbit_dev *dev)
 
 
 		if (cpu != 0x06 && cpu != 0x02) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_DEBUG "pcbit: invalid cpu value\n");
+#else
+			;
+#endif
 			kfree(frame);
 			pcbit_l2_error(dev);
 			return;
@@ -386,7 +402,11 @@ pcbit_receive(struct pcbit_dev *dev)
 		if (frame->hdr_len == 0) {
 			kfree(frame);
 #ifdef DEBUG
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_DEBUG "0 sized frame\n");
+#else
+			;
+#endif
 #endif
 			pcbit_firmware_bug(dev);
 			return;
@@ -394,10 +414,18 @@ pcbit_receive(struct pcbit_dev *dev)
 		/* sanity check the length values */
 		if (frame->hdr_len > 1024 || frame->dt_len > 2048) {
 #ifdef DEBUG
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_DEBUG "length problem: ");
+#else
+			;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_DEBUG "TH=%04x TD=%04x\n",
 			       frame->hdr_len,
 			       frame->dt_len);
+#else
+			;
+#endif
 #endif
 			pcbit_l2_error(dev);
 			kfree(frame);
@@ -409,7 +437,11 @@ pcbit_receive(struct pcbit_dev *dev)
 					   ((frame->hdr_len + 15) & ~15));
 
 		if (!frame->skb) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_DEBUG "pcbit_receive: out of memory\n");
+#else
+			;
+#endif
 			kfree(frame);
 			return;
 		}
@@ -423,7 +455,11 @@ pcbit_receive(struct pcbit_dev *dev)
 		tt &= 0x7fffU;
 
 		if (!(frame = dev->read_frame)) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk("Type 1 frame and no frame queued\n");
+#else
+			;
+#endif
 			/* usually after an error: toss frame */
 			dev->readptr += tt;
 			if (dev->readptr > dev->sh_mem + BANK2 + BANKLEN)
@@ -504,11 +540,19 @@ pcbit_irq_handler(int interrupt, void *devptr)
 	dev = (struct pcbit_dev *) devptr;
 
 	if (!dev) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "pcbit_irq_handler: wrong device\n");
+#else
+		;
+#endif
 		return IRQ_NONE;
 	}
 	if (dev->interrupt) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "pcbit: reentering interrupt hander\n");
+#else
+		;
+#endif
 		return IRQ_HANDLED;
 	}
 	dev->interrupt = 1;
@@ -522,7 +566,11 @@ pcbit_irq_handler(int interrupt, void *devptr)
 	}
 	if (info & 0x40U) {     /* E bit set */
 #ifdef DEBUG
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "pcbit_irq_handler: E bit on\n");
+#else
+		;
+#endif
 #endif
 		pcbit_l2_error(dev);
 		dev->interrupt = 0;
@@ -563,7 +611,11 @@ pcbit_l2_active_conf(struct pcbit_dev *dev, u_char info)
 	state = dev->l2_state;
 
 #ifdef DEBUG
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_DEBUG "layer2_active_confirm\n");
+#else
+	;
+#endif
 #endif
 
 
@@ -638,7 +690,11 @@ pcbit_l2_error(struct pcbit_dev *dev)
 {
 	if (dev->l2_state == L2_RUNNING) {
 
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_INFO "pcbit: layer 2 error\n");
+#else
+		;
+#endif
 
 #ifdef DEBUG
 		log_state(dev);
@@ -709,5 +765,9 @@ pcbit_recv_ack(struct pcbit_dev *dev, unsigned char ack)
 			count++;
 		}
 	} else
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "recv_ack: unacked = 0\n");
+#else
+		;
+#endif
 }

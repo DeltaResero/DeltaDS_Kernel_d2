@@ -63,7 +63,11 @@ MODULE_PARM_DESC(debug, "Turn on/off debugging (default:off).");
 
 DVB_DEFINE_MOD_OPT_ADAPTER_NR(adapter_nr);
 
+#ifdef CONFIG_DEBUG_PRINTK
 #define dprintk(x...) do { if (debug) printk(KERN_DEBUG x); } while (0)
+#else
+#define d;
+#endif
 
 #define ISO_BUF_COUNT      4
 #define FRAMES_PER_ISO_BUF 4
@@ -142,10 +146,22 @@ static int ttusb_cmd(struct ttusb *ttusb,
 	int i;
 
 	if (debug >= 3) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG ">");
+#else
+		;
+#endif
 		for (i = 0; i < len; ++i)
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_CONT " %02x", data[i]);
+#else
+			;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_CONT "\n");
+#else
+		;
+#endif
 	}
 
 	if (mutex_lock_interruptible(&ttusb->semusb) < 0)
@@ -154,14 +170,22 @@ static int ttusb_cmd(struct ttusb *ttusb,
 	err = usb_bulk_msg(ttusb->dev, ttusb->bulk_out_pipe,
 			   (u8 *) data, len, &actual_len, 1000);
 	if (err != 0) {
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk("%s: usb_bulk_msg(send) failed, err == %i!\n",
 			__func__, err);
+#else
+		d;
+#endif
 		mutex_unlock(&ttusb->semusb);
 		return err;
 	}
 	if (actual_len != len) {
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk("%s: only wrote %d of %d bytes\n", __func__,
 			actual_len, len);
+#else
+		d;
+#endif
 		mutex_unlock(&ttusb->semusb);
 		return -1;
 	}
@@ -170,18 +194,34 @@ static int ttusb_cmd(struct ttusb *ttusb,
 			   ttusb->last_result, 32, &actual_len, 1000);
 
 	if (err != 0) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk("%s: failed, receive error %d\n", __func__,
 		       err);
+#else
+		;
+#endif
 		mutex_unlock(&ttusb->semusb);
 		return err;
 	}
 
 	if (debug >= 3) {
 		actual_len = ttusb->last_result[3] + 4;
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "<");
+#else
+		;
+#endif
 		for (i = 0; i < actual_len; ++i)
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_CONT " %02x", ttusb->last_result[i]);
+#else
+			;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_CONT "\n");
+#else
+		;
+#endif
 	}
 
 	if (!needresult)
@@ -277,7 +317,11 @@ static int master_xfer(struct i2c_adapter* adapter, struct i2c_msg *msg, int num
 				    snd_buf, snd_len, rcv_buf, rcv_len);
 
 		if (err < rcv_len) {
+#ifdef CONFIG_DEBUG_PRINTK
 			dprintk("%s: i == %i\n", __func__, i);
+#else
+			d;
+#endif
 			break;
 		}
 
@@ -337,8 +381,12 @@ static int ttusb_boot_dsp(struct ttusb *ttusb)
       done:
 	release_firmware(fw);
 	if (err) {
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk("%s: usb_bulk_msg() failed, return value %i!\n",
 			__func__, err);
+#else
+		d;
+#endif
 	}
 
 	return err;
@@ -438,9 +486,13 @@ static int ttusb_init_controller(struct ttusb *ttusb)
 	if ((err = ttusb_result(ttusb, get_version, sizeof(get_version))))
 		return err;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk("%s: stc-version: %c%c%c%c%c\n", __func__,
 		get_version[4], get_version[5], get_version[6],
 		get_version[7], get_version[8]);
+#else
+	d;
+#endif
 
 	if (memcmp(get_version + 4, "V 0.0", 5) &&
 	    memcmp(get_version + 4, "V 1.1", 5) &&
@@ -464,8 +516,12 @@ static int ttusb_init_controller(struct ttusb *ttusb)
 	    ttusb_result(ttusb, get_dsp_version, sizeof(get_dsp_version));
 	if (err)
 		return err;
+#ifdef CONFIG_DEBUG_PRINTK
 	printk("%s: dsp-version: %c%c%c\n", __func__,
 	       get_dsp_version[4], get_dsp_version[5], get_dsp_version[6]);
+#else
+	;
+#endif
 	return 0;
 }
 
@@ -486,8 +542,12 @@ static int ttusb_send_diseqc(struct dvb_frontend* fe,
 
 	/* Diseqc */
 	if ((err = ttusb_cmd(ttusb, b, 4 + b[3], 0))) {
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk("%s: usb_bulk_msg() failed, return value %i!\n",
 			__func__, err);
+#else
+		d;
+#endif
 	}
 
 	return err;
@@ -504,8 +564,12 @@ static int ttusb_update_lnb(struct ttusb *ttusb)
 
 	/* SetLNB */
 	if ((err = ttusb_cmd(ttusb, b, sizeof(b), 0))) {
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk("%s: usb_bulk_msg() failed, return value %i!\n",
 			__func__, err);
+#else
+		d;
+#endif
 	}
 
 	return err;
@@ -538,8 +602,12 @@ static void ttusb_set_led_freq(struct ttusb *ttusb, u8 freq)
 
 	err = ttusb_cmd(ttusb, b, sizeof(b), 0);
 	if (err) {
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk("%s: usb_bulk_msg() failed, return value %i!\n",
 			__func__, err);
+#else
+		d;
+#endif
 	}
 }
 #endif
@@ -564,8 +632,12 @@ static void ttusb_process_muxpack(struct ttusb *ttusb, const u8 * muxpack,
 	for (i = 0; i < len; i += 2)
 		csum ^= le16_to_cpup((__le16 *) (muxpack + i));
 	if (csum) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk("%s: muxpack with incorrect checksum, ignoring\n",
 		       __func__);
+#else
+		;
+#endif
 		numinvalid++;
 		return;
 	}
@@ -573,8 +645,12 @@ static void ttusb_process_muxpack(struct ttusb *ttusb, const u8 * muxpack,
 	cc = (muxpack[len - 4] << 8) | muxpack[len - 3];
 	cc &= 0x7FFF;
 	if ((cc != ttusb->cc) && (ttusb->cc != -1))
+#ifdef CONFIG_DEBUG_PRINTK
 		printk("%s: cc discontinuity (%d frames missing)\n",
 		       __func__, (cc - ttusb->cc) & 0x7FFF);
+#else
+		;
+#endif
 	ttusb->cc = (cc + 1) & 0x7FFF;
 	if (muxpack[0] & 0x80) {
 #ifdef TTUSB_HWSECTIONS
@@ -595,7 +671,11 @@ static void ttusb_process_muxpack(struct ttusb *ttusb, const u8 * muxpack,
 		    !!(ttusb->muxpack[1] & 1))
 			data++;
 #warning TODO: pusi
+#ifdef CONFIG_DEBUG_PRINTK
 		printk("cc: %04x\n", (data[0] << 8) | data[1]);
+#else
+		;
+#endif
 #endif
 		numsec++;
 	} else if (muxpack[0] == 0x47) {
@@ -614,7 +694,11 @@ static void ttusb_process_muxpack(struct ttusb *ttusb, const u8 * muxpack,
 		dvb_dmx_swfilter_packets(&ttusb->dvb_demux, muxpack, 1);
 	} else if (muxpack[0] != 0) {
 		numinvalid++;
+#ifdef CONFIG_DEBUG_PRINTK
 		printk("illegal muxpack type %02x\n", muxpack[0]);
+#else
+		;
+#endif
 	} else
 		numstuff++;
 }
@@ -624,7 +708,11 @@ static void ttusb_process_frame(struct ttusb *ttusb, u8 * data, int len)
 	int maxwork = 1024;
 	while (len) {
 		if (!(maxwork--)) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk("%s: too much work\n", __func__);
+#else
+			;
+#endif
 			break;
 		}
 
@@ -638,10 +726,18 @@ static void ttusb_process_frame(struct ttusb *ttusb, u8 * data, int len)
 			else {
 				ttusb->mux_state = 0;
 				if (ttusb->insync) {
+#ifdef CONFIG_DEBUG_PRINTK
 					dprintk("%s: %02x\n",
 						__func__, data[-1]);
+#else
+					d;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 					printk(KERN_INFO "%s: lost sync.\n",
 					       __func__);
+#else
+					;
+#endif
 					ttusb->insync = 0;
 				}
 			}
@@ -750,20 +846,28 @@ static void ttusb_iso_irq(struct urb *urb)
 		return;
 
 #if 0
+#ifdef CONFIG_DEBUG_PRINTK
 	printk("%s: status %d, errcount == %d, length == %i\n",
 	       __func__,
 	       urb->status, urb->error_count, urb->actual_length);
+#else
+	;
+#endif
 #endif
 
 	if (!urb->status) {
 		for (i = 0; i < urb->number_of_packets; ++i) {
 			numpkt++;
 			if (time_after_eq(jiffies, lastj + HZ)) {
+#ifdef CONFIG_DEBUG_PRINTK
 				dprintk("frames/s: %lu (ts: %d, stuff %d, "
 					"sec: %d, invalid: %d, all: %d)\n",
 					numpkt * HZ / (jiffies - lastj),
 					numts, numstuff, numsec, numinvalid,
 					numts + numstuff + numsec + numinvalid);
+#else
+				d;
+#endif
 				numts = numstuff = numsec = numinvalid = 0;
 				lastj = jiffies;
 				numpkt = 0;
@@ -804,8 +908,12 @@ static int ttusb_alloc_iso_urbs(struct ttusb *ttusb)
 						 &ttusb->iso_dma_handle);
 
 	if (!ttusb->iso_buffer) {
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk("%s: pci_alloc_consistent - not enough memory\n",
 			__func__);
+#else
+		d;
+#endif
 		return -ENOMEM;
 	}
 
@@ -843,7 +951,11 @@ static int ttusb_start_iso_xfer(struct ttusb *ttusb)
 	int i, j, err, buffer_offset = 0;
 
 	if (ttusb->iso_streaming) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk("%s: iso xfer already running!\n", __func__);
+#else
+		;
+#endif
 		return 0;
 	}
 
@@ -910,7 +1022,11 @@ static int ttusb_start_feed(struct dvb_demux_feed *dvbdmxfeed)
 	struct ttusb *ttusb = (struct ttusb *) dvbdmxfeed->demux;
 	int feed_type = 1;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk("ttusb_start_feed\n");
+#else
+	d;
+#endif
 
 	switch (dvbdmxfeed->type) {
 	case DMX_TYPE_TS:
@@ -1439,7 +1555,11 @@ static int dvbc_philips_tdm1316l_tuner_set_params(struct dvb_frontend *fe)
 	if (fe->ops.i2c_gate_ctrl)
 		fe->ops.i2c_gate_ctrl(fe, 1);
 	if (i2c_transfer(&ttusb->i2c_adap, &tuner_msg, 1) != 1) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk("dvb-ttusb-budget: dvbc_philips_tdm1316l_pll_set Error 1\n");
+#else
+		;
+#endif
 		return -EIO;
 	}
 
@@ -1448,7 +1568,11 @@ static int dvbc_philips_tdm1316l_tuner_set_params(struct dvb_frontend *fe)
 	if (fe->ops.i2c_gate_ctrl)
 		fe->ops.i2c_gate_ctrl(fe, 1);
 	if (i2c_transfer(&ttusb->i2c_adap, &tuner_msg, 1) != 1) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk("dvb-ttusb-budget: dvbc_philips_tdm1316l_pll_set Error 2\n");
+#else
+		;
+#endif
 		return -EIO;
 	}
 
@@ -1625,12 +1749,20 @@ static void frontend_init(struct ttusb* ttusb)
 	}
 
 	if (ttusb->fe == NULL) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk("dvb-ttusb-budget: A frontend driver was not found for device [%04x:%04x]\n",
 		       le16_to_cpu(ttusb->dev->descriptor.idVendor),
 		       le16_to_cpu(ttusb->dev->descriptor.idProduct));
+#else
+		;
+#endif
 	} else {
 		if (dvb_register_frontend(&ttusb->adapter, ttusb->fe)) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk("dvb-ttusb-budget: Frontend registration failed!\n");
+#else
+			;
+#endif
 			dvb_frontend_detach(ttusb->fe);
 			ttusb->fe = NULL;
 		}
@@ -1650,7 +1782,11 @@ static int ttusb_probe(struct usb_interface *intf, const struct usb_device_id *i
 	struct ttusb *ttusb;
 	int result;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk("%s: TTUSB DVB connected\n", __func__);
+#else
+	d;
+#endif
 
 	udev = interface_to_usbdev(intf);
 
@@ -1672,14 +1808,22 @@ static int ttusb_probe(struct usb_interface *intf, const struct usb_device_id *i
 
 	result = ttusb_alloc_iso_urbs(ttusb);
 	if (result < 0) {
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk("%s: ttusb_alloc_iso_urbs - failed\n", __func__);
+#else
+		d;
+#endif
 		mutex_unlock(&ttusb->semi2c);
 		kfree(ttusb);
 		return result;
 	}
 
 	if (ttusb_init_controller(ttusb))
+#ifdef CONFIG_DEBUG_PRINTK
 		printk("ttusb_init_controller: error\n");
+#else
+		;
+#endif
 
 	mutex_unlock(&ttusb->semi2c);
 
@@ -1789,7 +1933,11 @@ static void ttusb_disconnect(struct usb_interface *intf)
 
 	kfree(ttusb);
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk("%s: TTUSB DVB disconnected\n", __func__);
+#else
+	d;
+#endif
 }
 
 static struct usb_device_id ttusb_table[] = {

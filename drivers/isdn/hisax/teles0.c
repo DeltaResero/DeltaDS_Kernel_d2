@@ -271,7 +271,11 @@ setup_teles0(struct IsdnCard *card)
 	char tmp[64];
 
 	strcpy(tmp, teles0_revision);
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "HiSax: Teles 8.0/16.0 driver Rev. %s\n", HiSax_getrev(tmp));
+#else
+	;
+#endif
 	if ((cs->typ != ISDN_CTYPE_16_0) && (cs->typ != ISDN_CTYPE_8_0))
 		return (0);
 
@@ -315,8 +319,12 @@ setup_teles0(struct IsdnCard *card)
 								 * 0x1c 16.3 ???
 								 */
 		if (val != 0x1e && val != 0x1f) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING "Teles0: 16.0 Byte at %x is %x\n",
 			       cs->hw.teles0.cfg_reg + 2, val);
+#else
+			;
+#endif
 			release_region(cs->hw.teles0.cfg_reg, 8);
 			return (0);
 		}

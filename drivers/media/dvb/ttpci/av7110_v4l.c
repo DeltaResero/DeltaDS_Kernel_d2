@@ -55,8 +55,12 @@ int msp_writereg(struct av7110 *av7110, u8 dev, u16 reg, u16 val)
 	}
 
 	if (i2c_transfer(&av7110->i2c_adap, &msgs, 1) != 1) {
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk(1, "dvb-ttpci: failed @ card %d, %u = %u\n",
 		       av7110->dvb_adapter.num, reg, val);
+#else
+		d;
+#endif
 		return -EIO;
 	}
 	return 0;
@@ -85,8 +89,12 @@ static int msp_readreg(struct av7110 *av7110, u8 dev, u16 reg, u16 *val)
 	}
 
 	if (i2c_transfer(&av7110->i2c_adap, &msgs[0], 2) != 2) {
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk(1, "dvb-ttpci: failed @ card %d, %u\n",
 		       av7110->dvb_adapter.num, reg);
+#else
+		d;
+#endif
 		return -EIO;
 	}
 	*val = (msg2[0] << 8) | msg2[1];
@@ -139,7 +147,11 @@ static int ves1820_writereg(struct saa7146_dev *dev, u8 addr, u8 reg, u8 data)
 	u8 buf[] = { 0x00, reg, data };
 	struct i2c_msg msg = { .addr = addr, .flags = 0, .buf = buf, .len = 3 };
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(4, "dev: %p\n", dev);
+#else
+	d;
+#endif
 
 	if (1 != i2c_transfer(&av7110->i2c_adap, &msg, 1))
 		return -1;
@@ -151,7 +163,11 @@ static int tuner_write(struct saa7146_dev *dev, u8 addr, u8 data [4])
 	struct av7110 *av7110 = dev->ext_priv;
 	struct i2c_msg msg = { .addr = addr, .flags = 0, .buf = data, .len = 4 };
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(4, "dev: %p\n", dev);
+#else
+	d;
+#endif
 
 	if (1 != i2c_transfer(&av7110->i2c_adap, &msg, 1))
 		return -1;
@@ -164,7 +180,11 @@ static int ves1820_set_tv_freq(struct saa7146_dev *dev, u32 freq)
 	u8 config;
 	u8 buf[4];
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(4, "freq: 0x%08x\n", freq);
+#else
+	d;
+#endif
 
 	/* magic number: 614. tuning with the frequency given by v4l2
 	   is always off by 614*62.5 = 38375 kHz...*/
@@ -235,19 +255,31 @@ static int av7110_dvb_c_switch(struct saa7146_fh *fh)
 	u16 adswitch;
 	int source, sync, err;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(4, "%p\n", av7110);
+#else
+	d;
+#endif
 
 	if ((vv->video_status & STATUS_OVERLAY) != 0) {
 		vv->ov_suspend = vv->video_fh;
 		err = saa7146_stop_preview(vv->video_fh); /* side effect: video_status is now 0, video_fh is NULL */
 		if (err != 0) {
+#ifdef CONFIG_DEBUG_PRINTK
 			dprintk(2, "suspending video failed\n");
+#else
+			d;
+#endif
 			vv->ov_suspend = NULL;
 		}
 	}
 
 	if (0 != av7110->current_input) {
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk(1, "switching to analog TV:\n");
+#else
+		d;
+#endif
 		adswitch = 1;
 		source = SAA7146_HPS_SOURCE_PORT_B;
 		sync = SAA7146_HPS_SYNC_PORT_B;
@@ -310,7 +342,11 @@ static int av7110_dvb_c_switch(struct saa7146_fh *fh)
 
 	/* hmm, this does not do anything!? */
 	if (av7110_fw_cmd(av7110, COMTYPE_AUDIODAC, ADSwitch, 1, adswitch))
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk(1, "ADSwitch error\n");
+#else
+		d;
+#endif
 
 	saa7146_set_hps_source_and_sync(dev, source, sync);
 
@@ -329,7 +365,11 @@ static int vidioc_g_tuner(struct file *file, void *fh, struct v4l2_tuner *t)
 	u16 stereo_det;
 	s8 stereo;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(2, "VIDIOC_G_TUNER: %d\n", t->index);
+#else
+	d;
+#endif
 
 	if (!av7110->analog_tuner_flags || t->index != 0)
 		return -EINVAL;
@@ -348,9 +388,17 @@ static int vidioc_g_tuner(struct file *file, void *fh, struct v4l2_tuner *t)
 
 	/* FIXME: standard / stereo detection is still broken */
 	msp_readreg(av7110, MSP_RD_DEM, 0x007e, &stereo_det);
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(1, "VIDIOC_G_TUNER: msp3400 TV standard detection: 0x%04x\n", stereo_det);
+#else
+	d;
+#endif
 	msp_readreg(av7110, MSP_RD_DSP, 0x0018, &stereo_det);
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(1, "VIDIOC_G_TUNER: msp3400 stereo detection: 0x%04x\n", stereo_det);
+#else
+	d;
+#endif
 	stereo = (s8)(stereo_det >> 8);
 	if (stereo > 0x10) {
 		/* stereo */
@@ -371,34 +419,58 @@ static int vidioc_s_tuner(struct file *file, void *fh, struct v4l2_tuner *t)
 	struct saa7146_dev *dev = ((struct saa7146_fh *)fh)->dev;
 	struct av7110 *av7110 = (struct av7110 *)dev->ext_priv;
 	u16 fm_matrix, src;
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(2, "VIDIOC_S_TUNER: %d\n", t->index);
+#else
+	d;
+#endif
 
 	if (!av7110->analog_tuner_flags || av7110->current_input != 1)
 		return -EINVAL;
 
 	switch (t->audmode) {
 	case V4L2_TUNER_MODE_STEREO:
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk(2, "VIDIOC_S_TUNER: V4L2_TUNER_MODE_STEREO\n");
+#else
+		d;
+#endif
 		fm_matrix = 0x3001; /* stereo */
 		src = 0x0020;
 		break;
 	case V4L2_TUNER_MODE_LANG1_LANG2:
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk(2, "VIDIOC_S_TUNER: V4L2_TUNER_MODE_LANG1_LANG2\n");
+#else
+		d;
+#endif
 		fm_matrix = 0x3000; /* bilingual */
 		src = 0x0020;
 		break;
 	case V4L2_TUNER_MODE_LANG1:
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk(2, "VIDIOC_S_TUNER: V4L2_TUNER_MODE_LANG1\n");
+#else
+		d;
+#endif
 		fm_matrix = 0x3000; /* mono */
 		src = 0x0000;
 		break;
 	case V4L2_TUNER_MODE_LANG2:
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk(2, "VIDIOC_S_TUNER: V4L2_TUNER_MODE_LANG2\n");
+#else
+		d;
+#endif
 		fm_matrix = 0x3000; /* mono */
 		src = 0x0010;
 		break;
 	default: /* case V4L2_TUNER_MODE_MONO: */
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk(2, "VIDIOC_S_TUNER: TDA9840_SET_MONO\n");
+#else
+		d;
+#endif
 		fm_matrix = 0x3000; /* mono */
 		src = 0x0030;
 		break;
@@ -461,7 +533,11 @@ static int vidioc_enum_input(struct file *file, void *fh, struct v4l2_input *i)
 	struct saa7146_dev *dev = ((struct saa7146_fh *)fh)->dev;
 	struct av7110 *av7110 = (struct av7110 *)dev->ext_priv;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(2, "VIDIOC_ENUMINPUT: %d\n", i->index);
+#else
+	d;
+#endif
 
 	if (av7110->analog_tuner_flags) {
 		if (i->index >= 4)
@@ -482,7 +558,11 @@ static int vidioc_g_input(struct file *file, void *fh, unsigned int *input)
 	struct av7110 *av7110 = (struct av7110 *)dev->ext_priv;
 
 	*input = av7110->current_input;
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(2, "VIDIOC_G_INPUT: %d\n", *input);
+#else
+	d;
+#endif
 	return 0;
 }
 
@@ -491,7 +571,11 @@ static int vidioc_s_input(struct file *file, void *fh, unsigned int input)
 	struct saa7146_dev *dev = ((struct saa7146_fh *)fh)->dev;
 	struct av7110 *av7110 = (struct av7110 *)dev->ext_priv;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(2, "VIDIOC_S_INPUT: %d\n", input);
+#else
+	d;
+#endif
 
 	if (!av7110->analog_tuner_flags)
 		return 0;
@@ -505,7 +589,11 @@ static int vidioc_s_input(struct file *file, void *fh, unsigned int input)
 
 static int vidioc_g_audio(struct file *file, void *fh, struct v4l2_audio *a)
 {
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(2, "VIDIOC_G_AUDIO: %d\n", a->index);
+#else
+	d;
+#endif
 	if (a->index != 0)
 		return -EINVAL;
 	memcpy(a, &msp3400_v4l2_audio, sizeof(struct v4l2_audio));
@@ -514,7 +602,11 @@ static int vidioc_g_audio(struct file *file, void *fh, struct v4l2_audio *a)
 
 static int vidioc_s_audio(struct file *file, void *fh, struct v4l2_audio *a)
 {
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(2, "VIDIOC_S_AUDIO: %d\n", a->index);
+#else
+	d;
+#endif
 	return 0;
 }
 
@@ -524,7 +616,11 @@ static int vidioc_g_sliced_vbi_cap(struct file *file, void *fh,
 	struct saa7146_dev *dev = ((struct saa7146_fh *)fh)->dev;
 	struct av7110 *av7110 = (struct av7110 *)dev->ext_priv;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(2, "VIDIOC_G_SLICED_VBI_CAP\n");
+#else
+	d;
+#endif
 	if (cap->type != V4L2_BUF_TYPE_SLICED_VBI_OUTPUT)
 		return -EINVAL;
 	if (FW_VERSION(av7110->arm_app) >= 0x2623) {
@@ -540,7 +636,11 @@ static int vidioc_g_fmt_sliced_vbi_out(struct file *file, void *fh,
 	struct saa7146_dev *dev = ((struct saa7146_fh *)fh)->dev;
 	struct av7110 *av7110 = (struct av7110 *)dev->ext_priv;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(2, "VIDIOC_G_FMT:\n");
+#else
+	d;
+#endif
 	if (FW_VERSION(av7110->arm_app) < 0x2623)
 		return -EINVAL;
 	memset(&f->fmt.sliced, 0, sizeof f->fmt.sliced);
@@ -558,7 +658,11 @@ static int vidioc_s_fmt_sliced_vbi_out(struct file *file, void *fh,
 	struct saa7146_dev *dev = ((struct saa7146_fh *)fh)->dev;
 	struct av7110 *av7110 = (struct av7110 *)dev->ext_priv;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(2, "VIDIOC_S_FMT\n");
+#else
+	d;
+#endif
 	if (FW_VERSION(av7110->arm_app) < 0x2623)
 		return -EINVAL;
 	if (f->fmt.sliced.service_set != V4L2_SLICED_WSS_625 &&
@@ -587,7 +691,11 @@ static int av7110_vbi_reset(struct file *file)
 	struct saa7146_dev *dev = fh->dev;
 	struct av7110 *av7110 = (struct av7110*) dev->ext_priv;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(2, "%s\n", __func__);
+#else
+	d;
+#endif
 	av7110->wssMode = 0;
 	av7110->wssData = 0;
 	if (FW_VERSION(av7110->arm_app) < 0x2623)
@@ -604,7 +712,11 @@ static ssize_t av7110_vbi_write(struct file *file, const char __user *data, size
 	struct v4l2_sliced_vbi_data d;
 	int rc;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(2, "%s\n", __func__);
+#else
+	d;
+#endif
 	if (FW_VERSION(av7110->arm_app) < 0x2623 || !av7110->wssMode || count != sizeof d)
 		return -EINVAL;
 	if (copy_from_user(&d, data, count))
@@ -705,8 +817,12 @@ int av7110_init_analog_module(struct av7110 *av7110)
 	msleep(100); // the probing above resets the msp...
 	msp_readreg(av7110, MSP_RD_DSP, 0x001e, &version1);
 	msp_readreg(av7110, MSP_RD_DSP, 0x001f, &version2);
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(1, "dvb-ttpci: @ card %d MSP34xx version 0x%04x 0x%04x\n",
 		av7110->dvb_adapter.num, version1, version2);
+#else
+	d;
+#endif
 	msp_writereg(av7110, MSP_WR_DSP, 0x0013, 0x0c00);
 	msp_writereg(av7110, MSP_WR_DSP, 0x0000, 0x7f00); // loudspeaker + headphone
 	msp_writereg(av7110, MSP_WR_DSP, 0x0008, 0x0220); // loudspeaker source
@@ -744,7 +860,11 @@ int av7110_init_analog_module(struct av7110 *av7110)
 		/* init the saa7113 */
 		while (*i != 0xff) {
 			if (i2c_writereg(av7110, 0x48, i[0], i[1]) != 1) {
+#ifdef CONFIG_DEBUG_PRINTK
 				dprintk(1, "saa7113 initialization failed @ card %d", av7110->dvb_adapter.num);
+#else
+				d;
+#endif
 				break;
 			}
 			i += 2;

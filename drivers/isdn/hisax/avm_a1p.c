@@ -259,8 +259,12 @@ int __devinit setup_avm_a1_pcmcia(struct IsdnCard *card)
 
 	ISACVersion(cs, "AVM A1 PCMCIA:");
 	if (HscxVersion(cs, "AVM A1 PCMCIA:")) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING
 		       "AVM A1 PCMCIA: wrong HSCX versions check IO address\n");
+#else
+		;
+#endif
 		return (0);
 	}
 	return (1);

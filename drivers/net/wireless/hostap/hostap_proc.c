@@ -123,8 +123,8 @@ static int prism2_wds_proc_read(char *page, char **start, off_t off,
 			     iface->dev->name,
 			     iface->u.wds.remote_addr);
 		if ((p - page) > PROC_LIMIT) {
-			printk(KERN_DEBUG "%s: wds proc did not fit\n",
-			       local->dev->name);
+//			printk(KERN_DEBUG "%s: wds proc did not fit\n",
+;
 			break;
 		}
 	}
@@ -178,8 +178,8 @@ static int prism2_bss_list_proc_read(char *page, char **start, off_t off,
 		}
 		p += sprintf(p, "\n");
 		if ((p - page) > PROC_LIMIT) {
-			printk(KERN_DEBUG "%s: BSS proc did not fit\n",
-			       local->dev->name);
+//			printk(KERN_DEBUG "%s: BSS proc did not fit\n",
+;
 			break;
 		}
 	}
@@ -391,15 +391,15 @@ void hostap_init_proc(local_info_t *local)
 	local->proc = NULL;
 
 	if (hostap_proc == NULL) {
-		printk(KERN_WARNING "%s: hostap proc directory not created\n",
-		       local->dev->name);
+//		printk(KERN_WARNING "%s: hostap proc directory not created\n",
+;
 		return;
 	}
 
 	local->proc = proc_mkdir(local->ddev->name, hostap_proc);
 	if (local->proc == NULL) {
-		printk(KERN_INFO "/proc/net/hostap/%s creation failed\n",
-		       local->ddev->name);
+//		printk(KERN_INFO "/proc/net/hostap/%s creation failed\n",
+;
 		return;
 	}
 

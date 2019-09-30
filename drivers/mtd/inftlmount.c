@@ -81,14 +81,22 @@ static int find_boot_record(struct INFTLrecord *inftl)
 			static int warncount = 5;
 
 			if (warncount) {
+#ifdef CONFIG_DEBUG_PRINTK
 				printk(KERN_WARNING "INFTL: block read at 0x%x "
 					"of mtd%d failed: %d\n",
 					block * inftl->EraseSize,
 					inftl->mbd.mtd->index, ret);
+#else
+				;
+#endif
 				if (!--warncount)
+#ifdef CONFIG_DEBUG_PRINTK
 					printk(KERN_WARNING "INFTL: further "
 						"failures for this block will "
 						"not be printed\n");
+#else
+					;
+#endif
 			}
 			continue;
 		}
@@ -103,10 +111,14 @@ static int find_boot_record(struct INFTLrecord *inftl)
 				     block * inftl->EraseSize + SECTORSIZE + 8,
 				     8, &retlen,(char *)&h1);
 		if (ret < 0) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING "INFTL: ANAND header found at "
 				"0x%x in mtd%d, but OOB data read failed "
 				"(err %d)\n", block * inftl->EraseSize,
 				inftl->mbd.mtd->index, ret);
+#else
+			;
+#endif
 			continue;
 		}
 
@@ -121,14 +133,22 @@ static int find_boot_record(struct INFTLrecord *inftl)
 		mtd_read(mtd, block * inftl->EraseSize + 4096, SECTORSIZE,
 			 &retlen, buf);
 		if (retlen != SECTORSIZE) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING "INFTL: Unable to read spare "
 			       "Media Header\n");
+#else
+			;
+#endif
 			return -1;
 		}
 		/* Check if this one is the same as the first one we found. */
 		if (memcmp(mh, buf, sizeof(struct INFTLMediaHeader))) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING "INFTL: Primary and spare Media "
 			       "Headers disagree.\n");
+#else
+			;
+#endif
 			return -1;
 		}
 
@@ -223,18 +243,26 @@ static int find_boot_record(struct INFTLrecord *inftl)
 				mtd_erase(mtd, instr);
 			}
 			if ((ip->lastUnit - ip->firstUnit + 1) < ip->virtualUnits) {
+#ifdef CONFIG_DEBUG_PRINTK
 				printk(KERN_WARNING "INFTL: Media Header "
 					"Partition %d sanity check failed\n"
 					"    firstUnit %d : lastUnit %d  >  "
 					"virtualUnits %d\n", i, ip->lastUnit,
 					ip->firstUnit, ip->Reserved0);
+#else
+				;
+#endif
 				return -1;
 			}
 			if (ip->Reserved1 != 0) {
+#ifdef CONFIG_DEBUG_PRINTK
 				printk(KERN_WARNING "INFTL: Media Header "
 					"Partition %d sanity check failed: "
 					"Reserved1 %d != 0\n",
 					i, ip->Reserved1);
+#else
+				;
+#endif
 				return -1;
 			}
 
@@ -243,9 +271,13 @@ static int find_boot_record(struct INFTLrecord *inftl)
 		}
 
 		if (i >= 4) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING "INFTL: Media Header Partition "
 				"sanity check failed:\n       No partition "
 				"marked as Disk Partition\n");
+#else
+			;
+#endif
 			return -1;
 		}
 
@@ -253,11 +285,15 @@ static int find_boot_record(struct INFTLrecord *inftl)
 		inftl->numvunits = ip->virtualUnits;
 		if (inftl->numvunits > (inftl->nb_blocks -
 		    inftl->nb_boot_blocks - 2)) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING "INFTL: Media Header sanity check "
 				"failed:\n        numvunits (%d) > nb_blocks "
 				"(%d) - nb_boot_blocks(%d) - 2\n",
 				inftl->numvunits, inftl->nb_blocks,
 				inftl->nb_boot_blocks);
+#else
+			;
+#endif
 			return -1;
 		}
 
@@ -275,18 +311,26 @@ static int find_boot_record(struct INFTLrecord *inftl)
 		/* Memory alloc */
 		inftl->PUtable = kmalloc(inftl->nb_blocks * sizeof(u16), GFP_KERNEL);
 		if (!inftl->PUtable) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING "INFTL: allocation of PUtable "
 				"failed (%zd bytes)\n",
 				inftl->nb_blocks * sizeof(u16));
+#else
+			;
+#endif
 			return -ENOMEM;
 		}
 
 		inftl->VUtable = kmalloc(inftl->nb_blocks * sizeof(u16), GFP_KERNEL);
 		if (!inftl->VUtable) {
 			kfree(inftl->PUtable);
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING "INFTL: allocation of VUtable "
 				"failed (%zd bytes)\n",
 				inftl->nb_blocks * sizeof(u16));
+#else
+			;
+#endif
 			return -ENOMEM;
 		}
 
@@ -397,8 +441,12 @@ int INFTL_formatblock(struct INFTLrecord *inftl, int block)
 		mtd_erase(inftl->mbd.mtd, instr);
 
 		if (instr->state == MTD_ERASE_FAILED) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING "INFTL: error while formatting block %d\n",
 				block);
+#else
+			;
+#endif
 			goto fail;
 		}
 
@@ -440,13 +488,21 @@ static void format_chain(struct INFTLrecord *inftl, unsigned int first_block)
 {
 	unsigned int block = first_block, block1;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_WARNING "INFTL: formatting chain at block %d\n",
 		first_block);
+#else
+	;
+#endif
 
 	for (;;) {
 		block1 = inftl->PUtable[block];
 
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "INFTL: formatting block %d\n", block);
+#else
+		;
+#endif
 		if (INFTL_formatblock(inftl, block) < 0) {
 			/*
 			 * Cannot format !!!! Mark it as Bad Unit,
@@ -551,7 +607,11 @@ int INFTL_mount(struct INFTLrecord *s)
 
 	/* Search for INFTL MediaHeader and Spare INFTL Media Header */
 	if (find_boot_record(s) < 0) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "INFTL: could not find valid boot record?\n");
+#else
+		;
+#endif
 		return -ENXIO;
 	}
 
@@ -564,9 +624,13 @@ int INFTL_mount(struct INFTLrecord *s)
 	/* Temporary buffer to store ANAC numbers. */
 	ANACtable = kcalloc(s->nb_blocks, sizeof(u8), GFP_KERNEL);
 	if (!ANACtable) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "INFTL: allocation of ANACtable "
 				"failed (%zd bytes)\n",
 				s->nb_blocks * sizeof(u8));
+#else
+		;
+#endif
 		return -ENOMEM;
 	}
 
@@ -626,10 +690,14 @@ int INFTL_mount(struct INFTLrecord *s)
 
 			/* Check for invalid block */
 			if (erase_mark != ERASE_MARK) {
+#ifdef CONFIG_DEBUG_PRINTK
 				printk(KERN_WARNING "INFTL: corrupt block %d "
 					"in chain %d, chain length %d, erase "
 					"mark 0x%x?\n", block, first_block,
 					chain_length, erase_mark);
+#else
+				;
+#endif
 				/*
 				 * Assume end of chain, probably incomplete
 				 * fold/erase...
@@ -651,9 +719,13 @@ int INFTL_mount(struct INFTLrecord *s)
 			    ((prev_block >= s->nb_blocks) &&
 			     (prev_block != BLOCK_NIL))) {
 				if (chain_length > 0) {
+#ifdef CONFIG_DEBUG_PRINTK
 					printk(KERN_WARNING "INFTL: corrupt "
 						"block %d in chain %d?\n",
 						block, first_block);
+#else
+					;
+#endif
 					do_format_chain++;
 				}
 				break;
@@ -686,9 +758,13 @@ int INFTL_mount(struct INFTLrecord *s)
 
 			/* Validate next block before following it... */
 			if (block > s->lastEUN) {
+#ifdef CONFIG_DEBUG_PRINTK
 				printk(KERN_WARNING "INFTL: invalid previous "
 					"block %d in chain %d?\n", block,
 					first_block);
+#else
+				;
+#endif
 				do_format_chain++;
 				break;
 			}
@@ -730,9 +806,13 @@ int INFTL_mount(struct INFTLrecord *s)
 			if (s->PUtable[block] == BLOCK_NIL)
 				break;
 			if (s->PUtable[block] > s->lastEUN) {
+#ifdef CONFIG_DEBUG_PRINTK
 				printk(KERN_WARNING "INFTL: invalid prev %d, "
 					"in virtual chain %d\n",
 					s->PUtable[block], logical_block);
+#else
+				;
+#endif
 				s->PUtable[block] = BLOCK_NIL;
 
 			}
@@ -773,8 +853,12 @@ int INFTL_mount(struct INFTLrecord *s)
 	pr_debug("INFTL: pass 3, format unused blocks\n");
 	for (block = s->firstEUN; block <= s->lastEUN; block++) {
 		if (s->PUtable[block] == BLOCK_NOTEXPLORED) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk("INFTL: unreferenced block %d, formatting it\n",
 				block);
+#else
+			;
+#endif
 			if (INFTL_formatblock(s, block) < 0)
 				s->PUtable[block] = BLOCK_RESERVED;
 			else

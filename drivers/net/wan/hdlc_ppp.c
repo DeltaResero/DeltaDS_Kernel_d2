@@ -170,7 +170,7 @@ static int ppp_hard_header(struct sk_buff *skb, struct net_device *dev,
 {
 	struct hdlc_header *data;
 #if DEBUG_HARD_HEADER
-	printk(KERN_DEBUG "%s: ppp_hard_header() called\n", dev->name);
+;
 #endif
 
 	skb_push(skb, sizeof(struct hdlc_header));
@@ -246,8 +246,8 @@ static void ppp_tx_cp(struct net_device *dev, u16 pid, u8 code,
 		sprintf(ptr, " %02X", skb->data[sizeof(struct cp_header) + i]);
 		ptr += strlen(ptr);
 	}
-	printk(KERN_DEBUG "%s: TX %s [%s id 0x%X]%s\n", dev->name,
-	       proto_name(pid), code_names[code], id, debug_buffer);
+//	printk(KERN_DEBUG "%s: TX %s [%s id 0x%X]%s\n", dev->name,
+;
 #endif
 
 	ppp_hard_header(skb, dev, pid, NULL, NULL, 0);
@@ -313,8 +313,8 @@ static void ppp_cp_event(struct net_device *dev, u16 pid, u16 event, u8 code,
 	BUG_ON(event >= EVENTS);
 
 #if DEBUG_STATE
-	printk(KERN_DEBUG "%s: %s ppp_cp_event(%s) %s ...\n", dev->name,
-	       proto_name(pid), event_names[event], state_names[proto->state]);
+//	printk(KERN_DEBUG "%s: %s ppp_cp_event(%s) %s ...\n", dev->name,
+;
 #endif
 
 	action = cp_table[event][old_state];
@@ -366,8 +366,8 @@ static void ppp_cp_event(struct net_device *dev, u16 pid, u16 event, u8 code,
 		del_timer(&proto->timer);
 
 #if DEBUG_STATE
-	printk(KERN_DEBUG "%s: %s ppp_cp_event(%s) ... %s\n", dev->name,
-	       proto_name(pid), event_names[event], state_names[proto->state]);
+//	printk(KERN_DEBUG "%s: %s ppp_cp_event(%s) ... %s\n", dev->name,
+;
 #endif
 }
 
@@ -481,8 +481,8 @@ static int ppp_rx(struct sk_buff *skb)
 		sprintf(ptr, " %02X", skb->data[i]);
 		ptr += strlen(ptr);
 	}
-	printk(KERN_DEBUG "%s: RX %s %s\n", dev->name, proto_name(pid),
-	       debug_buffer);
+//	printk(KERN_DEBUG "%s: RX %s %s\n", dev->name, proto_name(pid),
+;
 #endif
 
 	/* LCP only */

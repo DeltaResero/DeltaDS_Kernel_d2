@@ -102,8 +102,12 @@ static int ir_rc6_decode(struct rc_dev *dev, struct ir_raw_event ev)
 		goto out;
 
 again:
+#ifdef CONFIG_DEBUG_PRINTK
 	IR_dprintk(2, "RC6 decode started at state %i (%uus %s)\n",
 		   data->state, TO_US(ev.duration), TO_STR(ev.pulse));
+#else
+	IR_d;
+#endif
 
 	if (!geq_margin(ev.duration, RC6_UNIT, RC6_UNIT / 2))
 		return 0;
@@ -172,7 +176,11 @@ again:
 			break;
 
 		if (!(data->header & RC6_STARTBIT_MASK)) {
+#ifdef CONFIG_DEBUG_PRINTK
 			IR_dprintk(1, "RC6 invalid start bit\n");
+#else
+			IR_d;
+#endif
 			break;
 		}
 
@@ -189,7 +197,11 @@ again:
 			data->wanted_bits = RC6_6A_NBITS;
 			break;
 		default:
+#ifdef CONFIG_DEBUG_PRINTK
 			IR_dprintk(1, "RC6 unknown mode\n");
+#else
+			IR_d;
+#endif
 			goto out;
 		}
 		goto again;
@@ -231,8 +243,12 @@ again:
 		case RC6_MODE_0:
 			scancode = data->body;
 			toggle = data->toggle;
+#ifdef CONFIG_DEBUG_PRINTK
 			IR_dprintk(1, "RC6(0) scancode 0x%04x (toggle: %u)\n",
 				   scancode, toggle);
+#else
+			IR_d;
+#endif
 			break;
 		case RC6_MODE_6A:
 			if (data->count > CHAR_BIT * sizeof data->body) {
@@ -264,8 +280,12 @@ again:
 	}
 
 out:
+#ifdef CONFIG_DEBUG_PRINTK
 	IR_dprintk(1, "RC6 decode failed at state %i (%uus %s)\n",
 		   data->state, TO_US(ev.duration), TO_STR(ev.pulse));
+#else
+	IR_d;
+#endif
 	data->state = STATE_INACTIVE;
 	return -EINVAL;
 }
@@ -279,7 +299,11 @@ static int __init ir_rc6_decode_init(void)
 {
 	ir_raw_handler_register(&rc6_handler);
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "IR RC6 protocol handler initialized\n");
+#else
+	;
+#endif
 	return 0;
 }
 

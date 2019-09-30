@@ -485,8 +485,12 @@ static struct mtd_part *allocate_partition(struct mtd_info *master,
 	}
 	if (slave->offset + slave->mtd.size > master->size) {
 		slave->mtd.size = master->size - slave->offset;
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING"mtd: partition \"%s\" extends beyond the end of device \"%s\" -- size truncated to %#llx\n",
 			part->name, master->name, (unsigned long long)slave->mtd.size);
+#else
+		;
+#endif
 	}
 	if (master->numeraseregions > 1) {
 		/* Deal with variable erase size stuff */
@@ -520,14 +524,22 @@ static struct mtd_part *allocate_partition(struct mtd_info *master,
 		/* FIXME: Let it be writable if it is on a boundary of
 		 * _minor_ erase size though */
 		slave->mtd.flags &= ~MTD_WRITEABLE;
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING"mtd: partition \"%s\" doesn't start on an erase block boundary -- force read-only\n",
 			part->name);
+#else
+		;
+#endif
 	}
 	if ((slave->mtd.flags & MTD_WRITEABLE) &&
 	    mtd_mod_by_eb(slave->mtd.size, &slave->mtd)) {
 		slave->mtd.flags &= ~MTD_WRITEABLE;
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING"mtd: partition \"%s\" doesn't end on an erase block -- force read-only\n",
 			part->name);
+#else
+		;
+#endif
 	}
 
 	slave->mtd.ecclayout = master->ecclayout;
@@ -647,7 +659,11 @@ int add_mtd_partitions(struct mtd_info *master,
 	uint64_t cur_offset = 0;
 	int i;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_NOTICE "Creating %d MTD partitions on \"%s\":\n", nbparts, master->name);
+#else
+	;
+#endif
 
 	for (i = 0; i < nbparts; i++) {
 		slave = allocate_partition(master, parts + i, i, cur_offset);

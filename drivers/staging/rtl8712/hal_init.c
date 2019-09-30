@@ -335,11 +335,11 @@ uint rtl8712_hal_init(struct _adapter *padapter)
 	if (rtl8712_dl_fw(padapter) != _SUCCESS)
 		return _FAIL;
 
-	printk(KERN_INFO "r8712u: 1 RCR=0x%x\n",  r8712_read32(padapter, RCR));
+;
 	val32 = r8712_read32(padapter, RCR);
 	r8712_write32(padapter, RCR, (val32 | BIT(26))); /* Enable RX TCP
 							    Checksum offload */
-	printk(KERN_INFO "r8712u: 2 RCR=0x%x\n", r8712_read32(padapter, RCR));
+;
 	val32 = r8712_read32(padapter, RCR);
 	r8712_write32(padapter, RCR, (val32|BIT(25))); /* Append PHY status */
 	val32 = 0;

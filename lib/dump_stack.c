@@ -9,8 +9,12 @@
 void dump_stack(void) __attribute__ ((weak));
 void dump_stack(void)
 {
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_NOTICE
 		"This architecture does not implement dump_stack()\n");
+#else
+	;
+#endif
 }
 
 EXPORT_SYMBOL(dump_stack);

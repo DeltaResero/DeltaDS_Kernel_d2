@@ -1400,7 +1400,7 @@ static int download(struct cosa_data *cosa, const char __user *microcode, int le
 	int i;
 
 	if (put_wait_data(cosa, 'w') == -1) return -1;
-	if ((i=get_wait_data(cosa)) != 'w') { printk("dnld: 0x%04x\n",i); return -2;}
+;
 	if (get_wait_data(cosa) != '=') return -3;
 
 	if (puthexnumber(cosa, address) < 0) return -4;
@@ -1429,7 +1429,7 @@ static int download(struct cosa_data *cosa, const char __user *microcode, int le
 	if (get_wait_data(cosa) != '\n') return -22;
 	if (get_wait_data(cosa) != '.') return -23;
 #if 0
-	printk(KERN_DEBUG "cosa%d: download completed.\n", cosa->num);
+;
 #endif
 	return 0;
 }
@@ -1455,7 +1455,7 @@ static int startmicrocode(struct cosa_data *cosa, int address)
 	if (get_wait_data(cosa) != '\r') return -9;
 	if (get_wait_data(cosa) != '\n') return -10;
 #if 0
-	printk(KERN_DEBUG "cosa%d: microcode started\n", cosa->num);
+;
 #endif
 	return 0;
 }
@@ -1505,7 +1505,7 @@ static int readmem(struct cosa_data *cosa, char __user *microcode, int length, i
 	if (get_wait_data(cosa) != '\n') return -22;
 	if (get_wait_data(cosa) != '.') return -23;
 #if 0
-	printk(KERN_DEBUG "cosa%d: readmem completed.\n", cosa->num);
+;
 #endif
 	return 0;
 }
@@ -1705,9 +1705,9 @@ static inline void tx_interrupt(struct cosa_data *cosa, int status)
 			if (i > cosa->nchannels) {
 				/* Can be safely ignored */
 #ifdef DEBUG_IRQS
-				printk(KERN_DEBUG "%s: Forcing TX "
-					"to not-ready channel %d\n",
-					cosa->name, cosa->txchan);
+//				printk(KERN_DEBUG "%s: Forcing TX "
+//					"to not-ready channel %d\n",
+;
 #endif
 				break;
 			}

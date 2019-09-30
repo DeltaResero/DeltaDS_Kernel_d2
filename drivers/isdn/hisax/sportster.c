@@ -215,7 +215,11 @@ setup_sportster(struct IsdnCard *card)
 	char tmp[64];
 
 	strcpy(tmp, sportster_revision);
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "HiSax: USR Sportster driver Rev. %s\n", HiSax_getrev(tmp));
+#else
+	;
+#endif
 	if (cs->typ != ISDN_CTYPE_SPORTSTER)
 		return (0);
 
@@ -260,8 +264,12 @@ setup_sportster(struct IsdnCard *card)
 	cs->irq_func = &sportster_interrupt;
 	ISACVersion(cs, "Sportster:");
 	if (HscxVersion(cs, "Sportster:")) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING
 		       "Sportster: wrong HSCX versions check IO address\n");
+#else
+		;
+#endif
 		release_io_sportster(cs);
 		return (0);
 	}

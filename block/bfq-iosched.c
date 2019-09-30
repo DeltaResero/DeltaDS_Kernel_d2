@@ -2975,8 +2975,12 @@ static void bfq_set_next_ioprio_data(struct bfq_queue *bfqq, struct bfq_io_cq *b
 
 	if (bfqq->entity.new_ioprio < 0 ||
 	    bfqq->entity.new_ioprio >= IOPRIO_BE_NR) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_CRIT "bfq_set_next_ioprio_data: new_ioprio %d\n",
 				 bfqq->entity.new_ioprio);
+#else
+		;
+#endif
 		BUG();
 	}
 

@@ -452,7 +452,7 @@ static int dio700_cs_attach(struct pcmcia_device *link)
 {
 	struct local_info_t *local;
 
-	printk(KERN_INFO "ni_daq_700:  cs-attach\n");
+;
 
 	dev_dbg(&link->dev, "dio700_cs_attach()\n");
 
@@ -473,7 +473,7 @@ static int dio700_cs_attach(struct pcmcia_device *link)
 static void dio700_cs_detach(struct pcmcia_device *link)
 {
 
-	printk(KERN_INFO "ni_daq_700: cs-detach!\n");
+;
 
 	dev_dbg(&link->dev, "dio700_cs_detach\n");
 
@@ -498,7 +498,7 @@ static void dio700_config(struct pcmcia_device *link)
 {
 	int ret;
 
-	printk(KERN_INFO "ni_daq_700:  cs-config\n");
+;
 
 	dev_dbg(&link->dev, "dio700_config\n");
 
@@ -521,7 +521,7 @@ static void dio700_config(struct pcmcia_device *link)
 	return;
 
 failed:
-	printk(KERN_INFO "ni_daq_700 cs failed");
+;
 	dio700_release(link);
 
 }				/* dio700_config */

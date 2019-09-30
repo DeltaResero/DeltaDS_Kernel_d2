@@ -107,7 +107,11 @@ l1m_debug(struct FsmInst *fi, char *fmt, ...)
 	vaf.fmt = fmt;
 	vaf.va = &va;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_DEBUG "%s: %pV\n", dev_name(&l1->dch->dev.dev), &vaf);
+#else
+	;
+#endif
 
 	va_end(va);
 }

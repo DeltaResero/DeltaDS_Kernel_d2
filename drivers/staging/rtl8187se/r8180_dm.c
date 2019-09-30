@@ -939,7 +939,7 @@ bool SetAntenna8185(struct net_device *dev, u8 u1bAntennaIndex)
 		break;
 
 	default:
-		printk("SetAntenna8185: unknown u1bAntennaIndex(%d)\n", u1bAntennaIndex);
+;
 		break;
 	}
 

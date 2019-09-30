@@ -221,7 +221,11 @@ dbusy_timer_handler(struct IsdnCardState *cs)
 				cs->tx_cnt = 0;
 				cs->tx_skb = NULL;
 			} else {
+#ifdef CONFIG_DEBUG_PRINTK
 				printk(KERN_WARNING "HiSax: ISAC D-Channel Busy no skb\n");
+#else
+				;
+#endif
 				debugl1(cs, "D-Channel Busy no skb");
 			}
 			cs->writeisac(cs, IPACX_CMDRD, 0x01); // Tx reset, generates XPR
@@ -348,7 +352,11 @@ dch_int(struct IsdnCardState *cs)
 			if ((count = cs->rcvidx) > 0) {
 				cs->rcvidx = 0;
 				if (!(skb = dev_alloc_skb(count)))
+#ifdef CONFIG_DEBUG_PRINTK
 					printk(KERN_WARNING "HiSax dch_int(): receive out of memory\n");
+#else
+					;
+#endif
 				else {
 					memcpy(skb_put(skb, count), cs->rcvbuf, count);
 					skb_queue_tail(&cs->rq, skb);
@@ -401,7 +409,11 @@ afterXPR:
 			cs->tx_cnt = 0;
 			dch_fill_fifo(cs);
 		} else {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING "HiSax: ISAC XDU no skb\n");
+#else
+			;
+#endif
 			debugl1(cs, "ISAC XDU no skb");
 		}
 	}
@@ -420,7 +432,11 @@ dch_setstack(struct PStack *st, struct IsdnCardState *cs)
 static void
 dch_init(struct IsdnCardState *cs)
 {
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "HiSax: IPACX ISDN driver v0.1.0\n");
+#else
+	;
+#endif
 
 	cs->setstack_d      = dch_setstack;
 
@@ -627,7 +643,11 @@ bch_int(struct IsdnCardState *cs, u_char hscx)
 				if (cs->debug & L1_DEB_HSCX_FIFO)
 					debugl1(cs, "bch_int Frame %d", count);
 				if (!(skb = dev_alloc_skb(count)))
+#ifdef CONFIG_DEBUG_PRINTK
 					printk(KERN_WARNING "HiSax bch_int(): receive frame out of memory\n");
+#else
+					;
+#endif
 				else {
 					memcpy(skb_put(skb, count), bcs->hw.hscx.rcvbuf, count);
 					skb_queue_tail(&bcs->rqueue, skb);
@@ -644,7 +664,11 @@ bch_int(struct IsdnCardState *cs, u_char hscx)
 		if (bcs->mode == L1_MODE_TRANS) { // queue every chunk
 			// receive transparent audio data
 			if (!(skb = dev_alloc_skb(B_FIFO_SIZE)))
+#ifdef CONFIG_DEBUG_PRINTK
 				printk(KERN_WARNING "HiSax bch_int(): receive transparent out of memory\n");
+#else
+				;
+#endif
 			else {
 				memcpy(skb_put(skb, B_FIFO_SIZE), bcs->hw.hscx.rcvbuf, B_FIFO_SIZE);
 				skb_queue_tail(&bcs->rqueue, skb);

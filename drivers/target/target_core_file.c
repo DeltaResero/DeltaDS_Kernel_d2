@@ -42,6 +42,9 @@
 #include "target_core_file.h"
 
 static struct se_subsystem_api fileio_template;
+#else
+#define DEBUG_FD_CACHE(x...) ;
+#endif
 
 /*	fd_attach_hba(): (Part of se_subsystem_api_t template)
  *

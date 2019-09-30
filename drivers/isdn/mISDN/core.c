@@ -401,7 +401,11 @@ static void mISDN_cleanup(void)
 	mISDN_timer_cleanup();
 	class_unregister(&mISDN_class);
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_DEBUG "mISDNcore unloaded\n");
+#else
+	;
+#endif
 }
 
 module_init(mISDNInit);

@@ -310,7 +310,11 @@ get_next_bframe(struct bchannel *bch)
 			return 1;
 		} else {
 			test_and_clear_bit(FLG_TX_NEXT, &bch->Flags);
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING "B TX_NEXT without skb\n");
+#else
+			;
+#endif
 		}
 	}
 	bch->tx_skb = NULL;

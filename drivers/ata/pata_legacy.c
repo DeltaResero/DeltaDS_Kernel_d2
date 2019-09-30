@@ -900,8 +900,12 @@ static __init int probe_chip_type(struct legacy_probe *probe)
 
 		if ((inb(0x1F2) & 0x80) == 0) {
 			/* PDC20230c or 20630 ? */
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_INFO  "PDC20230-C/20630 VLB ATA controller"
 							" detected.\n");
+#else
+			;
+#endif
 			udelay(100);
 			inb(0x1F5);
 			local_irq_restore(flags);
@@ -911,8 +915,12 @@ static __init int probe_chip_type(struct legacy_probe *probe)
 			inb(0x1F2);
 			inb(0x1F2);
 			if (inb(0x1F2) == 0x00)
+#ifdef CONFIG_DEBUG_PRINTK
 				printk(KERN_INFO "PDC20230-B VLB ATA "
 						     "controller detected.\n");
+#else
+				;
+#endif
 			local_irq_restore(flags);
 			return BIOS;
 		}
@@ -1070,8 +1078,12 @@ static __init void probe_opti_vlb(void)
 	u8 ctrl = (opti_syscfg(0x30) & 0xC0) >> 6;
 
 	opti82c46x = 3;	/* Assume master and slave first */
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO DRV_NAME ": Opti 82C46%s chipset support.\n",
 								optis[ctrl]);
+#else
+	;
+#endif
 	if (ctrl == 3)
 		chans = (opti_syscfg(0x3F) & 0x20) ? 2 : 1;
 	ctrl = opti_syscfg(0xAC);

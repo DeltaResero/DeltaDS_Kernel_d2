@@ -232,7 +232,11 @@ int __devinit setup_niccy(struct IsdnCard *card)
 	char tmp[64];
 
 	strcpy(tmp, niccy_revision);
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "HiSax: Niccy driver Rev. %s\n", HiSax_getrev(tmp));
+#else
+	;
+#endif
 	if (cs->typ != ISDN_CTYPE_NICCY)
 		return 0;
 #ifdef __ISAPNP__
@@ -271,7 +275,11 @@ int __devinit setup_niccy(struct IsdnCard *card)
 				return 0;
 			}
 		} else
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_INFO "NiccyPnP: no ISAPnP card found\n");
+#else
+			;
+#endif
 	}
 #endif
 	if (card->para[1]) {
@@ -309,26 +317,42 @@ int __devinit setup_niccy(struct IsdnCard *card)
 				return 0;
 			/* get IRQ */
 			if (!niccy_dev->irq) {
+#ifdef CONFIG_DEBUG_PRINTK
 				printk(KERN_WARNING
 				       "Niccy: No IRQ for PCI card found\n");
+#else
+				;
+#endif
 				return 0;
 			}
 			cs->irq = niccy_dev->irq;
 			cs->hw.niccy.cfg_reg = pci_resource_start(niccy_dev, 0);
 			if (!cs->hw.niccy.cfg_reg) {
+#ifdef CONFIG_DEBUG_PRINTK
 				printk(KERN_WARNING
 				       "Niccy: No IO-Adr for PCI cfg found\n");
+#else
+				;
+#endif
 				return 0;
 			}
 			pci_ioaddr = pci_resource_start(niccy_dev, 1);
 			if (!pci_ioaddr) {
+#ifdef CONFIG_DEBUG_PRINTK
 				printk(KERN_WARNING
 				       "Niccy: No IO-Adr for PCI card found\n");
+#else
+				;
+#endif
 				return 0;
 			}
 			cs->subtyp = NICCY_PCI;
 		} else {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING "Niccy: No PCI card found\n");
+#else
+			;
+#endif
 			return 0;
 		}
 		cs->irq_flags |= IRQF_SHARED;

@@ -30,11 +30,19 @@ MODULE_PARM_DESC(debug, "Activates frontend debugging (default:0)");
 	printk(KERN_ERR  "mb86a20s: " args);				\
 } while (0)
 
+#ifdef CONFIG_DEBUG_PRINTK
 #define dprintk(args...)						\
 	do {								\
 		if (debug) {						\
 			printk(KERN_DEBUG "mb86a20s: %s: ", __func__);	\
+#else
+#define d;
+#endif
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(args);					\
+#else
+			;
+#endif
 		}							\
 	} while (0)
 
@@ -187,8 +195,12 @@ static int mb86a20s_i2c_writereg(struct mb86a20s_state *state,
 
 	rc = i2c_transfer(state->i2c, &msg, 1);
 	if (rc != 1) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk("%s: writereg error (rc == %i, reg == 0x%02x,"
 			 " data == 0x%02x)\n", __func__, rc, reg, data);
+#else
+		;
+#endif
 		return rc;
 	}
 
@@ -243,7 +255,11 @@ static int mb86a20s_initfe(struct dvb_frontend *fe)
 	int rc;
 	u8  regD5 = 1;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk("\n");
+#else
+	d;
+#endif
 
 	if (fe->ops.i2c_gate_ctrl)
 		fe->ops.i2c_gate_ctrl(fe, 0);
@@ -270,10 +286,18 @@ static int mb86a20s_initfe(struct dvb_frontend *fe)
 err:
 	if (rc < 0) {
 		state->need_init = true;
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_INFO "mb86a20s: Init failed. Will try again later\n");
+#else
+		;
+#endif
 	} else {
 		state->need_init = false;
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk("Initialization succeeded.\n");
+#else
+		d;
+#endif
 	}
 	return rc;
 }
@@ -284,7 +308,11 @@ static int mb86a20s_read_signal_strength(struct dvb_frontend *fe, u16 *strength)
 	unsigned rf_max, rf_min, rf;
 	u8	 val;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk("\n");
+#else
+	d;
+#endif
 
 	if (fe->ops.i2c_gate_ctrl)
 		fe->ops.i2c_gate_ctrl(fe, 0);
@@ -310,7 +338,11 @@ static int mb86a20s_read_signal_strength(struct dvb_frontend *fe, u16 *strength)
 		}
 	} while (1);
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk("signal strength = %d\n", *strength);
+#else
+	d;
+#endif
 
 	if (fe->ops.i2c_gate_ctrl)
 		fe->ops.i2c_gate_ctrl(fe, 1);
@@ -323,7 +355,11 @@ static int mb86a20s_read_status(struct dvb_frontend *fe, fe_status_t *status)
 	struct mb86a20s_state *state = fe->demodulator_priv;
 	u8 val;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk("\n");
+#else
+	d;
+#endif
 	*status = 0;
 
 	if (fe->ops.i2c_gate_ctrl)
@@ -347,7 +383,11 @@ static int mb86a20s_read_status(struct dvb_frontend *fe, fe_status_t *status)
 	if (val >= 8)				/* Maybe 9? */
 		*status |= FE_HAS_LOCK;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk("val = %d, status = 0x%02x\n", val, *status);
+#else
+	d;
+#endif
 
 	return 0;
 }
@@ -363,7 +403,11 @@ static int mb86a20s_set_frontend(struct dvb_frontend *fe)
 	struct dtv_frontend_properties *p = &fe->dtv_property_cache;
 #endif
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk("\n");
+#else
+	d;
+#endif
 
 	if (fe->ops.i2c_gate_ctrl)
 		fe->ops.i2c_gate_ctrl(fe, 1);
@@ -619,7 +663,11 @@ static void mb86a20s_release(struct dvb_frontend *fe)
 {
 	struct mb86a20s_state *state = fe->demodulator_priv;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk("\n");
+#else
+	d;
+#endif
 
 	kfree(state);
 }
@@ -635,7 +683,11 @@ struct dvb_frontend *mb86a20s_attach(const struct mb86a20s_config *config,
 	struct mb86a20s_state *state =
 		kzalloc(sizeof(struct mb86a20s_state), GFP_KERNEL);
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk("\n");
+#else
+	d;
+#endif
 	if (state == NULL) {
 		rc("Unable to kzalloc\n");
 		goto error;
@@ -654,7 +706,11 @@ struct dvb_frontend *mb86a20s_attach(const struct mb86a20s_config *config,
 	rev = mb86a20s_readreg(state, 0);
 
 	if (rev == 0x13) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_INFO "Detected a Fujitsu mb86a20s frontend\n");
+#else
+		;
+#endif
 	} else {
 		printk(KERN_ERR "Frontend revision %d is unknown - aborting.\n",
 		       rev);

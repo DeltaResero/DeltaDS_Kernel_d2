@@ -390,7 +390,11 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
 		dma_params->pdc_xfer_size = 4;
 		break;
 	default:
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "atmel_ssc_dai: unsupported PCM format");
+#else
+		;
+#endif
 		return -EINVAL;
 	}
 
@@ -534,8 +538,12 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
 
 	case SND_SOC_DAIFMT_DSP_A | SND_SOC_DAIFMT_CBM_CFM:
 	default:
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING "atmel_ssc_dai: unsupported DAI format 0x%x\n",
 			ssc_p->daifmt);
+#else
+		;
+#endif
 		return -EINVAL;
 	}
 	pr_debug("atmel_ssc_hw_params: "
@@ -564,8 +572,12 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
 		ret = request_irq(ssc_p->ssc->irq, atmel_ssc_interrupt, 0,
 				ssc_p->name, ssc_p);
 		if (ret < 0) {
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_WARNING
 					"atmel_ssc_dai: request_irq failure\n");
+#else
+			;
+#endif
 			pr_debug("Atmel_ssc_dai: Stoping clock\n");
 			clk_disable(ssc_p->ssc->clk);
 			return ret;

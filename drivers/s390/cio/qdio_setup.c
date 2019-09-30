@@ -499,7 +499,11 @@ void qdio_print_subchannel_info(struct qdio_irq *irq_ptr,
 		 (irq_ptr->siga_flag.sync) ? "S" : " ",
 		 (irq_ptr->siga_flag.sync_after_ai) ? "A" : " ",
 		 (irq_ptr->siga_flag.sync_out_after_pci) ? "P" : " ");
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "%s", s);
+#else
+	;
+#endif
 }
 
 int qdio_enable_async_operation(struct qdio_output_q *outq)

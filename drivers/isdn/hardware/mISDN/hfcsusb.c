@@ -67,7 +67,11 @@ static void
 ctrl_start_transfer(struct hfcsusb *hw)
 {
 	if (debug & DBG_HFC_CALL_TRACE)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "%s: %s\n", hw->name, __func__);
+#else
+		;
+#endif
 
 	if (hw->ctrl_cnt) {
 		hw->ctrl_urb->pipe = hw->ctrl_out_pipe;
@@ -119,7 +123,11 @@ ctrl_complete(struct urb *urb)
 	struct hfcsusb *hw = (struct hfcsusb *) urb->context;
 
 	if (debug & DBG_HFC_CALL_TRACE)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "%s: %s\n", hw->name, __func__);
+#else
+		;
+#endif
 
 	urb->dev = hw->dev;
 	if (hw->ctrl_cnt) {
@@ -216,7 +224,11 @@ hfcusb_l2l1B(struct mISDNchannel *ch, struct sk_buff *skb)
 	u_long			flags;
 
 	if (debug & DBG_HFC_CALL_TRACE)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "%s: %s\n", hw->name, __func__);
+#else
+		;
+#endif
 
 	switch (hh->prim) {
 	case PH_DATA_REQ:

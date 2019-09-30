@@ -58,11 +58,15 @@
 int mantis_dma_exit(struct mantis_pci *mantis)
 {
 	if (mantis->buf_cpu) {
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk(MANTIS_ERROR, 1,
 			"DMA=0x%lx cpu=0x%p size=%d",
 			(unsigned long) mantis->buf_dma,
 			 mantis->buf_cpu,
 			 MANTIS_BUF_SIZE);
+#else
+		d;
+#endif
 
 		pci_free_consistent(mantis->pdev, MANTIS_BUF_SIZE,
 				    mantis->buf_cpu, mantis->buf_dma);
@@ -70,11 +74,15 @@ int mantis_dma_exit(struct mantis_pci *mantis)
 		mantis->buf_cpu = NULL;
 	}
 	if (mantis->risc_cpu) {
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk(MANTIS_ERROR, 1,
 			"RISC=0x%lx cpu=0x%p size=%lx",
 			(unsigned long) mantis->risc_dma,
 			mantis->risc_cpu,
 			MANTIS_RISC_SIZE);
+#else
+		d;
+#endif
 
 		pci_free_consistent(mantis->pdev, MANTIS_RISC_SIZE,
 				    mantis->risc_cpu, mantis->risc_dma);
@@ -93,15 +101,23 @@ static inline int mantis_alloc_buffers(struct mantis_pci *mantis)
 						       MANTIS_BUF_SIZE,
 						       &mantis->buf_dma);
 		if (!mantis->buf_cpu) {
+#ifdef CONFIG_DEBUG_PRINTK
 			dprintk(MANTIS_ERROR, 1,
 				"DMA buffer allocation failed");
+#else
+			d;
+#endif
 
 			goto err;
 		}
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk(MANTIS_ERROR, 1,
 			"DMA=0x%lx cpu=0x%p size=%d",
 			(unsigned long) mantis->buf_dma,
 			mantis->buf_cpu, MANTIS_BUF_SIZE);
+#else
+		d;
+#endif
 	}
 	if (!mantis->risc_cpu) {
 		mantis->risc_cpu = pci_alloc_consistent(mantis->pdev,
@@ -109,22 +125,34 @@ static inline int mantis_alloc_buffers(struct mantis_pci *mantis)
 							&mantis->risc_dma);
 
 		if (!mantis->risc_cpu) {
+#ifdef CONFIG_DEBUG_PRINTK
 			dprintk(MANTIS_ERROR, 1,
 				"RISC program allocation failed");
+#else
+			d;
+#endif
 
 			mantis_dma_exit(mantis);
 
 			goto err;
 		}
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk(MANTIS_ERROR, 1,
 			"RISC=0x%lx cpu=0x%p size=%lx",
 			(unsigned long) mantis->risc_dma,
 			mantis->risc_cpu, MANTIS_RISC_SIZE);
+#else
+		d;
+#endif
 	}
 
 	return 0;
 err:
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(MANTIS_ERROR, 1, "Out of memory (?) .....");
+#else
+	d;
+#endif
 	return -ENOMEM;
 }
 
@@ -132,9 +160,17 @@ int mantis_dma_init(struct mantis_pci *mantis)
 {
 	int err = 0;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(MANTIS_DEBUG, 1, "Mantis DMA init");
+#else
+	d;
+#endif
 	if (mantis_alloc_buffers(mantis) < 0) {
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk(MANTIS_ERROR, 1, "Error allocating DMA buffer");
+#else
+		d;
+#endif
 
 		/* Stop RISC Engine */
 		mmwrite(0, MANTIS_DMA_CTL);
@@ -181,7 +217,11 @@ static inline void mantis_risc_program(struct mantis_pci *mantis)
 
 void mantis_dma_start(struct mantis_pci *mantis)
 {
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(MANTIS_DEBUG, 1, "Mantis Start DMA engine");
+#else
+	d;
+#endif
 
 	mantis_risc_program(mantis);
 	mmwrite(mantis->risc_dma, MANTIS_RISC_START);
@@ -203,7 +243,11 @@ void mantis_dma_stop(struct mantis_pci *mantis)
 
 	stat = mmread(MANTIS_INT_STAT);
 	mask = mmread(MANTIS_INT_MASK);
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(MANTIS_DEBUG, 1, "Mantis Stop DMA engine");
+#else
+	d;
+#endif
 
 	mmwrite((mmread(MANTIS_GPIF_ADDR) & (~(MANTIS_GPIF_HIFRDWRN))), MANTIS_GPIF_ADDR);
 

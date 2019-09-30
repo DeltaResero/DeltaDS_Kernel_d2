@@ -220,8 +220,12 @@ static int padlock_cra_init(struct crypto_tfm *tfm)
 	fallback_tfm = crypto_alloc_shash(fallback_driver_name, 0,
 					  CRYPTO_ALG_NEED_FALLBACK);
 	if (IS_ERR(fallback_tfm)) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_WARNING PFX "Fallback driver '%s' could not be loaded!\n",
 		       fallback_driver_name);
+#else
+		;
+#endif
 		err = PTR_ERR(fallback_tfm);
 		goto out;
 	}
@@ -561,7 +565,11 @@ static int __init padlock_init(void)
 	if (rc)
 		goto out_unreg1;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_NOTICE PFX "Using VIA PadLock ACE for SHA1/SHA256 algorithms.\n");
+#else
+	;
+#endif
 
 	return 0;
 

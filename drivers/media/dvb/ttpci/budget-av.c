@@ -222,7 +222,11 @@ static int ciintf_slot_reset(struct dvb_ca_en50221 *ca, int slot)
 	if (slot != 0)
 		return -EINVAL;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(1, "ciintf_slot_reset\n");
+#else
+	d;
+#endif
 	budget_av->slot_status = SLOTSTATUS_RESET;
 
 	saa7146_setgpio(saa, 2, SAA7146_GPIO_OUTHI); /* disable card */
@@ -251,7 +255,11 @@ static int ciintf_slot_shutdown(struct dvb_ca_en50221 *ca, int slot)
 	if (slot != 0)
 		return -EINVAL;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(1, "ciintf_slot_shutdown\n");
+#else
+	d;
+#endif
 
 	ttpci_budget_set_video_port(saa, BUDGET_VIDEO_PORTB);
 	budget_av->slot_status = SLOTSTATUS_NONE;
@@ -267,7 +275,11 @@ static int ciintf_slot_ts_enable(struct dvb_ca_en50221 *ca, int slot)
 	if (slot != 0)
 		return -EINVAL;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(1, "ciintf_slot_ts_enable: %d\n", budget_av->slot_status);
+#else
+	d;
+#endif
 
 	ttpci_budget_set_video_port(saa, BUDGET_VIDEO_PORTA);
 
@@ -435,18 +447,30 @@ static int saa7113_init(struct budget_av *budget_av)
 	msleep(200);
 
 	if (i2c_writereg(&budget->i2c_adap, 0x4a, 0x01, 0x08) != 1) {
+#ifdef CONFIG_DEBUG_PRINTK
 		dprintk(1, "saa7113 not found on KNC card\n");
+#else
+		d;
+#endif
 		return -ENODEV;
 	}
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(1, "saa7113 detected and initializing\n");
+#else
+	d;
+#endif
 
 	while (*data != 0xff) {
 		i2c_writereg(&budget->i2c_adap, 0x4a, *data, *(data + 1));
 		data += 2;
 	}
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(1, "saa7113  status=%02x\n", i2c_readreg(&budget->i2c_adap, 0x4a, 0x1f));
+#else
+	d;
+#endif
 
 	return 0;
 }
@@ -1371,7 +1395,11 @@ static void budget_av_irq(struct saa7146_dev *dev, u32 * isr)
 {
 	struct budget_av *budget_av = (struct budget_av *) dev->ext_priv;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(8, "dev: %p, budget_av: %p\n", dev, budget_av);
+#else
+	d;
+#endif
 
 	if (*isr & MASK_10)
 		ttpci_budget_irq10_handler(dev, isr);
@@ -1382,7 +1410,11 @@ static int budget_av_detach(struct saa7146_dev *dev)
 	struct budget_av *budget_av = (struct budget_av *) dev->ext_priv;
 	int err;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(2, "dev: %p\n", dev);
+#else
+	d;
+#endif
 
 	if (1 == budget_av->has_saa7113) {
 		saa7146_setgpio(dev, 0, SAA7146_GPIO_OUTLO);
@@ -1453,7 +1485,11 @@ static int budget_av_attach(struct saa7146_dev *dev, struct saa7146_pci_extensio
 	u8 *mac;
 	int err;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	dprintk(2, "dev: %p\n", dev);
+#else
+	d;
+#endif
 
 	if (!(budget_av = kzalloc(sizeof(struct budget_av), GFP_KERNEL)))
 		return -ENOMEM;

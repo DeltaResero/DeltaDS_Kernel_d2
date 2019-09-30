@@ -314,8 +314,12 @@ static int set_sample_rate_control(struct snd_soc_codec *codec, int mclk,
 	{
 		u32 adc, dac;
 		get_current_sample_rates(codec, mclk, &adc, &dac);
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "actual samplerate = %u,%u reg=%x\n",
 			adc, dac, data);
+#else
+		;
+#endif
 	}
 #endif
 	return 0;

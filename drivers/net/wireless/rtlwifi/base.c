@@ -1519,11 +1519,11 @@ static ssize_t rtl_store_debug_level(struct device *d,
 
 	ret = strict_strtoul(buf, 0, &val);
 	if (ret) {
-		printk(KERN_DEBUG "%s is not in hex or decimal form.\n", buf);
+;
 	} else {
 		rtlpriv->dbg.global_debuglevel = val;
-		printk(KERN_DEBUG "debuglevel:%x\n",
-		       rtlpriv->dbg.global_debuglevel);
+//		printk(KERN_DEBUG "debuglevel:%x\n",
+;
 	}
 
 	return strnlen(buf, count);

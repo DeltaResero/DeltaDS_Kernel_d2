@@ -81,7 +81,11 @@ static int parse_redboot_partitions(struct mtd_info *master,
 		while (mtd_block_isbad(master, offset)) {
 			if (!offset) {
 			nogood:
+#ifdef CONFIG_DEBUG_PRINTK
 				printk(KERN_NOTICE "Failed to find a non-bad block to check for RedBoot partition table\n");
+#else
+				;
+#endif
 				return -EIO;
 			}
 			offset -= master->erasesize;
@@ -99,8 +103,12 @@ static int parse_redboot_partitions(struct mtd_info *master,
 	if (!buf)
 		return -ENOMEM;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_NOTICE "Searching for RedBoot partition table in %s at offset 0x%lx\n",
 	       master->name, offset);
+#else
+	;
+#endif
 
 	ret = mtd_read(master, offset, master->erasesize, &retlen,
 		       (void *)buf);
@@ -170,8 +178,12 @@ static int parse_redboot_partitions(struct mtd_info *master,
 	}
 	if (i == numslots) {
 		/* Didn't find it */
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_NOTICE "No RedBoot partition table detected in %s\n",
 		       master->name);
+#else
+		;
+#endif
 		ret = 0;
 		goto out;
 	}

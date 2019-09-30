@@ -29,8 +29,12 @@ HscxVersion(struct IsdnCardState *cs, char *s)
 
 	verA = cs->BC_Read_Reg(cs, 0, HSCX_VSTR) & 0xf;
 	verB = cs->BC_Read_Reg(cs, 1, HSCX_VSTR) & 0xf;
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "%s HSCX version A: %s  B: %s\n", s,
 	       HSCXVer[verA], HSCXVer[verB]);
+#else
+	;
+#endif
 	if ((verA == 0) | (verA == 0xf) | (verB == 0) | (verB == 0xf))
 		return (1);
 	else

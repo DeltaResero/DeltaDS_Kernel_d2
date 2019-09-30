@@ -2409,7 +2409,11 @@ static void __devinit nvbridge_check_legacy_irq_routing(struct pci_dev *dev)
 	pci_read_config_dword(dev, 0x74, &cfg);
 
 	if (cfg & ((1 << 2) | (1 << 15))) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_INFO "Rewriting irq routing register on MCP55\n");
+#else
+		;
+#endif
 		cfg &= ~((1 << 2) | (1 << 15));
 		pci_write_config_dword(dev, 0x74, cfg);
 	}
@@ -3077,8 +3081,12 @@ static int __init pci_apply_final_quirks(void)
 	u8 tmp;
 
 	if (pci_cache_line_size)
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "PCI: CLS %u bytes\n",
 		       pci_cache_line_size << 2);
+#else
+		;
+#endif
 
 	for_each_pci_dev(dev) {
 		pci_fixup_device(pci_fixup_final, dev);
@@ -3094,15 +3102,23 @@ static int __init pci_apply_final_quirks(void)
 			if (!tmp || cls == tmp)
 				continue;
 
+#ifdef CONFIG_DEBUG_PRINTK
 			printk(KERN_DEBUG "PCI: CLS mismatch (%u != %u), "
 			       "using %u bytes\n", cls << 2, tmp << 2,
 			       pci_dfl_cache_line_size << 2);
+#else
+			;
+#endif
 			pci_cache_line_size = pci_dfl_cache_line_size;
 		}
 	}
 	if (!pci_cache_line_size) {
+#ifdef CONFIG_DEBUG_PRINTK
 		printk(KERN_DEBUG "PCI: CLS %u bytes, default %u\n",
 		       cls << 2, pci_dfl_cache_line_size << 2);
+#else
+		;
+#endif
 		pci_cache_line_size = cls ? cls : pci_dfl_cache_line_size;
 	}
 

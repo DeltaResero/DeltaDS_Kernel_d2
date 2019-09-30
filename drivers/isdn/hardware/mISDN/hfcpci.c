@@ -208,9 +208,17 @@ reset_hfcpci(struct hfc_pci *hc)
 	u_char	val;
 	int	cnt = 0;
 
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_DEBUG "reset_hfcpci: entered\n");
+#else
+	;
+#endif
 	val = Read_hfc(hc, HFCPCI_CHIP_ID);
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_INFO "HFC_PCI: resetting HFC ChipId(%x)\n", val);
+#else
+	;
+#endif
 	/* enable memory mapped ports, disable busmaster */
 	pci_write_config_word(hc->pdev, PCI_COMMAND, PCI_ENA_MEMIO);
 	disable_hwirq(hc);
@@ -218,7 +226,11 @@ reset_hfcpci(struct hfc_pci *hc)
 	pci_write_config_word(hc->pdev, PCI_COMMAND,
 			      PCI_ENA_MEMIO + PCI_ENA_MASTER);
 	val = Read_hfc(hc, HFCPCI_STATUS);
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_DEBUG "HFC-PCI status(%x) before reset\n", val);
+#else
+	;
+#endif
 	hc->hw.cirm = HFCPCI_RESET;	/* Reset On */
 	Write_hfc(hc, HFCPCI_CIRM, hc->hw.cirm);
 	set_current_state(TASK_UNINTERRUPTIBLE);
@@ -226,7 +238,11 @@ reset_hfcpci(struct hfc_pci *hc)
 	hc->hw.cirm = 0;		/* Reset Off */
 	Write_hfc(hc, HFCPCI_CIRM, hc->hw.cirm);
 	val = Read_hfc(hc, HFCPCI_STATUS);
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_DEBUG "HFC-PCI status(%x) after reset\n", val);
+#else
+	;
+#endif
 	while (cnt < 50000) { /* max 50000 us */
 		udelay(5);
 		cnt += 5;
@@ -234,7 +250,11 @@ reset_hfcpci(struct hfc_pci *hc)
 		if (!(val & 2))
 			break;
 	}
+#ifdef CONFIG_DEBUG_PRINTK
 	printk(KERN_DEBUG "HFC-PCI status(%x) after %dus\n", val, cnt);
+#else
+	;
+#endif
 
 	hc->hw.fifo_en = 0x30;	/* only D fifos enabled */
 
